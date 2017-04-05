@@ -1,12 +1,13 @@
 /*
- * libreriaMemoria.h
+ * libreriaKernel.h
  *
  *  Created on: 3/4/2017
  *      Author: utnso
  */
 
-#ifndef MEMORIA_LIBRERIAMEMORIA_H_
-#define MEMORIA_LIBRERIAMEMORIA_H_
+#ifndef LIBRERIAKERNEL_H_
+#define LIBRERIAKERNEL_H_
+
 
 #include <stdint.h>
 #include <unistd.h>
@@ -33,17 +34,24 @@
 
 
 //Archivo de Configuracion
+int puertoPrograma;
+int puertoCPU;
+char* ipMemoria;
 int puertoMemoria;
-int cantidadDeMarcos;
-uint32_t tamanioDeMarcos;
-int cantidadaEntradasCache;
-int cachePorProceso;
-char* algoritmoReemplazo;
-int retardoMemoria;
-
+char* ipFileSystem;
+int puertoFileSystem;
+int quantum;
+int quantumSleep;
+char* algoritmo;
+int gradoMultiprogramacion;
+//t_list* identificadoresSemaforos;
+//t_list* inicializacionSemaforos;
+//t_list* identificadorVariables;
+int stackSize;
 
 void mostrarArchivoConfig();
 
-void escucharKERNEL(void*);
+int socket_memoria;
+int socket_fs;
 
-#endif /* MEMORIA_LIBRERIAMEMORIA_H_ */
+#endif /* LIBRERIAKERNEL_H_ */

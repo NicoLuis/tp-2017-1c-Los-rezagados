@@ -1,0 +1,6 @@
+eclipse.preferences.version=1
+environment/project/cdt.managedbuild.config.gnu.exe.debug.1330906606/LD_LIBRARY_PATH/delimiter=\:
+environment/project/cdt.managedbuild.config.gnu.exe.debug.1330906606/LD_LIBRARY_PATH/operation=append
+environment/project/cdt.managedbuild.config.gnu.exe.debug.1330906606/LD_LIBRARY_PATH/value=${workspace_loc}/Herramientas/Debug
+environment/project/cdt.managedbuild.config.gnu.exe.debug.1330906606/append=true
+environment/project/cdt.managedbuild.config.gnu.exe.debug.1330906606/appendContributed=true

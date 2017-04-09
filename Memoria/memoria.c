@@ -45,11 +45,12 @@ int main(int argc, char* argv[]) {
 	//Creo un hilo para comunicarme con el Kernel
 		pthread_t hilo_conexionKERNEL;
 
+
 		//Atributo Detached
 		pthread_attr_t atributo;
 		pthread_attr_init(&atributo);
 		pthread_attr_setdetachstate(&atributo, PTHREAD_CREATE_DETACHED);
-
+/*
 		//-------------CREAR UN SOCKET DE ESCUCHA PARA LAS CPU's Y EL KERNEL-------------------------
 		int socket_memoria = crearSocketDeEscucha(puertoMemoria);
 
@@ -88,6 +89,15 @@ int main(int argc, char* argv[]) {
 
 					abort();
 				}
+				else if (strcmp("Hola soy el CPU", bufferEscucha) == 0){
+					falloP_thread = pthread_create(&hilo_conexionKERNEL, &atributo,(void*) escucharKERNEL, (void*) socket_cliente);
+					if (falloP_thread < 0) {
+
+						printf("Error Hilo Esucha Kernel\n");
+
+						abort();
+					}
+				}
 			}
 
 		}
@@ -102,7 +112,67 @@ int main(int argc, char* argv[]) {
 
 		pthread_attr_destroy(&atributo);
 
+*/
 
+
+	//-------------CREAR UN SOCKET DE ESCUCHA PARA LAS CPU's Y EL NUCLEO-------------------------
+	int socketMemoria = crearSocketDeEscucha(puertoMemoria);
+	char* bufferEscucha = malloc(200);
+
+	int falloP_thread;
+
+	//CADA VEZ QUE ESCUCHA UNA NUEVA CONEXION CREA UN HILO, PREGUNTA SI ES UNA CPU O EL KERNEL
+	//SEGUN QUIEN SEA EJECUTA LA FUNCION CORRESPONDIENTE:
+	// - escucharCPU(int socket_cliente);
+	// - escucharKERNEL(int socket_cliente);
+
+	while (1) {
+		int socket_cliente = aceptarCliente(socketMemoria);
+		if ((socket_cliente) == -1) {
+
+			printf("Error en el accept()");
+
+			abort();
+		}
+
+		send(socket_cliente, "Hola quien sos?", 16, 0);
+
+		int bytesRecibidos = recv(socket_cliente, bufferEscucha, 50, 0);
+		if (bytesRecibidos <= 0) {
+
+			printf("El cliente se ha desconectado");
+
+			abort();
+		}
+
+		bufferEscucha[bytesRecibidos] = '\0';
+
+		if (strcmp("Hola soy la CPU", bufferEscucha) == 0) {
+
+			pthread_t* hiloCPU = malloc(sizeof(pthread_t));
+
+			falloP_thread = pthread_create(hiloCPU,&atributo,(void*) escucharCPU, (void*) socket_cliente);
+			if (falloP_thread < 0) {
+
+				printf("Error Hilo CPU");
+
+				abort();
+			}
+
+		} else if (strcmp("Hola soy el KERNEL", bufferEscucha) == 0) {
+
+			falloP_thread = pthread_create(&hilo_conexionKERNEL, &atributo,(void*) escucharKERNEL, (void*) socket_cliente);
+			if (falloP_thread < 0) {
+
+				printf("Error Hilo Esucha Nucleo");
+
+				abort();
+			}
+		}
+
+	}
+
+	pthread_attr_destroy(&atributo);
 
 	return 0;
 

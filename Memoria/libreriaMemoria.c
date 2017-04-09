@@ -22,16 +22,29 @@ void mostrarArchivoConfig() {
 
 void escucharKERNEL(void* socket_kernel) {
 
-
-//Casteo socketNucleo
+	//Casteo socketNucleo
 	int socketKernel = (int) socket_kernel;
-
 
 	printf("Se conecto el Kernel\n");
 
 	int bytesEnviados = send(socketKernel, "Conexion Aceptada", 18, 0);
 	if (bytesEnviados <= 0) {
 		printf("Error send Nucleo");
+		pthread_exit(NULL);
+	}
+
+}
+
+void escucharCPU(void* socket_cpu) {
+
+	//Casteo socketCPU
+	int socketCPU = (int) socket_cpu;
+
+	printf("Se conecto un CPU\n");
+
+	int bytesEnviados = send(socketCPU, "Conexion Aceptada", 18, 0);
+	if (bytesEnviados <= 0) {
+		printf("Error send CPU");
 		pthread_exit(NULL);
 	}
 

@@ -23,13 +23,14 @@ int main(int argc, char* argv[]) {
 	t_config* configuracion = config_create(argv[1]);
 	ipKernel = config_get_string_value(configuracion, "IP_KERNEL");
 	puertoKernel = config_get_int_value(configuracion, "PUERTO_KERNEL");
-
+	ipMemoria = config_get_string_value(configuracion, "IP_MEMORIA");
+	puertoMemoria = config_get_int_value(configuracion, "PUERTO_MEMORIA");
 
 	//Muestro archivo de configuracion
 
 	mostrarArchivoConfig();
 
-	//-------------------------------CONEXION AL LA MEMORIA-------------------------------------
+	//-------------------------------CONEXION AL KERNEL-------------------------------------
 
 	printf("Me conecto al Kernel\n");
 
@@ -63,5 +64,42 @@ int main(int argc, char* argv[]) {
 	}
 
 	free(bufferKernel);
+
+	//-------------------------------CONEXION AL LA MEMORIA-------------------------------------
+
+	printf("Me conecto a la Memoria\n");
+
+	socket_memoria = conectarAServidor(ipMemoria, puertoMemoria);
+
+	char* bufferMemoria = malloc(200);
+
+	bytesRecibidos = recv(socket_memoria, bufferMemoria, 50, 0);
+	if (bytesRecibidos <= 0) {
+		printf("La Memoria se ha desconectado\n");
+	}
+
+	bufferMemoria[bytesRecibidos] = '\0';
+
+	printf("Recibi %d bytes con el siguiente mensaje: %s\n",bytesRecibidos, bufferMemoria);
+
+	send(socket_memoria, "Hola soy la CPU", 16, 0);
+
+	bytesRecibidos = recv(socket_memoria, bufferMemoria, 50, 0);
+
+	if (bytesRecibidos <= 0) {
+		printf("La Memoria se ha desconectado\n");
+	}
+
+	bufferMemoria[bytesRecibidos] = '\0';
+
+	printf("Respuesta: %s\n", bufferMemoria);
+
+	if (strcmp("Conexion aceptada", bufferMemoria) == 0) {
+		printf("Me conecte correctamente a la Memoria\n");
+	}
+
+	free(bufferMemoria);
+
+	return 0;
 
 }

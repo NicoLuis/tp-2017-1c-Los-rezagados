@@ -46,4 +46,6 @@ void mostrarArchivoConfig();
 
 void escucharKERNEL(void*);
 
+void escucharCPU(void*);
+
 #endif /* MEMORIA_LIBRERIAMEMORIA_H_ */

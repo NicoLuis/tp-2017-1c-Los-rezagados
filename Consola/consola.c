@@ -64,4 +64,15 @@ int main(int argc, char* argv[]) {
 
 	free(bufferKernel);
 
+	// Creo el hilo que permite que la consola quede a la espera de comandos que se ingresen por linea de comandos
+
+	pthread_attr_t atributo;
+	pthread_t hiloInterpreteDeComandos;
+	pthread_attr_init(&atributo);
+	pthread_attr_setdetachstate(&atributo, PTHREAD_CREATE_DETACHED);
+	pthread_create(&hiloInterpreteDeComandos, &atributo,(void*) finalizarPrograma, (void *) socket_kernel);
+	pthread_attr_destroy(&atributo);
+
+
+
 }

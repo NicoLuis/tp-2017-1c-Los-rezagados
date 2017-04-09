@@ -40,4 +40,6 @@ void mostrarArchivoConfig();
 
 int socket_kernel;
 
+void finalizarPrograma(void*);
+
 #endif /* LIBRERIACONSOLA_H_ */

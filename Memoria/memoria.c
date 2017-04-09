@@ -6,6 +6,7 @@
  */
 
 
+#include <herramientas/sockets.c>
 #include "libreriaMemoria.h"
 
 
@@ -16,12 +17,12 @@ int main(int argc, char* argv[]) {
 	//Archivo de configuracion
 
 	if (argc == 1) {
-		printf("Debe ingresar la ruta del archivo en LC");
+		printf("Debe ingresar la ruta del archivo en LC \n");
 		return -1;
 	}
 
 	if (argc != 2) {
-		printf("Numero incorrecto de argumentos");
+		printf("Numero incorrecto de argumentos \n");
 		return -2;
 	}
 

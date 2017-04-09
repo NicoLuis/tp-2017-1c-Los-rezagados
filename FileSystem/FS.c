@@ -1,12 +1,5 @@
-/*
- * memoria.c
- *
- *  Created on: 3/4/2017
- *      Author: utnso
- */
 
-
-#include "libreriaMemoria.h"
+#include "libreriaFS.h"
 
 
 
@@ -29,13 +22,9 @@ int main(int argc, char* argv[]) {
 	//Cargo archivo de configuracion
 
 	t_config* configuracion = config_create(argv[1]);
-	puertoMemoria = config_get_int_value(configuracion, "PUERTO");
-	cantidadDeMarcos = config_get_int_value(configuracion, "MARCOS");
-	tamanioDeMarcos = config_get_int_value(configuracion, "MARCO_SIZE");
-	cantidadaEntradasCache = config_get_int_value(configuracion, "ENTRADAS_CACHE");
-	cachePorProceso = config_get_int_value(configuracion, "CACHE_X_PROC");
-	algoritmoReemplazo = config_get_string_value(configuracion, "REEMPLAZO_CACHE");
-	retardoMemoria = config_get_int_value(configuracion, "RETARDO_MEMORIA");
+	puertoFS = config_get_int_value(configuracion, "PUERTO");
+	puntoMontaje = config_get_string_value(configuracion, "PUNTO_MONTAJE");
+
 
 	//Muestro archivo de configuracion
 
@@ -51,7 +40,7 @@ int main(int argc, char* argv[]) {
 		pthread_attr_setdetachstate(&atributo, PTHREAD_CREATE_DETACHED);
 
 		//-------------CREAR UN SOCKET DE ESCUCHA PARA LAS CPU's Y EL KERNEL-------------------------
-		int socket_memoria = crearSocketDeEscucha(puertoMemoria);
+		int socket_fs = crearSocketDeEscucha(puertoFS);
 
 		char* bufferEscucha = malloc(200);
 
@@ -59,7 +48,7 @@ int main(int argc, char* argv[]) {
 
 
 		while (1) {
-			int socket_cliente = aceptarCliente(socket_memoria);
+			int socket_cliente = aceptarCliente(socket_fs);
 			if ((socket_cliente) == -1) {
 
 				printf("Error en el accept()\n");
@@ -92,13 +81,7 @@ int main(int argc, char* argv[]) {
 
 		}
 
-		//Liberar memoria
-
-		printf("Liberando Memoria");
-
 		free(bufferEscucha);
-
-		printf("Memoria Liberada\n");
 
 		pthread_attr_destroy(&atributo);
 
@@ -107,3 +90,4 @@ int main(int argc, char* argv[]) {
 	return 0;
 
 }
+

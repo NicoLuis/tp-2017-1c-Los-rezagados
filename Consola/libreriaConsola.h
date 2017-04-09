@@ -1,13 +1,12 @@
 /*
- * libreriaKernel.h
+ * libreriaConsola.h
  *
- *  Created on: 3/4/2017
+ *  Created on: 9/4/2017
  *      Author: utnso
  */
 
-#ifndef LIBRERIAKERNEL_H_
-#define LIBRERIAKERNEL_H_
-
+#ifndef LIBRERIACONSOLA_H_
+#define LIBRERIACONSOLA_H_
 
 #include <stdint.h>
 #include <unistd.h>
@@ -34,28 +33,11 @@
 
 
 //Archivo de Configuracion
-int puertoPrograma;
-int puertoCPU;
-char* ipMemoria;
-int puertoMemoria;
-char* ipFileSystem;
-int puertoFS;
-int quantum;
-int quantumSleep;
-char* algoritmo;
-int gradoMultiprogramacion;
-//t_list* identificadoresSemaforos;
-//t_list* inicializacionSemaforos;
-//t_list* identificadorVariables;
-int stackSize;
+char* ipKernel;
+int puertoKernel;
 
 void mostrarArchivoConfig();
 
-int socket_memoria;
-int socket_fs;
+int socket_kernel;
 
-void escucharCPU(void*);
-
-void escucharConsola(void*);
-
-#endif /* LIBRERIAKERNEL_H_ */
+#endif /* LIBRERIACONSOLA_H_ */

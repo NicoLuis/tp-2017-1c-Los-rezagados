@@ -35,6 +35,7 @@ int main(int argc, char* argv[]) {
 	ipMemoria = config_get_string_value(configuracion, "IP_MEMORIA");
 	puertoMemoria = config_get_int_value(configuracion, "PUERTO_MEMORIA");
 	ipFileSystem = config_get_string_value(configuracion, "IP_FS");
+	puertoFS = config_get_int_value(configuracion, "PUERTO_FS");
 	quantum = config_get_int_value(configuracion, "QUANTUM");
 	quantumSleep = config_get_int_value(configuracion, "QUANTUM_SLEEP");
 	algoritmo = config_get_string_value(configuracion, "ALGORITMO");
@@ -79,11 +80,12 @@ int main(int argc, char* argv[]) {
 	}
 
 
+
 	//-------------------------------CONEXION AL FILE SYSTEM-------------------------------------
 
 	printf("Me conecto al File System\n");
 
-	socket_fs = conectarAServidor(ipFileSystem, puertoFileSystem);
+	socket_fs = conectarAServidor(ipFileSystem, puertoFS);
 
 	char* bufferFS = malloc(200);
 
@@ -111,6 +113,76 @@ int main(int argc, char* argv[]) {
 	if (strcmp("Conexion aceptada", bufferFS) == 0) {
 		printf("Me conecte correctamente al File System\n");
 	}
+
+
+
+	//-----------------------------CREO HILO PARA CONEXION DE CPU'S Y CONSOLA-------------------
+
+
+	//Creo un hilo para comunicarme con el nucleo
+	pthread_t hilo_conexionConsola;
+
+	//Atributo Detached
+	pthread_attr_t atributo;
+	pthread_attr_init(&atributo);
+	pthread_attr_setdetachstate(&atributo, PTHREAD_CREATE_DETACHED);
+
+	int socket_kernel = crearSocketDeEscucha(puertoPrograma);
+		char* bufferEscucha = malloc(200);
+
+		int falloP_thread;
+
+		//CADA VEZ QUE ESCUCHA UNA NUEVA CONEXION CREA UN HILO, PREGUNTA SI ES UNA CPU O UNA CONSOLA
+		//SEGUN QUIEN SEA EJECUTA LA FUNCION CORRESPONDIENTE:
+		// - escucharCPU(int socket_cliente);
+		// - escucharConsola(int socket_cliente);
+
+		while (1) {
+			int socket_cliente = aceptarCliente(socket_kernel);
+			if ((socket_cliente) == -1) {
+
+				printf("Error en el accept()");
+
+				abort();
+			}
+
+			send(socket_cliente, "Hola quien sos?", 16, 0);
+
+			int bytesRecibidos = recv(socket_cliente, bufferEscucha, 50, 0);
+			if (bytesRecibidos <= 0) {
+
+				printf("El cliente se ha desconectado");
+
+				abort();
+			}
+
+			bufferEscucha[bytesRecibidos] = '\0';
+
+			if (strcmp("Hola soy la Consola", bufferEscucha) == 0) {
+
+				pthread_t* hiloCPU = malloc(sizeof(pthread_t));
+
+				falloP_thread = pthread_create(hiloCPU, &atributo,(void*) escucharConsola, (void*) socket_cliente);
+				if (falloP_thread < 0) {
+
+					printf("Error Hilo CPU");
+
+					abort();
+				}
+
+			} else if (strcmp("Hola soy la CPU", bufferEscucha) == 0) {
+
+				falloP_thread = pthread_create(&hilo_conexionConsola, &atributo,(void*) escucharCPU, (void*) socket_cliente);
+				if (falloP_thread < 0) {
+
+					printf("Error Hilo Esucha Consola");
+
+					abort();
+				}
+			}
+
+		}
+
 
 
 	return 0;

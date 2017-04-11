@@ -113,7 +113,7 @@ int main(int argc, char* argv[]) {
 		}
 
 		//	muestro lo q recibi
-		printf(buffer);
+		fprintf(stderr, "%s", (char*) buffer);
 	}
 
 	return 0;

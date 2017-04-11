@@ -64,13 +64,15 @@ void escucharConsola(void* socketCliente) {
 	while(1){
 		void* buffer = malloc(200);		//el mensaje q recibi se guarda aca
 
-		int bytesRecibidos = recv(socket_consola, buffer, 200, MSG_WAITALL);
+		int bytesRecibidos = recv(socket_consola, buffer, 200, 0);
+
 		if (bytesRecibidos <= 0) {
-			printf("El cliente se ha desconectado");
+			fprintf(stderr, "El cliente se ha desconectado");
 
 			//si la consola se desconecto la saco de la lista
 			bool _esConsola(int socketC){ return socketC == socket_consola; }
 			list_remove_by_condition(lista_consolas, (void*) _esConsola);
+			pthread_exit(NULL);
 		}
 
 		//	reenvio lo q recibi
@@ -84,7 +86,8 @@ void escucharConsola(void* socketCliente) {
 		list_iterate(lista_cpus, (void*) _enviarACpus);
 
 		//	muestro lo q recibi
-		printf(buffer);
+
+		fprintf(stderr, "%s", (char*) buffer);
 	}
 
 }

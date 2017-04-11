@@ -34,6 +34,6 @@ void escucharKERNEL(void* socket_kernel) {
 		}
 
 		//	muestro lo q recibi
-		printf(buffer);
+		fprintf(stderr, "%s", (char*) buffer);
 	}
 }

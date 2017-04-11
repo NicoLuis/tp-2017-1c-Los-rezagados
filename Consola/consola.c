@@ -64,16 +64,30 @@ int main(int argc, char* argv[]) {
 
 	free(bufferKernel);
 
-	// Creo el hilo que permite que la consola quede a la espera de comandos que se ingresen por linea de comandos
 
+	// Creo el hilo que permite que la consola quede a la espera de comandos que se ingresen por linea de comandos
+	// fixme: el hilo hay q crearlo cuando detecte el comando -> sino el main sigue y termina el proceso sin hacer nada
+
+/*
 	pthread_attr_t atributo;
 	pthread_t hiloInterpreteDeComandos;
 	pthread_attr_init(&atributo);
 	pthread_attr_setdetachstate(&atributo, PTHREAD_CREATE_DETACHED);
 	pthread_create(&hiloInterpreteDeComandos, &atributo,(void*) finalizarPrograma, (void *) socket_kernel);
 	pthread_attr_destroy(&atributo);
+*/
 
+	while(1){
+		void* buffer = malloc(200);
+		int socket = (int) socket_kernel;
+		printf("Ingrese mensaje:\n");
+		scanf("%s", (char*) buffer);
 
+		//todo: cuando lea el comando hay q comparar cual es y ahi creo el hilo q haga lo q tnga q hacer
+
+		printf("El mensaje ingresado es: %s\n", (char*) buffer);
+		send(socket, buffer, 200, 0);
+	}
 
 	return 0;
 }

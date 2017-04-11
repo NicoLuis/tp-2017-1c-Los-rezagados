@@ -32,6 +32,8 @@
 #include <herramientas/sockets.h>
 
 
+t_list* lista_cpus;
+t_list* lista_consolas;
 
 //Archivo de Configuracion
 int puertoPrograma;

@@ -28,6 +28,10 @@ int main(int argc, char* argv[]) {
 	}
 
 
+	//Inicializo listas
+	lista_cpus = list_create();
+	lista_consolas = list_create();
+
 	//Cargo archivo de configuracion
 
 	t_config* configuracion = config_create(argv[1]);

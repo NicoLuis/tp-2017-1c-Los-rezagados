@@ -33,6 +33,20 @@ void escucharKERNEL(void* socket_kernel) {
 		pthread_exit(NULL);
 	}
 
+	// Espero por mensaje de Kernel para mostrar por pantalla (segun pide el Checkpoint)
+	while(1){
+		void* buffer = malloc(200);		//el mensaje q recibi se guarda aca
+
+		int bytesRecibidos = recv(socketKernel, buffer, 200, MSG_WAITALL);
+		if (bytesRecibidos <= 0) {
+			printf("El cliente se ha desconectado");
+			abort();
+		}
+
+		//	muestro lo q recibi
+		printf(buffer);
+	}
+
 }
 
 void escucharCPU(void* socket_cpu) {

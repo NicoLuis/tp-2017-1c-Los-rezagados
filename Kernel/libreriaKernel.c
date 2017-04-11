@@ -27,8 +27,11 @@ void mostrarArchivoConfig() {
 }
 
 void escucharCPU(void* socketClienteCPU) {
+
 	//Casteo socket_cpu
 	int socket_cpu = (int) socketClienteCPU;
+
+	list_add(lista_cpus, socketClienteCPU);
 
 	printf("Se conecto una CPU\n");
 
@@ -37,11 +40,16 @@ void escucharCPU(void* socketClienteCPU) {
 		printf("Error send CPU");
 		pthread_exit(NULL);
 	}
+
+
 }
 
 void escucharConsola(void* socketCliente) {
+
 	//Casteo socket_consola
 	int socket_consola = (int) socketCliente;
+
+	list_add(lista_consolas, socketCliente);
 
 	printf("Se conecto una Consola \n");
 
@@ -50,4 +58,33 @@ void escucharConsola(void* socketCliente) {
 		printf("Error send Consola");
 		pthread_exit(NULL);
 	}
+
+
+	// Espero por mensaje de Consola para reenviar a los demas procesos (segun pide el Checkpoint)
+	while(1){
+		void* buffer = malloc(200);		//el mensaje q recibi se guarda aca
+
+		int bytesRecibidos = recv(socket_consola, buffer, 200, MSG_WAITALL);
+		if (bytesRecibidos <= 0) {
+			printf("El cliente se ha desconectado");
+
+			//si la consola se desconecto la saco de la lista
+			bool _esConsola(int socketC){ return socketC == socket_consola; }
+			list_remove_by_condition(lista_consolas, (void*) _esConsola);
+		}
+
+		//	reenvio lo q recibi
+
+		send(socket_memoria, buffer, 200, 0);
+		send(socket_fs, buffer, 200, 0);
+
+		void _enviarACpus(int socketCpu) {
+			send(socketCpu, buffer, 200, 0);
+		}
+		list_iterate(lista_cpus, (void*) _enviarACpus);
+
+		//	muestro lo q recibi
+		printf(buffer);
+	}
+
 }

@@ -41,5 +41,6 @@ void mostrarArchivoConfig();
 int socket_kernel;
 
 void finalizarPrograma(void*);
+void leerComando(char* comando);
 
 #endif /* LIBRERIACONSOLA_H_ */

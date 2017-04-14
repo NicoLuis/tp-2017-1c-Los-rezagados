@@ -83,10 +83,12 @@ int main(int argc, char* argv[]) {
 		printf("Ingrese mensaje:\n");
 		fgets(mensaje, 200, stdin);
 
-		//todo: cuando lea el comando hay q comparar cual es y ahi creo el hilo q haga lo q tnga q hacer
-
-		printf("El mensaje ingresado es: %s\n", (char*) mensaje);
+		printf("El mensaje ingresado es: %s", (char*) mensaje);
 		send(socket, mensaje, 200, 0);
+		//fixme: cuando pase el check el send se va
+
+		leerComando(mensaje);
+
 	}
 
 	return 0;

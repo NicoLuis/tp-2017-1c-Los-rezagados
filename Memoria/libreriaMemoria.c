@@ -54,12 +54,32 @@ void escucharCPU(void* socket_cpu) {
 	//Casteo socketCPU
 	int socketCPU = (int) socket_cpu;
 
+	//Casteo socket_cpu
+
+	list_add(lista_cpus, socket_cpu);
+
 	printf("Se conecto un CPU\n");
 
 	int bytesEnviados = send(socketCPU, "Conexion Aceptada", 18, 0);
 	if (bytesEnviados <= 0) {
 		printf("Error send CPU");
 		pthread_exit(NULL);
+	}
+
+	while(1){
+		void* mensajeRecibido = malloc(sizeof(uint8_t));
+		int bytesRecibidos = recv(socketCPU, mensajeRecibido, sizeof(uint8_t), 0);
+		uint8_t tipoMensaje;
+		memcpy(&tipoMensaje, mensajeRecibido, sizeof(uint8_t));
+
+		if (bytesRecibidos <= 0 || tipoMensaje == CPU_TERMINO) {
+			fprintf(stderr, "La cpu %d se ha desconectado \n", socketCPU);
+
+			//si la cpu se desconecto la saco de la lista
+			bool _esCpu(int socketC){ return socketC == socketCPU; }
+			list_remove_by_condition(lista_cpus, (void*) _esCpu);
+			pthread_exit(NULL);
+		}
 	}
 
 }

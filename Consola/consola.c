@@ -78,15 +78,15 @@ int main(int argc, char* argv[]) {
 */
 
 	while(1){
-		void* buffer = malloc(200);
+		void* mensaje = malloc(200);
 		int socket = (int) socket_kernel;
 		printf("Ingrese mensaje:\n");
-		scanf("%s", (char*) buffer);
+		fgets(mensaje, 200, stdin);
 
 		//todo: cuando lea el comando hay q comparar cual es y ahi creo el hilo q haga lo q tnga q hacer
 
-		printf("El mensaje ingresado es: %s\n", (char*) buffer);
-		send(socket, buffer, 200, 0);
+		printf("El mensaje ingresado es: %s\n", (char*) mensaje);
+		send(socket, mensaje, 200, 0);
 	}
 
 	return 0;

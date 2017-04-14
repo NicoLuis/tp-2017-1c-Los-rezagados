@@ -32,6 +32,9 @@
 #include <herramientas/sockets.h>
 
 
+// TIPOS DE MENSAJES
+#define CPU_TERMINO 100
+
 t_list* lista_cpus;
 t_list* lista_consolas;
 

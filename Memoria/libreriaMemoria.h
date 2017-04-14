@@ -31,6 +31,8 @@
 #include <herramientas/sockets.h>
 
 
+// TIPOS DE MENSAJES
+#define CPU_TERMINO 100
 
 //Archivo de Configuracion
 int puertoMemoria;
@@ -40,6 +42,8 @@ int cantidadaEntradasCache;
 int cachePorProceso;
 char* algoritmoReemplazo;
 int retardoMemoria;
+
+t_list* lista_cpus;
 
 
 void mostrarArchivoConfig();

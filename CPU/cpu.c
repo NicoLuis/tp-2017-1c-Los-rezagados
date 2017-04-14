@@ -18,6 +18,7 @@ int main(int argc, char* argv[]) {
 		return -2;
 	}
 
+	signal (SIGINT, terminar);
 
 	//Cargo archivo de configuracion
 

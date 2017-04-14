@@ -3,6 +3,7 @@
 #include <string.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <signal.h>
 
 int conectarAServidor(char* ipServidor, int puertoServidor);
 

@@ -41,6 +41,21 @@ void escucharCPU(void* socketClienteCPU) {
 		pthread_exit(NULL);
 	}
 
+	while(1){
+		void* mensajeRecibido = malloc(sizeof(uint8_t));
+		int bytesRecibidos = recv(socket_cpu, mensajeRecibido, sizeof(uint8_t), 0);
+		uint8_t tipoMensaje;
+		memcpy(&tipoMensaje, mensajeRecibido, sizeof(uint8_t));
+
+		if (bytesRecibidos <= 0 || tipoMensaje == CPU_TERMINO) {
+			fprintf(stderr, "La cpu %d se ha desconectado \n", socket_cpu);
+
+			//si la cpu se desconecto la saco de la lista
+			bool _esCpu(int socketC){ return socketC == socket_cpu; }
+			list_remove_by_condition(lista_cpus, (void*) _esCpu);
+			pthread_exit(NULL);
+		}
+	}
 
 }
 
@@ -67,7 +82,7 @@ void escucharConsola(void* socketCliente) {
 		int bytesRecibidos = recv(socket_consola, buffer, 200, 0);
 
 		if (bytesRecibidos <= 0) {
-			fprintf(stderr, "El cliente se ha desconectado");
+			fprintf(stderr, "La consola %d se ha desconectado \n", socket_consola);
 
 			//si la consola se desconecto la saco de la lista
 			bool _esConsola(int socketC){ return socketC == socket_consola; }

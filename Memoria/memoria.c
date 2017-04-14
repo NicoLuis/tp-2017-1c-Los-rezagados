@@ -42,6 +42,8 @@ int main(int argc, char* argv[]) {
 
 	mostrarArchivoConfig();
 
+	lista_cpus = list_create();
+
 
 	//Creo un hilo para comunicarme con el Kernel
 		pthread_t hilo_conexionKERNEL;

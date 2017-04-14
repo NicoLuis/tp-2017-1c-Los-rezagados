@@ -34,6 +34,7 @@
 
 // TIPOS DE MENSAJES
 #define CPU_TERMINO 100
+#define CONSOLA_ENVIA_PATH 200
 
 t_list* lista_cpus;
 t_list* lista_consolas;

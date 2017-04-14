@@ -30,7 +30,7 @@
 #include <commons/process.h>
 #include <herramientas/sockets.h>
 
-
+#define CONSOLA_ENVIA_PATH 200
 
 //Archivo de Configuracion
 char* ipKernel;
@@ -42,5 +42,7 @@ int socket_kernel;
 
 void finalizarPrograma(void*);
 void leerComando(char* comando);
+void iniciarPrograma(char* pathAIniciar);
+char* cargarScript(void* pathScript);
 
 #endif /* LIBRERIACONSOLA_H_ */

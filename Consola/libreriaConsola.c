@@ -45,8 +45,14 @@ void leerComando(char* comando){
 		char* pathAIniciar = string_substring_from(comando, 6);
 		fprintf(stderr, "El path es %s\n", pathAIniciar);
 
-		//todo: inicia un hilo para este programa
-		//todo: mando mensaje a kernel con el path
+		//inicia un hilo para este programa
+
+		pthread_attr_t atributo;
+		pthread_attr_init(&atributo);
+		pthread_attr_setdetachstate(&atributo, PTHREAD_CREATE_DETACHED);
+		pthread_t hiloInterpreteDeComandos;
+		pthread_create(&hiloInterpreteDeComandos, &atributo,(void*) iniciarPrograma, (void *) pathAIniciar);
+		pthread_attr_destroy(&atributo);
 
 	}else{
 
@@ -80,4 +86,43 @@ void leerComando(char* comando){
 
 	}}}}}
 
+}
+
+
+
+
+void iniciarPrograma(char* pathAIniciar){
+
+
+	char* scriptCompleto = cargarScript(pathAIniciar);		//fixme: preguntar si envio a kernel el script completo o solo el path
+
+
+	uint8_t tipoMensaje = CONSOLA_ENVIA_PATH;
+	send((int) socket_kernel, &tipoMensaje, sizeof(uint8_t), 0);
+
+	uint32_t tamanioScript = string_length(scriptCompleto);
+	send((int) socket_kernel, &tamanioScript, sizeof(uint32_t), 0);
+
+	send((int) socket_kernel, scriptCompleto, tamanioScript, 0);
+
+}
+
+
+
+char* cargarScript(void* pathScript){
+	int fd;
+	char *data;
+	struct stat sbuf;
+
+	//todo: considerar errores
+
+	fd = open(pathScript, O_RDONLY);
+
+	stat(pathScript, &sbuf);
+
+	data = mmap((caddr_t)0, sbuf.st_size, PROT_READ, MAP_SHARED, fd, 0);
+
+	close(fd);
+
+	return data;
 }

@@ -77,11 +77,11 @@ void escucharConsola(void* socketCliente) {
 
 	// Espero por mensaje de Consola para reenviar a los demas procesos (segun pide el Checkpoint)
 	while(1){
-		void* buffer = malloc(200);		//el mensaje q recibi se guarda aca
 
-		int bytesRecibidos = recv(socket_consola, buffer, 200, 0);
+		t_msg* msgRecibido = msg_recibir(socket_consola);
+		msg_recibir_data(socket_consola, msgRecibido);
 
-		if (bytesRecibidos <= 0) {
+		if (msgRecibido->tipoMensaje == 0) {
 			fprintf(stderr, "La consola %d se ha desconectado \n", socket_consola);
 
 			//si la consola se desconecto la saco de la lista
@@ -89,20 +89,16 @@ void escucharConsola(void* socketCliente) {
 			list_remove_by_condition(lista_consolas, (void*) _esConsola);
 			pthread_exit(NULL);
 		}
+		fprintf(stderr, "tipoMensaje %d\n", msgRecibido->tipoMensaje);
+		fprintf(stderr, "longitud %d\n", msgRecibido->longitud);
+		fprintf(stderr, "texto %s\n", (char*) msgRecibido->data);
 
-		//	reenvio lo q recibi
-
-		send(socket_memoria, buffer, 200, 0);
-		send(socket_fs, buffer, 200, 0);
 
 		void _enviarACpus(int socketCpu) {
-			send(socketCpu, buffer, 200, 0);
+			send(socketCpu, msgRecibido->data, msgRecibido->longitud, 0);
 		}
 		list_iterate(lista_cpus, (void*) _enviarACpus);
 
-		//	muestro lo q recibi
-
-		fprintf(stderr, "%s", (char*) buffer);
 	}
 
 }

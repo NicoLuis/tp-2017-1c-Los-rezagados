@@ -33,18 +33,21 @@ void escucharKERNEL(void* socket_kernel) {
 		pthread_exit(NULL);
 	}
 
-	// Espero por mensaje de Kernel para mostrar por pantalla (segun pide el Checkpoint)
 	while(1){
-		void* buffer = malloc(200);		//el mensaje q recibi se guarda aca
 
-		int bytesRecibidos = recv(socketKernel, buffer, 200, MSG_WAITALL);
-		if (bytesRecibidos <= 0) {
-			printf("El cliente se ha desconectado");
-			abort();
+		// lo unico q esta haciendo es mostrar lo que se recibio
+		t_msg* msgRecibido = msg_recibir(socketKernel);
+		msg_recibir_data(socketKernel, msgRecibido);
+
+		if (msgRecibido->tipoMensaje == 0) {
+			fprintf(stderr, "El kernel %d se ha desconectado \n", socketKernel);
+			pthread_exit(NULL);
 		}
 
-		//	muestro lo q recibi
-		fprintf(stderr, "%s", (char*) buffer);
+		fprintf(stderr, "tipoMensaje %d\n", msgRecibido->tipoMensaje);
+		fprintf(stderr, "longitud %d\n", msgRecibido->longitud);
+		fprintf(stderr, "texto %s\n", (char*) msgRecibido->data);
+
 	}
 
 }
@@ -67,12 +70,12 @@ void escucharCPU(void* socket_cpu) {
 	}
 
 	while(1){
-		void* mensajeRecibido = malloc(sizeof(uint8_t));
-		int bytesRecibidos = recv(socketCPU, mensajeRecibido, sizeof(uint8_t), 0);
-		uint8_t tipoMensaje;
-		memcpy(&tipoMensaje, mensajeRecibido, sizeof(uint8_t));
 
-		if (bytesRecibidos <= 0 || tipoMensaje == CPU_TERMINO) {
+		// lo unico q esta haciendo es mostrar lo que se recibio
+		t_msg* msgRecibido = msg_recibir(socketCPU);
+		msg_recibir_data(socketCPU, msgRecibido);
+
+		if (msgRecibido->tipoMensaje == 0 || msgRecibido->tipoMensaje == CPU_TERMINO) {
 			fprintf(stderr, "La cpu %d se ha desconectado \n", socketCPU);
 
 			//si la cpu se desconecto la saco de la lista
@@ -80,6 +83,11 @@ void escucharCPU(void* socket_cpu) {
 			list_remove_by_condition(lista_cpus, (void*) _esCpu);
 			pthread_exit(NULL);
 		}
+
+		fprintf(stderr, "tipoMensaje %d\n", msgRecibido->tipoMensaje);
+		fprintf(stderr, "longitud %d\n", msgRecibido->longitud);
+		fprintf(stderr, "texto %s\n", (char*) msgRecibido->data);
+
 	}
 
 }

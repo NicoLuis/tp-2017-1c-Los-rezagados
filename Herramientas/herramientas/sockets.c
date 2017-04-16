@@ -1,4 +1,4 @@
-#include "../herramientas/sockets.h"
+#include "sockets.h"
 
 int conectarAServidor(char* ipServidor, int puertoServidor) {
 
@@ -52,4 +52,59 @@ int aceptarCliente(int socketEscucha) {
 	return socketCliente;
 
 }
+
+
+/************************************/
+/*			ENVIO 	MENSAJES		*/
+/************************************/
+
+
+t_msg* msg_crear(uint8_t tipoMensaje) {
+
+	t_msg *msg = (t_msg *) malloc(sizeof(t_msg));
+	msg->tipoMensaje = tipoMensaje;
+	msg->longitud = 0;
+	msg->data = NULL;
+
+	return msg;
+}
+
+void msg_destruir(t_msg *msg) {
+	free(msg->data);
+	free(msg);
+}
+
+void msg_enviar_separado(uint8_t tipoMensaje, uint32_t longitud, void* data, int socketTo){
+
+	send(socketTo, &tipoMensaje, sizeof(uint8_t), 0);
+	send(socketTo, &longitud, sizeof(uint32_t), 0);
+	send(socketTo, data, longitud, 0);
+
+}
+
+void msg_enviar(t_msg* msg, int socketTo){
+
+	send(socketTo, &msg->tipoMensaje, sizeof(uint8_t), 0);
+	send(socketTo, &msg->longitud, sizeof(uint32_t), 0);
+	send(socketTo, msg->data, msg->longitud, 0);
+
+}
+
+void msg_recibir_data(int socketFrom, t_msg* msg){
+
+	msg->data = malloc(msg->longitud);
+	recv(socketFrom, msg->data, msg->longitud, MSG_WAITALL);
+
+}
+
+t_msg* msg_recibir(int socketFrom){
+
+	t_msg* msg = msg_crear(0);
+
+	recv(socketFrom, &msg->tipoMensaje, sizeof(uint8_t), 0);
+	recv(socketFrom, &msg->longitud, sizeof(uint32_t), 0);
+
+	return msg;
+}
+
 

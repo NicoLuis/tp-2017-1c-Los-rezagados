@@ -27,7 +27,6 @@ int main(int argc, char* argv[]) {
 		return -2;
 	}
 
-
 	//Inicializo listas
 	lista_cpus = list_create();
 	lista_consolas = list_create();

@@ -31,6 +31,7 @@
 #include <herramientas/sockets.h>
 
 #define CONSOLA_ENVIA_PATH 200
+#define CONSOLA_ENVIA_TEXTO 201
 
 //Archivo de Configuracion
 char* ipKernel;

@@ -79,13 +79,8 @@ int main(int argc, char* argv[]) {
 
 	while(1){
 		void* mensaje = malloc(200);
-		int socket = (int) socket_kernel;
 		printf("Ingrese mensaje:\n");
 		fgets(mensaje, 200, stdin);
-
-		printf("El mensaje ingresado es: %s", (char*) mensaje);
-		send(socket, mensaje, 200, 0);
-		//fixme: cuando pase el check el send se va
 
 		leerComando(mensaje);
 

@@ -38,7 +38,9 @@ void finalizarPrograma(void* socket_kernel) {
 
 
 void leerComando(char* comando){
-	comando[string_length(comando)-1] = '\0';
+
+
+	comando[strlen(comando)-1] = '\0';
 
 	if(string_starts_with(comando, "start")){
 
@@ -82,6 +84,7 @@ void leerComando(char* comando){
 				"● disconnect: Desconectar Consola\n"
 				"● clear: Limpiar Mensajes\n");
 	}else{
+
 		fprintf(stderr, "El comando '%s' no es valido\n", comando);
 
 	}}}}}
@@ -96,14 +99,7 @@ void iniciarPrograma(char* pathAIniciar){
 
 	char* scriptCompleto = cargarScript(pathAIniciar);		//fixme: preguntar si envio a kernel el script completo o solo el path
 
-
-	uint8_t tipoMensaje = CONSOLA_ENVIA_PATH;
-	send((int) socket_kernel, &tipoMensaje, sizeof(uint8_t), 0);
-
-	uint32_t tamanioScript = string_length(scriptCompleto);
-	send((int) socket_kernel, &tamanioScript, sizeof(uint32_t), 0);
-
-	send((int) socket_kernel, scriptCompleto, tamanioScript, 0);
+	msg_enviar_separado(CONSOLA_ENVIA_PATH, string_length(scriptCompleto), scriptCompleto, (int) socket_kernel);
 
 }
 

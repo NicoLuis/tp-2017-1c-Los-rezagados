@@ -56,38 +56,34 @@ void leerComando(char* comando){
 		pthread_create(&hiloInterpreteDeComandos, &atributo,(void*) iniciarPrograma, (void *) pathAIniciar);
 		pthread_attr_destroy(&atributo);
 
-	}else{
-
-	if(string_starts_with(comando, "kill")){
+	}else if(string_starts_with(comando, "kill")){
 
 		int pidAFinalizar = atoi(string_substring_from(comando, 5));
 		fprintf(stderr, "El pid es %d\n", pidAFinalizar);
 
 		//todo: mando mensaje a kernel para que mate el pid
 
-	}else{
-
-	if(string_equals_ignore_case(comando, "disconnect")){
+	}else if(string_equals_ignore_case(comando, "disconnect")){
 
 		//todo: mando mensaje a kernel para matar a todos
 
-	}else{
-
-	if(string_equals_ignore_case(comando, "clear")){
+	}else if(string_equals_ignore_case(comando, "clear")){
 		system("clear");
-	}else{
 
-	if(string_equals_ignore_case(comando, "help")){
+	}else if(string_equals_ignore_case(comando, "help")){
 		printf("Comandos:\n"
 				"● start [path]: Iniciar Programa\n"
 				"● kill [pid]: Finalizar Programa\n"
 				"● disconnect: Desconectar Consola\n"
 				"● clear: Limpiar Mensajes\n");
-	}else{
+	}else if(string_starts_with(comando, "enviar")){
 
+		char* mensajeAEnviar = string_substring_from(comando, 7);
+		fprintf(stderr, "El mensajeAEnviar es %s\n", mensajeAEnviar);
+		msg_enviar_separado(CONSOLA_ENVIA_PATH, string_length(mensajeAEnviar)+1, mensajeAEnviar, (int) socket_kernel);
+
+	}else
 		fprintf(stderr, "El comando '%s' no es valido\n", comando);
-
-	}}}}}
 
 }
 

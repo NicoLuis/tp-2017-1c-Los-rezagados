@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/select.h>
 #include <netdb.h>
 #include <unistd.h>
 #include <pthread.h>
@@ -60,8 +61,12 @@ void mostrarArchivoConfig();
 int socket_memoria;
 int socket_fs;
 
-void escucharCPU(void*);
 
-void escucharConsola(void*);
+fd_set fdsMaestro;
+
+void escucharCPU(int);
+
+int handshake(int socket_cliente);
+void atender_consola(int socket_consola);
 
 #endif /* LIBRERIAKERNEL_H_ */

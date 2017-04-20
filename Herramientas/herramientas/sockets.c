@@ -17,25 +17,42 @@ int conectarAServidor(char* ipServidor, int puertoServidor) {
 	return socketServidor;
 }
 
-int crearSocketDeEscucha(int puerto) {
+int crearSocketDeEscucha(char* puerto, t_log* conectar_select_log) {
 
-	struct sockaddr_in direccion;
-	direccion.sin_family = AF_INET;
-	direccion.sin_addr.s_addr = INADDR_ANY;
-	direccion.sin_port = htons(puerto);
+	struct addrinfo hints, *ai, *p;
+	int socketEscucha, activado = 1, rv;
+	memset(&hints, 0, sizeof hints);
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = AI_PASSIVE; //netdb
 
-	int socketEscucha = socket(AF_INET, SOCK_STREAM, 0);
-
-	int activado = 1;
-	setsockopt(socketEscucha, SOL_SOCKET, SO_REUSEADDR, &activado,sizeof(activado));
-
-	if (bind(socketEscucha, (void*) &direccion, sizeof(direccion)) != 0) {
-		perror("Falló el bind");
-		return -1;
+	if ((rv = getaddrinfo(NULL, puerto, &hints, &ai)) != 0) {
+		log_error(conectar_select_log, "selectserver: %s\n", gai_strerror(rv));
+		fprintf(stderr, "selectserver: %s\n", gai_strerror(rv));
 	}
 
-	printf("Estoy escuchando\n");
-	listen(socketEscucha, 100);
+	for(p = ai; p != NULL; p = p->ai_next) {
+		socketEscucha = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+		if (socketEscucha < 0) continue;
+		setsockopt(socketEscucha, SOL_SOCKET, SO_REUSEADDR, &activado,sizeof(int));
+
+		if (bind(socketEscucha, p->ai_addr, p->ai_addrlen) < 0) {
+			close(socketEscucha);
+			continue;
+		}
+		break;
+	}
+
+	if (p == NULL){
+		log_error(conectar_select_log, "fallo el bind");
+		fprintf(stderr, "selectserver: failed to bind \n");
+	}
+	freeaddrinfo(ai);
+
+	if (listen(socketEscucha, 10) < 0){
+		log_error(conectar_select_log, "listen");
+		perror("listen");
+	}
 
 	return socketEscucha;
 
@@ -46,9 +63,6 @@ int aceptarCliente(int socketEscucha) {
 	struct sockaddr_in direccionCliente;
 	unsigned int tamanioDireccion = sizeof(struct sockaddr_in);
 	int socketCliente = accept(socketEscucha, (void*) &direccionCliente,&tamanioDireccion);
-
-	printf("Recibí una conexión en %d!!\n", socketCliente);
-
 	return socketCliente;
 
 }

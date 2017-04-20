@@ -10,6 +10,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <string.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
@@ -18,7 +19,16 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <commons/log.h>
 
+#include <sys/types.h>
+#include <sys/ioctl.h>
+#include <sys/wait.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <errno.h>
+#include <pthread.h>
+#include <semaphore.h>
 
 typedef struct {
 	uint8_t tipoMensaje;
@@ -29,7 +39,7 @@ typedef struct {
 
 int conectarAServidor(char* ipServidor, int puertoServidor);
 
-int crearSocketDeEscucha(int puerto);
+int crearSocketDeEscucha(char* puerto, t_log* conectar_select_log);
 
 int aceptarCliente(int socketEscucha);
 

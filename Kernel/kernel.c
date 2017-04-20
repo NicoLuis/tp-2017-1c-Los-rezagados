@@ -9,7 +9,7 @@
 #include <herramientas/sockets.c>
 #include "libreriaKernel.h"
 
-
+int conectar_select(char*);
 
 
 int main(int argc, char* argv[]) {
@@ -120,75 +120,92 @@ int main(int argc, char* argv[]) {
 
 
 
-	//-----------------------------CREO HILO PARA CONEXION DE CPU'S Y CONSOLA-------------------
+	conectar_select(string_itoa(puertoPrograma));
 
-
-	//Creo un hilo para comunicarme con el nucleo
-	pthread_t hilo_conexionConsola;
-
-	//Atributo Detached
-	pthread_attr_t atributo;
-	pthread_attr_init(&atributo);
-	pthread_attr_setdetachstate(&atributo, PTHREAD_CREATE_DETACHED);
-
-	int socket_kernel = crearSocketDeEscucha(puertoPrograma);
-		char* bufferEscucha = malloc(200);
-
-		int falloP_thread;
-
-		//CADA VEZ QUE ESCUCHA UNA NUEVA CONEXION CREA UN HILO, PREGUNTA SI ES UNA CPU O UNA CONSOLA
-		//SEGUN QUIEN SEA EJECUTA LA FUNCION CORRESPONDIENTE:
-		// - escucharCPU(int socket_cliente);
-		// - escucharConsola(int socket_cliente);
-
-		while (1) {
-			int socket_cliente = aceptarCliente(socket_kernel);
-			if ((socket_cliente) == -1) {
-
-				printf("Error en el accept()");
-
-				abort();
-			}
-
-			send(socket_cliente, "Hola quien sos?", 16, 0);
-
-			int bytesRecibidos = recv(socket_cliente, bufferEscucha, 50, 0);
-			if (bytesRecibidos <= 0) {
-
-				printf("El cliente se ha desconectado");
-
-				abort();
-			}
-
-			bufferEscucha[bytesRecibidos] = '\0';
-
-			if (strcmp("Hola soy la Consola", bufferEscucha) == 0) {
-
-				pthread_t* hiloCPU = malloc(sizeof(pthread_t));
-
-				falloP_thread = pthread_create(hiloCPU, &atributo,(void*) escucharConsola, (void*) socket_cliente);
-				if (falloP_thread < 0) {
-
-					printf("Error Hilo CPU");
-
-					abort();
-				}
-
-			} else if (strcmp("Hola soy la CPU", bufferEscucha) == 0) {
-
-				falloP_thread = pthread_create(&hilo_conexionConsola, &atributo,(void*) escucharCPU, (void*) socket_cliente);
-				if (falloP_thread < 0) {
-
-					printf("Error Hilo Esucha Consola");
-
-					abort();
-				}
-			}
-
-		}
 
 
 
 	return 0;
 
 }
+
+int conectar_select(char* puerto_escucha) {
+
+	fd_set descriptoresLectura;
+	int socket_cliente_aceptado, current_fd;
+	t_log* conectar_select_log = log_create("kernel.log", "conectar_select", false, LOG_LEVEL_TRACE);
+	log_trace(conectar_select_log, "Iniciando select");
+	FD_ZERO(&fdsMaestro);
+	FD_ZERO(&descriptoresLectura);
+
+	int servidor = crearSocketDeEscucha(puerto_escucha, conectar_select_log);
+	FD_SET(servidor, &fdsMaestro);
+	int max_fds = servidor;
+
+	pthread_t hilo_conexionCPU;
+	//Atributo Detached
+	pthread_attr_t atributo;
+	pthread_attr_init(&atributo);
+	pthread_attr_setdetachstate(&atributo, PTHREAD_CREATE_DETACHED);
+
+	while (1) {
+		descriptoresLectura = fdsMaestro;
+
+		if (select(max_fds + 1, &descriptoresLectura, NULL, NULL, NULL) == -1) {
+			if(errno==EINTR) select(max_fds + 1, &descriptoresLectura, NULL, NULL, NULL);
+			else	log_error(conectar_select_log, "Error en el select");
+		}
+
+		for (current_fd  = 0; current_fd  <= max_fds; current_fd++) {
+			if (FD_ISSET(current_fd , &descriptoresLectura)) {
+				if (current_fd  == servidor) {
+					if ((socket_cliente_aceptado = aceptarCliente(servidor)) == -1){
+						log_error(conectar_select_log, "Error al aceptar conexion");
+						perror("Error al aceptar conexion");
+					} else {
+// Aca entro cuando entro una nueva conexion		-----------------------------------------------------------------
+						FD_SET(socket_cliente_aceptado, &fdsMaestro);
+						if (socket_cliente_aceptado > max_fds) max_fds = socket_cliente_aceptado;
+						log_trace(conectar_select_log, "El select recibio una conexion en el socket %d", socket_cliente_aceptado);
+
+						int tipo = handshake(socket_cliente_aceptado);
+
+						switch(tipo){
+
+
+							case 1:
+// Aca entro cuando entro una nueva consola		-----------------------------------------------------------------
+								list_add(lista_consolas, &socket_cliente_aceptado);
+
+								break;
+							case 2:
+// Aca entro cuando entro una nueva cpu			-----------------------------------------------------------------
+
+								if (pthread_create(&hilo_conexionCPU, &atributo,(void*) escucharCPU, (void*) socket_cliente_aceptado) < 0) {	//fixme: el hilo para CPU queda?
+									log_error(conectar_select_log, "Error Hilo Escucha Consola");
+									abort();
+								}
+
+								list_add(lista_cpus, &socket_cliente_aceptado);
+
+								break;
+							case -1:
+								log_error(conectar_select_log, "Error en el handshake: el cliente se desconecto"); break;
+
+							case -2:
+								log_error(conectar_select_log, "Error en el handshake: send"); break;
+
+
+						}
+
+					}
+
+				} else {
+					atender_consola(current_fd);		//todo: ver q pasa con las conexiones de CPU
+				}
+			}
+		}
+	}
+	return 0;
+}
+

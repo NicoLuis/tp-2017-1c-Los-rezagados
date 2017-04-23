@@ -26,6 +26,10 @@ int main(int argc, char* argv[]) {
 		return -2;
 	}
 
+	//Creo archivo de log
+
+	t_log* log_memoria = log_create("memoria.log", "memoria_principal", false, LOG_LEVEL_TRACE);
+
 
 	//Cargo archivo de configuracion
 
@@ -122,7 +126,7 @@ int main(int argc, char* argv[]) {
 
 
 	//-------------CREAR UN SOCKET DE ESCUCHA PARA LAS CPU's Y EL NUCLEO-------------------------
-	int socketMemoria = crearSocketDeEscucha(puertoMemoria,0);
+	int socketMemoria = crearSocketDeEscucha(string_itoa(puertoMemoria), log_memoria);
 	char* bufferEscucha = malloc(200);
 
 	int falloP_thread;

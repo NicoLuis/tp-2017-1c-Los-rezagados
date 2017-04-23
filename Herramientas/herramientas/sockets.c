@@ -17,7 +17,7 @@ int conectarAServidor(char* ipServidor, int puertoServidor) {
 	return socketServidor;
 }
 
-int crearSocketDeEscucha(char* puerto, t_log* conectar_select_log) {
+int crearSocketDeEscucha(char* puerto, t_log* log) {
 
 	struct addrinfo hints, *ai, *p;
 	int socketEscucha, activado = 1, rv;
@@ -27,7 +27,7 @@ int crearSocketDeEscucha(char* puerto, t_log* conectar_select_log) {
 	hints.ai_flags = AI_PASSIVE; //netdb
 
 	if ((rv = getaddrinfo(NULL, puerto, &hints, &ai)) != 0) {
-		log_error(conectar_select_log, "selectserver: %s\n", gai_strerror(rv));
+		log_error(log, "selectserver: %s\n", gai_strerror(rv));
 		fprintf(stderr, "selectserver: %s\n", gai_strerror(rv));
 	}
 
@@ -44,13 +44,13 @@ int crearSocketDeEscucha(char* puerto, t_log* conectar_select_log) {
 	}
 
 	if (p == NULL){
-		log_error(conectar_select_log, "fallo el bind");
+		log_error(log, "fallo el bind");
 		fprintf(stderr, "selectserver: failed to bind \n");
 	}
 	freeaddrinfo(ai);
 
 	if (listen(socketEscucha, 10) < 0){
-		log_error(conectar_select_log, "listen");
+		log_error(log, "listen");
 		perror("listen");
 	}
 

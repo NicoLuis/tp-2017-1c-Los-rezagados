@@ -10,12 +10,19 @@
 void mostrarArchivoConfig() {
 
 	printf("El puerto de la MEMORIA es: %d\n", puertoMemoria);
+	log_info(log_memoria,"El puerto de la MEMORIA es: %d\n", puertoMemoria);
 	printf("La cantidad de Marcos es: %d\n", cantidadDeMarcos);
+	log_info(log_memoria,"La cantidad de Marcos es: %d\n", cantidadDeMarcos);
 	printf("El tamaño de las Marcos es: %d\n", tamanioDeMarcos);
+	log_info(log_memoria,"El tamaño de las Marcos es: %d\n", tamanioDeMarcos);
 	printf("La cantidad de entradas de Cache habilitadas son: %d\n", cantidadaEntradasCache);
+	log_info(log_memoria,"La cantidad de entradas de Cache habilitadas son: %d\n", cantidadaEntradasCache);
 	printf("La cantidad maxima de entradas a la cache por proceso son: %d\n", cachePorProceso);
+	log_info(log_memoria,"La cantidad maxima de entradas a la cache por proceso son: %d\n", cachePorProceso);
 	printf("El algoritmo de reemplaco de la Cache es: %s\n", algoritmoReemplazo);
+	log_info(log_memoria,"El algoritmo de reemplaco de la Cache es: %s\n", algoritmoReemplazo);
 	printf("El retardo de la memoria es de: %d\n",retardoMemoria);
+	log_info(log_memoria,"El retardo de la memoria es de: %d\n",retardoMemoria);
 
 }
 
@@ -29,11 +36,11 @@ void escucharKERNEL(void* socket_kernel) {
 	uint32_t tamanioCodigo;
 	uint32_t cantidadDePaginas;
 
-	printf("Se conecto el Kernel\n");
+	log_info(log_memoria,"Se conecto el Kernel\n");
 
 	int bytesEnviados = send(socketKernel, "Conexion Aceptada", 18, 0);
 	if (bytesEnviados <= 0) {
-		printf("Error send Kernel");
+		log_error(log_memoria,"Error send Kernel");
 		pthread_exit(NULL);
 	}
 
@@ -45,18 +52,18 @@ void escucharKERNEL(void* socket_kernel) {
 
 		int bytesRecibidos = recv(socketKernel, &header, sizeof(uint32_t), 0);
 		if (bytesRecibidos <= 0) {
-			printf("El Kernel se ha desconectado");
+			log_info(log_memoria,"El Kernel se ha desconectado");
 			pthread_exit(NULL);
 		}
 
 		if (header != KERNEL) {
-			printf("Error recv header nucleo");
+			log_error(log_memoria,"Error recv header nucleo");
 			pthread_exit(NULL);
 		}
 
 		bytesRecibidos = recv(socketKernel, &header, sizeof(uint32_t), 0);
 		if (bytesRecibidos <= 0) {
-			printf("El Kernel se ha desconectado");
+			log_info(log_memoria,"El Kernel se ha desconectado");
 			pthread_exit(NULL);
 		}
 
@@ -65,19 +72,19 @@ void escucharKERNEL(void* socket_kernel) {
 
 			bytesRecibidos = recv(socketKernel, &pid, sizeof(uint32_t), 0);
 			if (bytesRecibidos <= 0) {
-					printf("El Kernel se ha desconectado");
+					log_info(log_memoria,"El Kernel se ha desconectado");
 					pthread_exit(NULL);
 				}
 
 			bytesRecibidos = recv(socketKernel, &cantidadDePaginas,sizeof(uint32_t), 0);
 			if (bytesRecibidos <= 0) {
-					printf("El Kernel se ha desconectado");
+					log_info(log_memoria,"El Kernel se ha desconectado");
 					pthread_exit(NULL);
 				}
 
 			bytesRecibidos = recv(socketKernel, &tamanioCodigo,sizeof(uint32_t), 0);
 			if (bytesRecibidos <= 0) {
-					printf("El Kernel se ha desconectado");
+					log_info(log_memoria,"El Kernel se ha desconectado");
 					pthread_exit(NULL);
 				}
 
@@ -85,11 +92,11 @@ void escucharKERNEL(void* socket_kernel) {
 
 			bytesRecibidos = recv(socketKernel, codigoAnSISOP, tamanioCodigo,0);
 			if (bytesRecibidos <= 0) {
-				printf("El Kernel se ha desconectado");
+				log_info(log_memoria,"El Kernel se ha desconectado");
 				pthread_exit(NULL);
 			}
 
-			printf("Solicitud de inicializar proceso %d con %d paginas", pid,cantidadDePaginas);
+			log_info(log_memoria,"Solicitud de inicializar proceso %d con %d paginas", pid,cantidadDePaginas);
 
 			//Inicializo programa en FS
 
@@ -115,7 +122,7 @@ void escucharKERNEL(void* socket_kernel) {
 
 			bytesEnviados = send(socket_fs, bufferFS,tamanioValidoBufferFS, 0);
 			if (bytesEnviados <= 0) {
-				printf("Error send FS");
+				log_error(log_memoria,"Error send FS");
 				pthread_mutex_unlock(&mutexFS);
 				pthread_exit(NULL);
 				}
@@ -126,20 +133,20 @@ void escucharKERNEL(void* socket_kernel) {
 
 			bytesRecibidos = recv(socket_fs, &header, sizeof(uint32_t), 0);
 			if (bytesRecibidos <= 0) {
-				printf("El FS se ha desconectado");
+				log_info(log_memoria,"El FS se ha desconectado");
 				pthread_mutex_unlock(&mutexFS);
 				pthread_exit(NULL);
 			}
 
 			if (header != FS) {
-				printf("Error recv header FS");
+				log_error(log_memoria,"Error recv header FS");
 				pthread_mutex_unlock(&mutexFS);
 				pthread_exit(NULL);
 			}
 
 			bytesRecibidos = recv(socket_fs, &header, sizeof(uint32_t), 0);
 			if (bytesRecibidos <= 0) {
-				printf("El FS se ha desconectado");
+				log_info(log_memoria,"El FS se ha desconectado");
 				pthread_mutex_unlock(&mutexFS);
 				pthread_exit(NULL);
 			}
@@ -150,14 +157,14 @@ void escucharKERNEL(void* socket_kernel) {
 
 				bytesRecibidos = recv(socket_fs, &pid, sizeof(uint32_t), 0);
 				if (bytesRecibidos <= 0) {
-					printf("El FS se ha desconectado");
+					log_info(log_memoria,"El FS se ha desconectado");
 					pthread_mutex_unlock(&mutexFS);
 					pthread_exit(NULL);
 					}
 
 				pthread_mutex_unlock(&mutexFS);
 
-				printf("Espacio insuficiente para proceso: %d\n",pid);
+				log_info(log_memoria,"Espacio insuficiente para proceso: %d\n",pid);
 
 				header = MEMORIA;
 				memcpy(bufferKernel, &header, sizeof(uint32_t));
@@ -172,7 +179,7 @@ void escucharKERNEL(void* socket_kernel) {
 
 				bytesEnviados = send(socketKernel, bufferKernel,tamanioValidoBufferKernel, 0);
 				if (bytesEnviados <= 0) {
-					printf("Error send Kernel");
+					log_error(log_memoria,"Error send Kernel");
 					pthread_exit(NULL);
 				}
 
@@ -183,14 +190,14 @@ void escucharKERNEL(void* socket_kernel) {
 			case ESPACIO_SUFICIENTE: {
 				bytesRecibidos = recv(socket_fs, &pid, sizeof(uint32_t), 0);
 				if (bytesRecibidos <= 0) {
-					printf("El FS se ha desconectado");
+					log_info(log_memoria,"El FS se ha desconectado");
 					pthread_mutex_unlock(&mutexFS);
 					pthread_exit(NULL);
 				}
 
 				pthread_mutex_unlock(&mutexFS);
 
-				printf("Espacio suficiente para proceso: %d\n", pid);
+				log_info(log_memoria,"Espacio suficiente para proceso: %d\n", pid);
 
 				//Crear el proceso inicializando su lista de pags y agregarlo a la lista de procesos
 
@@ -228,7 +235,7 @@ void escucharKERNEL(void* socket_kernel) {
 
 				bytesEnviados = send(socketKernel, bufferKernel,tamanioValidoBufferKernel, 0);
 				if (bytesEnviados <= 0) {
-					printf("Error send Kernel");
+					log_error(log_memoria,"Error send Kernel");
 					pthread_exit(NULL);
 				}
 
@@ -242,11 +249,11 @@ void escucharKERNEL(void* socket_kernel) {
 		case FINALIZAR_PROGRAMA: {
 			bytesRecibidos = recv(socketKernel, &pid, sizeof(uint32_t), 0);
 			if (bytesRecibidos <= 0) {
-				printf("El Kernel se ha desconectado");
+				log_info(log_memoria,"El Kernel se ha desconectado");
 				pthread_exit(NULL);
 			}
 
-			printf("Finalizando proceso %d\n", pid);
+			log_info(log_memoria,"Finalizando proceso %d\n", pid);
 
 			lockFramesYProcesos();
 
@@ -275,7 +282,7 @@ void escucharKERNEL(void* socket_kernel) {
 
 			if (bytesEnviados <= 0) {
 
-				printf("Error Send Finalizar Programa en FS\n");
+				log_error(log_memoria,"Error Send Finalizar Programa en FS\n");
 
 				pthread_mutex_unlock(&mutexFS);
 
@@ -306,11 +313,11 @@ void escucharCPU(void* socket_cpu) {
 	t_proceso* proceso;
 	list_add(lista_cpus, socket_cpu);
 
-	printf("Se conecto un CPU\n");
+	log_info(log_memoria,"Se conecto un CPU\n");
 
 	int bytesEnviados = send(socketCPU, "Conexion Aceptada", 18, 0);
 	if (bytesEnviados <= 0) {
-		printf("Error send CPU");
+		log_error(log_memoria,"Error send CPU");
 		pthread_exit(NULL);
 	}
 
@@ -320,25 +327,25 @@ void escucharCPU(void* socket_cpu) {
 
 			bytesRecibidos = recv(socketCPU, &header, sizeof(uint32_t), 0);
 			if (bytesRecibidos <= 0) {
-				printf("Error recv CPU");
+				log_error(log_memoria,"Error recv CPU");
 				pthread_exit(NULL);
 			}
 
 			if (header != CPU) {
-				printf("La CPU se ha desconectado o etc");
+				log_info(log_memoria,"La CPU se ha desconectado o etc");
 				pthread_exit(NULL);
 			}
 
 			bytesRecibidos = recv(socketCPU, &header, sizeof(uint32_t), 0);
 			if (bytesRecibidos <= 0) {
-				printf("Error recv CPU");
+				log_error(log_memoria,"Error recv CPU");
 				pthread_exit(NULL);
 			}
 
 			switch (header) {
 
 			case FIN_CPU: {
-				printf("La CPU %d ha finalizado\n", socketCPU);
+				log_info(log_memoria,"La CPU %d ha finalizado\n", socketCPU);
 				pthread_exit(NULL);
 			}
 			break;
@@ -353,23 +360,23 @@ void escucharCPU(void* socket_cpu) {
 
 				bytesRecibidos = recv(socketCPU, &numero_pagina, sizeof(uint8_t),0);
 				if (bytesRecibidos <= 0) {
-					printf("Error recv CPU");
+					log_error(log_memoria,"Error recv CPU");
 					pthread_exit(NULL);
 				}
 
 				bytesRecibidos = recv(socketCPU, &offset, sizeof(uint32_t), 0);
 				if (bytesRecibidos <= 0) {
-					printf("Error recv CPU");
+					log_error(log_memoria,"Error recv CPU");
 					pthread_exit(NULL);
 				}
 
 				bytesRecibidos = recv(socketCPU, &tamanio_leer, sizeof(uint32_t),0);
 				if (bytesRecibidos <= 0) {
-					printf("Error recv CPU");
+					log_error(log_memoria,"Error recv CPU");
 					pthread_exit(NULL);
 				}
 
-				printf("Solicitud de lectura. Pag:%d Offset:%d Size:%d",numero_pagina, offset, tamanio_leer);
+				log_info(log_memoria,"Solicitud de lectura. Pag:%d Offset:%d Size:%d",numero_pagina, offset, tamanio_leer);
 
 				lockProcesos();
 				ponerBitUsoEn1(PID, numero_pagina);
@@ -377,14 +384,14 @@ void escucharCPU(void* socket_cpu) {
 
 				if (paginaInvalida(PID, numero_pagina)) {
 
-					printf("Stack Overflow proceso %d\n", PID);
+					log_info(log_memoria,"Stack Overflow proceso %d\n", PID);
 
 					//AVISO FINALIZACION PROGRAMA A LA CPU
 					header = FINALIZAR_PROGRAMA;
 
 					bytesEnviados = send(socketCPU, &header, sizeof(uint32_t), 0);
 					if (bytesEnviados <= 0) {
-						printf("Error send CPU");
+						log_error(log_memoria,"Error send CPU");
 						pthread_exit(NULL);
 					}
 
@@ -411,14 +418,14 @@ void escucharCPU(void* socket_cpu) {
 
 					if ((!hayFrameLibre) && (proceso->cantFramesAsignados == 0)) {
 
-						printf("Finalizando programa: %d. No hay frames disponibles\n",PID);
+						log_info(log_memoria,"Finalizando programa: %d. No hay frames disponibles\n",PID);
 
 						//AVISO FINALIZACION PROGRAMA A LA CPU
 						header = FINALIZAR_PROGRAMA;
 
 						bytesEnviados = send(socketCPU, &header, sizeof(uint32_t), 0);
 						if (bytesEnviados <= 0) {
-							printf("Error send CPU");
+							log_error(log_memoria,"Error send CPU");
 							pthread_exit(NULL);
 						}
 
@@ -428,7 +435,7 @@ void escucharCPU(void* socket_cpu) {
 
 					} else {
 
-						printf("La pagina %d NO esta en Memoria Real. Page Fault\n",numero_pagina);
+						log_info(log_memoria,"La pagina %d NO esta en Memoria Real. Page Fault\n",numero_pagina);
 
 						//Envio solicitud de lectura a FS
 
@@ -461,7 +468,7 @@ void escucharCPU(void* socket_cpu) {
 				break;
 
 			default:
-				printf("Error");
+				log_error(log_memoria,"Error");
 			}
 
 	}
@@ -470,7 +477,7 @@ void escucharCPU(void* socket_cpu) {
 void* reservarMemoria(int cantidadMarcos, int capacidadMarco) {
 	// La creo con calloc para que me la llene de \0
 	void * memoria = calloc(cantidadMarcos, capacidadMarco);
-	printf("Memoria reservada\n");
+	log_info(log_memoria,"Memoria reservada\n");
 	return memoria;
 }
 
@@ -550,12 +557,12 @@ void escribirPaginaEnFS(uint32_t pid, uint8_t nroPag, void* contenido_pagina) {
 	int bytesEnviados = send(socket_fs, bufferFS, tamanioValidoBufferFS,0);
 
 	if (bytesEnviados <= 0) {
-		printf("Error escritura en FS");
+		log_error(log_memoria,"Error escritura en FS");
 		pthread_mutex_unlock(&mutexFS);
 		pthread_exit(NULL);
 	}
 
-	printf("Escribi en FS pagina %d del proceso %d\n", nroPag, pid);
+	log_info(log_memoria,"Escribi en FS pagina %d del proceso %d\n", nroPag, pid);
 
 	pthread_mutex_unlock(&mutexFS);
 
@@ -575,7 +582,7 @@ void liberarFramesDeProceso(uint32_t unPid) {
 		t_frame* frame = list_find(listaFrames, (void *) _soy_el_frame_buscado);
 		frame->pid = 0;
 
-		printf("Frame %d liberado", frame->nroFrame);
+		log_info(log_memoria,"Frame %d liberado", frame->nroFrame);
 
 		i++;
 	}
@@ -707,7 +714,7 @@ void enviarContenidoCPU(void* contenido_leido, uint32_t tamanioContenido,int soc
 
 	int bytesEnviados = send(socketCPU, bufferCPU, tamanioValidoBuffer, 0);
 	if (bytesEnviados <= 0) {
-		printf("Error send CPU");
+		log_error(log_memoria,"Error send CPU");
 		pthread_exit(NULL);
 	}
 
@@ -779,11 +786,11 @@ void* pedirPaginaAFS(uint32_t pid, uint8_t numero_pagina) {
 
 	pthread_mutex_lock(&mutexFS);
 
-	printf("Pido a FS pagina %d del proceso %d", numero_pagina,pid);
+	log_info(log_memoria,"Pido a FS pagina %d del proceso %d", numero_pagina,pid);
 
 	int bytesEnviados = send(socket_fs, bufferFS, tamanioValidoBufferFS,0);
 	if (bytesEnviados <= 0) {
-		printf("Error send FS");
+		log_error(log_memoria,"Error send FS");
 		pthread_mutex_unlock(&mutexFS);
 		pthread_exit(NULL);
 	}
@@ -792,26 +799,26 @@ void* pedirPaginaAFS(uint32_t pid, uint8_t numero_pagina) {
 
 	bytesRecibidos = recv(socket_fs, &header, sizeof(uint32_t), 0);
 	if (bytesRecibidos <= 0) {
-		printf("El FS se ha desconectado");
+		log_info(log_memoria,"El FS se ha desconectado");
 		pthread_mutex_unlock(&mutexFS);
 		pthread_exit(NULL);
 	}
 
 	if (header != FS) {
-		printf("El FS se desconecto\n");
+		log_info(log_memoria,"El FS se desconecto\n");
 		pthread_mutex_unlock(&mutexFS);
 		pthread_exit(NULL);
 	}
 
 	bytesRecibidos = recv(socket_fs, &header, sizeof(uint32_t), 0);
 	if (bytesRecibidos <= 0) {
-		printf( "El FS se ha desconectado");
+		log_info(log_memoria, "El FS se ha desconectado");
 		pthread_mutex_unlock(&mutexFS);
 		pthread_exit(NULL);
 	}
 
 	if (header != ENVIO_PAGINA) {
-		printf( "Error en recv accion fs");
+		log_info(log_memoria, "Error en recv accion fs");
 		pthread_mutex_unlock(&mutexFS);
 		pthread_exit(NULL);
 	}
@@ -820,26 +827,26 @@ void* pedirPaginaAFS(uint32_t pid, uint8_t numero_pagina) {
 
 	bytesRecibidos = recv(socket_fs, &pid, sizeof(uint32_t), 0);
 	if (bytesRecibidos <= 0) {
-		printf("El FS se ha desconectado");
+		log_info(log_memoria,"El FS se ha desconectado");
 		pthread_mutex_unlock(&mutexFS);
 		pthread_exit(NULL);
 	}
 
 	bytesRecibidos = recv(socket_fs, &numero_pagina, sizeof(uint8_t), 0);
 	if (bytesRecibidos <= 0) {
-		printf("El FS se ha desconectado");
+		log_info(log_memoria,"El FS se ha desconectado");
 		pthread_mutex_unlock(&mutexFS);
 		pthread_exit(NULL);
 	}
 
 	bytesRecibidos = recv(socket_fs, paginaLeida, tamanioDeMarcos, 0);
 	if (bytesRecibidos <= 0) {
-		printf("El FS se ha desconectado");
+		log_info(log_memoria,"El FS se ha desconectado");
 		pthread_mutex_unlock(&mutexFS);
 		pthread_exit(NULL);
 	}
 
-	printf("Recibi de FS pagina %d del proceso %d\n", numero_pagina,pid);
+	log_info(log_memoria,"Recibi de FS pagina %d del proceso %d\n", numero_pagina,pid);
 
 	pthread_mutex_unlock(&mutexFS);
 
@@ -872,7 +879,7 @@ void cargarPaginaAMemoria(uint32_t pid, uint8_t numero_pagina,void* paginaLeida,
 
 		escribirContenido(frame->nroFrame, 0, tamanioDeMarcos, paginaLeida);
 
-		printf("Pagina %d del proceso %d cargada en frame %d\n",numero_pagina, pid, frame->nroFrame);
+		log_info(log_memoria,"Pagina %d del proceso %d cargada en frame %d\n",numero_pagina, pid, frame->nroFrame);
 
 	}
 

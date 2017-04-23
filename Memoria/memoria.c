@@ -28,7 +28,7 @@ int main(int argc, char* argv[]) {
 
 	//Creo archivo de log
 
-	t_log* log_memoria = log_create("memoria.log", "memoria_principal", false, LOG_LEVEL_TRACE);
+	log_memoria = log_create("memoria.log", "memoria_principal", false, LOG_LEVEL_TRACE);
 
 
 	//Cargo archivo de configuracion
@@ -140,7 +140,7 @@ int main(int argc, char* argv[]) {
 		int socket_cliente = aceptarCliente(socketMemoria);
 		if ((socket_cliente) == -1) {
 
-			printf("Error en el accept()");
+			log_error(log_memoria,"Error en el accept()");
 
 			abort();
 		}
@@ -150,7 +150,7 @@ int main(int argc, char* argv[]) {
 		int bytesRecibidos = recv(socket_cliente, bufferEscucha, 50, 0);
 		if (bytesRecibidos <= 0) {
 
-			printf("El cliente se ha desconectado");
+			log_info(log_memoria,"El cliente se ha desconectado");
 
 			abort();
 		}
@@ -164,7 +164,7 @@ int main(int argc, char* argv[]) {
 			falloP_thread = pthread_create(hiloCPU,&atributo,(void*) escucharCPU, (void*) socket_cliente);
 			if (falloP_thread < 0) {
 
-				printf("Error Hilo CPU");
+				log_error(log_memoria,"Error Hilo CPU");
 
 				abort();
 			}
@@ -174,7 +174,7 @@ int main(int argc, char* argv[]) {
 			falloP_thread = pthread_create(&hilo_conexionKERNEL, &atributo,(void*) escucharKERNEL, (void*) socket_cliente);
 			if (falloP_thread < 0) {
 
-				printf("Error Hilo Escucha Nucleo");
+				log_error(log_memoria,"Error Hilo Escucha Nucleo");
 
 				abort();
 			}

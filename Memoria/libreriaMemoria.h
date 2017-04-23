@@ -47,7 +47,7 @@ t_list* lista_cpus;
 t_list* listaFrames;
 t_list* listaProcesos;
 t_list* TLB;
-
+t_log* log_memoria;
 
 //PROCESO
 typedef struct {

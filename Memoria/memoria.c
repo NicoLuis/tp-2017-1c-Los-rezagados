@@ -42,6 +42,9 @@ int main(int argc, char* argv[]) {
 
 	mostrarArchivoConfig();
 
+	//reservo memoria para la memoria real
+	memoria_real = reservarMemoria(cantidadDeMarcos, tamanioDeMarcos);
+
 	lista_cpus = list_create();
 
 
@@ -167,7 +170,7 @@ int main(int argc, char* argv[]) {
 			falloP_thread = pthread_create(&hilo_conexionKERNEL, &atributo,(void*) escucharKERNEL, (void*) socket_cliente);
 			if (falloP_thread < 0) {
 
-				printf("Error Hilo Esucha Nucleo");
+				printf("Error Hilo Escucha Nucleo");
 
 				abort();
 			}

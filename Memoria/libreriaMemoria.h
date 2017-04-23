@@ -29,6 +29,7 @@
 #include <commons/log.h>
 #include <commons/process.h>
 #include <herramientas/sockets.h>
+#include <herramientas/enum.h>
 
 
 // TIPOS DE MENSAJES
@@ -42,8 +43,10 @@ int cantidadaEntradasCache;
 int cachePorProceso;
 char* algoritmoReemplazo;
 int retardoMemoria;
-
 t_list* lista_cpus;
+t_list* listaFrames;
+t_list* listaProcesos;
+t_list* TLB;
 
 
 void mostrarArchivoConfig();
@@ -51,5 +54,67 @@ void mostrarArchivoConfig();
 void escucharKERNEL(void*);
 
 void escucharCPU(void*);
+
+void* memoria_real;
+
+void* reservarMemoria(int, int);
+
+void lockProcesos();
+
+void unlockProcesos();
+
+void lockFramesYProcesos();
+
+void unlockFramesYProcesos();
+
+void crearProcesoYAgregarAListaDeProcesos(uint32_t pid,	uint32_t cantidadDePaginas);
+
+void escribirPaginaEnFS(uint32_t pid, uint8_t nroPag, void* contenido_pagina);
+
+void liberarFramesDeProceso(uint32_t unPid);
+
+void eliminarProcesoDeListaDeProcesos(uint32_t unPid);
+
+t_list* crearEInicializarListaDePaginas(uint32_t cantidadDePaginas);
+
+//PROCESO
+typedef struct {
+	uint32_t PID;
+	int cantPaginas;
+	int cantFramesAsignados;
+	t_list* listaPaginas;
+} t_proceso;
+
+//FRAME
+typedef struct {
+	int nroFrame;
+	int bit_modif;
+	int pid;
+} t_frame;
+
+//PAGINA
+typedef struct {
+	uint8_t nroPag;
+	int nroFrame;
+	int bit_pres;
+	int bit_uso;
+} t_pag;
+
+//Socket FS
+int socket_fs;
+
+//Variable Global para LRU
+int cantAccesosMemoria;
+
+//Semaforos
+
+pthread_mutex_t mutexListaProcesos;
+pthread_mutex_t mutexListaFrames;
+pthread_mutex_t mutexTLB;
+pthread_mutex_t mutexCantAccesosMemoria;
+pthread_mutex_t mutexRetardo;
+pthread_mutex_t mutexMemoriaReal;
+pthread_mutex_t mutexFS;
+pthread_mutex_t mutexDump;
 
 #endif /* MEMORIA_LIBRERIAMEMORIA_H_ */

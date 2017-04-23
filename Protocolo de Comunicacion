@@ -1,0 +1,319 @@
+enum{CONSOLA=1,
+	KERNEL,
+	CPU,
+	MEMORIA,
+	FS,
+	ENVIO_CODIGO,
+	DESCONECTARME,
+	IMPRIMIR,
+	IMPRIMIR_TEXTO,
+	ESPACIO_INSUFICIENTE,
+	FINALIZAR_PROGRAMA,
+	INICIALIZAR_PROGRAMA,
+	ENVIO_PCB,
+	VALOR_VARIABLE_COMPARTIDA,
+	DESALOJAR_PROCESO,
+	CONTINUAR_EJECUCION,
+	GRABAR_VARIABLE_COMPARTIDA,
+	WAIT,
+	SIGNAL,
+	ENTRADA_SALIDA,
+	ENVIO_PCB,
+	FIN_CPU,
+	LECTURA_PAGINA,
+	ESCRITURA_PAGINA,
+	CAMBIO_PROCESO_ACTIVO,
+	TAMANIO_PAGINAS,
+	ESPACIO_SUFICIENTE,
+	ENVIO_PARTE_PAGINA,
+	LECTURA_PAGINA,
+	ENVIO_PAGINA
+	}
+
+	
+//Al recibir, usar recv + memcpy. 
+//En el caso de estar recibiendo un contenido con un puntero, sabiendo de antemano el tamanio del contenido, tener reservada la memoria con malloc(). 
+
+//Cuando dice LONGITUD, TAMANIO DE UN TEXTO o CODIGO, tener en cuenta el '\0'. Ejemplo tamanio de "hola" es 5, osea strlen("hola)+1
+-----------
+--CONSOLA--
+-----------
+	
+	CONSOLA -> KERNEL
+		
+		CONSOLA MANDA PROGRAMA ANSISOP AL KERNEL	
+			4BytesParaIdentificarseComoConsola  	4BytesParaIndicarEnvioDeCodigo		4BytesParaIndicarElTamanioDelCodigo 	NBytesDelCodigo(hasta 2^16 -1)
+				CONSOLA==1						      	 ENVIO_CODIGO==6						uint32_t == N					string con contenido del ansisop
+															 
+		CONSOLA MANDA FINALIZAR PROGRAMA ANSISOP AL KERNEL
+			4BytesParaIdentificarseComoConsola		4BytesParaIndicarPedidoDeFinalizarPrograma
+				CONSOLA==1									FINALIZAR_PROGRAMA==14
+		
+		CONSOLA MANDA DESCONECTAR AL KERNEL
+			4BytesParaIdentificarseComoConsola		4BytesParaIndicarPedidoDeFinalizarPrograma
+				CONSOLA==1									DESCONECTAR==7
+		
+		CONSOLA RECIBE IMPRIMIR DEL KERNEL (ver Kernel)
+		 
+		CONSOLA RECIBE IMPRIMIR_TEXTO DEL KERNEL (ver Kernel)
+		
+		CONSOLA RECIBE QUE NO HAY ESPACIO SUFICIENTE DEL KERNEL (ver Kernel)
+		
+		CONSOLA RECIBE PEDIDO DE FINALIZAR PROGRAMA DEL KERNEL (ver Kernel)
+----------
+--KERNEL--
+----------
+	
+	KERNEL -> CONSOLA
+		
+		KERNEL ENVIA SOLICITUD DE IMPRIMIR VALOR A LA CONSOLA	
+			4BytesParaIndicarQueQuiereImprimirUnValor	4BytesParaValorAMostrar
+				IMPRIMIR==8									uint32_t
+		
+		
+		KERNEL ENVIA SOLICITUD DE IMPRIMIR TEXTO A LA CONSOLA	
+			4BytesParaIndicarQueQuiereImprimirTexto	1ByteParaIndicarLaLongitudDelTexto 	NBytesDelTexto (hasta 2^8 -1)
+					IMPRIMIR_TEXTO==9							uint8_t	== N			string con texto a mostrar
+		
+		KERNEL ENVIA AVISO DE ESPACIO INSUFICIENTE A LA CONSOLA		
+			4BytesParaIndicarQueAvisaQueNoHayEspacioSuficiente
+					ESPACIO_INSUFICIENTE==10
+					
+		KERNEL ENVIA PEDIDO DE FINALIZAR PROGRAMA A LA CONSOLA
+			4BytesParaIndicarPedidoDeFinalizarPrograma
+					FINALIZAR_PROGRAMA==11
+					
+		KERNEL RECIBE CODIGO ANSISOP DE LA CONSOLA(ver Consola)
+		
+		
+					
+	KERNEL -> MEMORIA
+
+		KERNEL ENVIA PEDIDO DE INICIALIZAR PROGRAMA A LA MEMORIA	
+			4BytesParaIdentificarseComoKernel  4BytesParaIndicarInicializarPrograma 4BytesParaElPID 4BytesParaIndicarCantidadDePaginas 4BytesParaIndicarElTamanioDelCodigo  NBytesDelCodigo 
+			KERNEL==2 								INICIALIZAR_PROGRAMA==12			uint32_t				uint32_t					uint32_t == N						string con el codigo
+			
+		KERNEL ENVIA PEDIDO DE FINALIZAR PROGRAMA A LA MEMORIA
+			4BytesParaIdentificarseComoKernel  4BytesParaIndicarFinalizarPrograma 4BytesParaElPID
+			KERNEL==2 							FINALIZAR_PROGRAMA==11				  uint32_t
+		
+		KERNEL RECIBE QUE NO HAY ESPACIO SUFICIENTE PARA ALMACENAR EL PROGRAMA DE LA MEMORIA (ver Memoria)
+		
+		KERNEL RECIBE QUE HAY ESPACIO SUFICIENTE PARA ALMACENAR EL PROGRAMA DE LA MEMORIA (ver Mmemoria)
+		
+		KERNEL RECIBE EL TAMANIO DE PAGINA DE LA MEMORIA(ver Memoria)
+		
+	KERNEL -> CPU
+		
+		KERNEL ENVIA PCB A LA CPU(USAR FUNCION enviarPCB de PCB.h)
+			4BytesParaIdentificarseComoKernel  4BytesParaIndicarQueEstaEnviandoPCB 4BytesParaQuantum 4BytesParaQuantumSleep	4BytesParaPID 4BytesParaPC 4BytesParaCantPaginas 4BytesParaTamanioIndiceDeCodigo NBytesParaIndiceDeCodigo 4BytesParaTamanioIndiceDeEtiquetas MBytesParaIndiceDeEtiquetas 4BytesParaStackPointer	4BytesParaTamanioIndiceDeStack XBytesParaIndiceDeStack  ZBytesConArgumentosyVariablesDeCadaFuncionPresenteEnElIndiceDeStack
+			KERNEL==2								ENVIO_PCB==13						uint32_t		uint32_t				uint32_t	uint32_t		uint32_t				uint32_t == N				indice de codigo				uint32_t == M					indice de etiquetas				uint32_t				uint32_t == X			indice de stack				los bytes que sean necesarios dependiendo el caso
+									
+		KERNEL ENVIA VALOR DE VARIABLE COMPARTIDA A LA CPU	
+			4BytesParaIdentificarseComoKernel  4BytesParaIndicarQueEstaEnviandoValorDeVariableCompartida 4BytesParaElValor
+			KERNEL==2								VALOR_VARIABLE_COMPARTIDA==14							uint32_t
+					
+		KERNEL ENVIA DESALOJAR PROCESO A LA CPU
+			4BytesParaIdentificarseComoKernel	4BytesParaIndicarQueEstaEnviandoDesalojarProceso
+			KERNEL==2										DESALOJAR_PROCESO==15					
+		
+		KERNEL ENVIA CONTINUAR_EJECUCION A LA CPU
+			4BytesParaIdentificarseComoKernel	4BytesParaIndicarQueEstaEnviandoContinuarLaEjecucion
+			KERNEL==4										CONTINUAR_EJECUCION=16			
+		
+		KERNEL RECIBE VALOR DE VARIABLE COMPARTIDA A GRABAR DE LA CPU(ver Cpu)
+		
+		KERNEL RECIBE WAIT DE SEMAFORO DE LA CPU (ver Cpu)
+		
+		KERNEL RECIBE SIGNAL DE SEMAFORO DE LA CPU (ver Cpu)
+		
+		KERNEL RECIBE SOLICITUD DE ENTRADA/SALIDA DE LA CPU(ver Cpu)
+		
+		KERNEL RECIBE PCB DE LA CPU (ver Cpu)
+		
+		KERNEL RECIBE SOLICITUD DE IMPRIMIR VALOR DE LA CPU (ver CPU)
+		
+		KERNEL RECIBE SOLICITUD DE IMPRIMIR TEXTO DE LA CPU (ver CPU)
+		
+		KERNEL RECIBE SOLICITUD DE FINALIZAR PROGRAMA DE LA CPU (ver CPU)
+		
+		KERNEL RECIBE SOLICITUD DEL VALOR DE  UNA VARIABLE COMPARTIDA POR PARTE DEL CPU (ver CPU)
+		
+		KERNEL RECIBE AVISO DE FINALIZACION DE LA CPU (ver CPU)
+		
+	
+----------
+---CPU----
+----------
+
+	CPU-> KERNEL
+		
+		CPU ENVIA SOLICITUD DE IMPRIMIR VALOR AL KERNEL	
+			4BytesParaIdentificarseComoCPU 4BytesParaIndicarQueQuiereImprimirUnValor	4BytesParaValorAMostrar
+					CPU==3							IMPRIMIR==8							  uint32_t
+		
+		CPU ENVIA SOLICITUD DE IMPRIMIR TEXTO AL KERNEL	
+			4BytesParaIdentificarseComoCPU 4BytesParaIndicarQueQuiereImprimirTexto	1ByteParaIndicarLaLongitudDelTexto 	NBytesDelTexto (hasta 2^8 -1)
+						CPU==3						IMPRIMIR_TEXTO==9							uint8_t	== N			string con texto a mostrar
+		
+		CPU ENVIA VALOR DE VARIABLE COMPARTIDA A GRABAR AL KERNEL
+			4BytesParaIdentificarseComoCPU 4BytesParaIndicarQueQuiereGrabarVariableCompartida 1ByteParaElTamanioDelNombreDeVariable NBytesParaElNombreDeVariable 		4BytesParaElValor
+			CPU==3									GRABAR_VARIABLE_COMPARTIDA==17 						uint8_t == N			   string de hasta 2^8-1 caracteres 	     uint32_t
+
+		CPU ENVIA SOLICITUD DE VALOR DE VARIABLE COMPARTIDA AL KERNEL
+			4BytesParaIdentificarseComoCPU 4BytesParaIndicarQueQuiereSolicitarValorDeVariableCompartida 1ByteParaElTamanioDelNombreDeVariable NBytesParaElNombreDeVariable
+			CPU==3									VALOR_VARIABLE_COMPARTIDA==14					                uint8_t==N					string de hasta 2^8-1 caracteres 
+		
+		CPU ENVIA WAIT DE SEMAFORO AL KERNEL
+			4BytesParaIdentificarseComoCPU	4BytesParaIndicarQueQuiereHacerUnWait 1ByteParaElTamanioDelNombreDeSemaforo NBytesParaElNombreDeSemaforo
+			CPU==3										WAIT==18									uint8_t == N				string de hasta 2^8-1 caracteres
+		
+		CPU ENVIA SIGNAL DE SEMAFORO AL KERNEL
+			4BytesParaIdentificarseComoCPU	4BytesParaIndicarQueQuiereHacerUnSignal 1ByteParaElTamanioDelNombreDeSemaforo NBytesParaElNombreDeSemaforo
+			CPU==3								SIGNAL==19									uint8_t == N				 string de hasta 2^8-1 caracteres
+		
+		CPU ENVIA SOLICITUD DE ENTRADA/SALIDA AL KERNEL
+			4BytesParaIdentificarseComoCPU 4BytesParaIndicarQueQuiereHacerEntradaSalida 1ByteParaElTamanioDelNombreDeDispositivo NBytesParaElNombreDeDispositivo		4BytesParaUnidadesDeTiempo   XBytesParaProtocoloPCB
+			CPU==3									ENTRADA_SALIDA==20						uint8_t	== N					   string de hasta 2^8-1 caracteres 			uint32_t				 usar funcion enviarPCB
+		
+		CPU ENVIA PCB AL KERNEL(USAR FUNCION enviarPCB de PCB.h)
+			4BytesParaIdentificarseComoCPU 4BytesParaIndicarQueEnviaPCB 4BytesParaPID 4BytesParaPC 4BytesParaCantPaginas 4BytesParaTamanioIndiceDeCodigo NBytesParaIndiceDeCodigo 4BytesParaTamanioBufferDeEtiquetas MBytesParaBufferDeEtiquetas 4BytesParaStackPointer		4BytesParaTamanioIndiceDeStack   XBytesParaIndiceDeStack	ZBytesConArgumentosyVariablesDeCadaFuncionPresenteEnElIndiceDeStack
+			CPU==3									ENVIO_PCB==21			 int32_t	uint32_t		uint32_t				uint32_t == N				indice de codigo				uint32_t == M					indice de etiquetas				uint32_t						uint32_t == X		   indice de stack				los bytes que sean necesarios dependiendo el caso
+		
+		CPU ENVIA SOLICITUD DE FINALIZAR PROGRAMA AL KERNEL (cuando termina la ejecucion de la ultima sentencia del programa)
+			4BytesParaIdentificarseComoCPU 4BytesParaIndicarQueFinalizaElPrograma 4BytesParaPID 
+			CPU==3									FINALIZAR_PROGRAMA==11			uint32_t		
+			
+		CPU ENVIA AVISO DE FINALIZACION AL KERNEL
+			4BytesParaIdentificarseComoCPU 4BytesParaIndicarFinCPU 
+			CPU==3  							FIN_CPU==22	
+			
+		
+		CPU RECIBE PCB DEL KERNEL(ver Kernel)
+		
+		CPU RECIBE VALOR DE VARIABLE COMPARTIDA DEL KERNEL(ver Kernel)
+		
+		CPU RECIBE DESALOJAR PROCESO DEL KERNEL (ver Kernel)
+		
+		CPU RECIBE CONTINUAR CON LA EJECUCION (ver Kernel)
+
+	CPU-> MEMORIA
+		
+		CPU ENVIA PEDIDO DE LECTURA DE PAGINA A LA MEMORIA
+			4BytesParaIdentificarseComoCPU	4BytesParaIndicarQueQuiereLeerParteDeUnaPagina 1ByteParaNumeroDePaginaDelProceso 4BytesParaOffset	4BytesParaTamanioALeer					 
+			CPU==3								LECTURA_PAGINA==23										uint8_t					uint32_t 			uint32_t				
+		CPU ENVIA PEDIDO DE ESCRITURA DE PAGINA A LA MEMORIA
+			4BytesParaIdentificarseComoCPU	4BytesParaIndicarQueQuiereEscribirParteDeUnaPagina 1BytesParaNumeroDePaginaDelProceso  4BytesParaOffset	4BytesParaTamanioAEscribir XBytesParaBuffer													 
+			CPU==3								ESCRITURA_PAGINA==24									uint8_t								uint32_t   		uint32_t == X			buffer de X bytes
+		CPU ENVIA CAMBIO DE PROCESO ACTIVO A LA MEMORIA
+			4BytesParaIdentificarseComoCPU 4BytesParaIndicarCambioDeProcesoActivo 4BytesParaElPID
+			CPU==3  							CAMBIO_PROCESO_ACTIVO==25          uint32_t	 
+			
+		CPU ENVIA AVISO DE FINALIZACION A LA MEMORIA
+			4BytesParaIdentificarseComoCPU 4BytesParaIndicarFinCPU 
+			CPU==3  							FIN_CPU==22         	 
+	
+		
+		CPU RECIBE PARTE DE PAGINA LEIDA DE LA MEMORIA(ver MEMORIA)
+		
+		CPU RECIBE TAMANIO DE PAGINA DE LA MEMORIA(ver MEMORIA)
+	
+----------
+---MEMORIA----
+----------	
+	MEMORIA -> KERNEL
+	
+		MEMORIA ENVIA TAMANIO DE PAGINA AL KERNEL		
+			4BytesParaIdentificarseComoMEMORIA 4BytesParaIndicarEnvioDeTamanioDePaginas  4BytesParaTamanioDePagina
+				MEMORIA==4							TAMANIO_PAGINAS==26						uint32_t						
+		
+		MEMORIA ENVIA QUE NO HAY SUFICIENTE ESPACIO PARA ALMACENAR EL PROGRAMA AL KERNEL		
+			4BytesParaIdentificarseComoMEMORIA 4BytesParaIndicarQueNoHayEspacioSuficiente	4BytesParaElPid
+				MEMORIA==4						 ESPACIO_INSUFICIENTE==10						uint32_t
+				
+		MEMORIA ENVIA QUE HAY SUFICIENTE ESPACIO PARA ALMACENAR EL PROGRAMA AL KERNEL		
+		4BytesParaIdentificarseComoMEMORIA 4BytesParaIndicarQueHayEspacioSuficiente	4BytesParaElPid
+			MEMORIA==16						 ESPACIO_SUFICIENTE==27						uint32_t		
+		
+		MEMORIA RECIBE INICIALIZAR PROCESO DEL KERNEL (ver Kernel)
+		
+		MEMORIA RECIBE FINALIZAR PROCESO DEL KERNEL (ver Kernel)		
+		
+	
+
+	MEMORIA-> CPU
+	
+		MEMORIA ENVIA TAMANIO DE PAGINA A LA CPU		
+				4BytesParaIdentificarseComoMEMORIA 4BytesParaIndicarEnvioDeTamanioDePaginas  4BytesParaTamanioDePagina
+				MEMORIA==4							TAMANIO_PAGINAS==26						uint32_t	
+				
+		MEMORIA ENVIA PARTE DE PAGINA LEIDA A LA CPU	
+			4BytesParaIdentificarseComoMEMORIA	4BytesParaIndicarEnvioDeParteDePagina 1ByteParaTamanioDeContenidoAEnviar	NBytesParaContenidoAEnviar
+				MEMORIA==4							ENVIO_PARTE_PAGINA==28					uint32_t == N					contenido a enviar
+		
+		MEMORIA RECIBE PEDIDO DE LECTURA DE LA CPU(ver CPU)
+		
+		MEMORIA RECIBE PEDIDO DE ESCRITURA DE LA CPU(ver CPU)
+		
+		MEMORIA RECIBE CAMBIO DE PROCESO ACTIVO DE LA CPU(ver CPU)
+		
+		MEMORIA RECIBE AVISO DE FINALIZACION DE LA CPU (ver CPU)
+		
+	
+	MEMORIA -> SWAP
+		
+		MEMORIA ENVIA TAMANIO DE PAGINA AL SWAP		
+			4BytesParaIdentificarseComoMEMORIA 4BytesParaIndicarEnvioDeTamanioDePaginas  4BytesParaTamanioDePagina
+				MEMORIA==4							TAMANIO_PAGINAS==26							uint32_t
+		
+		MEMORIA ENVIA PEDIDO DE LECTURA DE PAGINA AL SWAP
+			4BytesParaIdentificarseComoMEMORIA	4BytesParaIndicarQueQuiereLeerUnaPagina 4BytesParaElPID	1ByteParaNumeroDePaginaDelProceso				 
+			MEMORIA==4								LECTURA_PAGINA==29						 uint32_t					uint8_t
+		
+	
+		MEMORIA ENVIA PEDIDO DE ESCRITURA DE PAGINA AL SWAP
+			4BytesParaIdentificarseComoMEMORIA	4BytesParaIndicarQueQuiereEscribirUnaPagina 4BytesParaElPID 1BytesParaNumeroDePaginaDelProceso 	NBytesParaDatosAEscribir(N definido por el tamanio de pagina)
+				MEMORIA==4							ESCRITURA_PAGINA==24						uint32_t  			uint8_t						contenido a escribir (buffer de tamanio fijo)
+			
+		MEMORIA ENVIA PEDIDO DE INICIALIZAR PROGRAMA AL SWAP	
+			4BytesParaIdentificarseComoMEMORIA  4BytesParaIndicarInicializarPrograma 4BytesParaElPID 4BytesParaIndicarCantidadDePaginas
+				MEMORIA==4							INICIALIZAR_PROGRAMA==12			uint32_t			uint32_t
+			
+		MEMORIA ENVIA PEDIDO DE FINALIZAR PROGRAMA AL SWAP		
+			4BytesParaIdentificarseComoUmc 4BytesParaIndicarFinalizarPrograma 	4BytesParaElPID
+			MEMORIA==4									FINALIZAR_PROGRAMA==11		uint32_t	
+		
+		MEMORIA RECIBE PAGINA LEIDA DEL SWAP (ver Swap)
+		
+		MEMORIA RECIBE AVISO DE ESPACIO INSUFICIENTE DEL SWAP (ver Swap)
+		
+		MEMORIA RECIBE AVISO DE ESPACIO SUFICIENTE DEL SWAP (ver Swap)
+
+----------
+---FS---
+----------
+
+	FS  -> MEMORIA
+		
+		FS ENVIA PAGINA LEIDA A LA MEMORIA 
+			4BytesParaIdentificarseComoFile System	4BytesParaIndicarQueEnviaUnaPagina   4BytesParaElPID 1ByteParaNumeroDePaginaDelProceso 	NBytesParaDatosAEnviar(N definido por el tamanio de pagina)
+				FS==5										ENVIO_PAGINA==30				uint32_t  			uint8_t						contenido a escribir (buffer de tamanio fijo)
+		
+				
+		FS ENVIA AVISO DE ESPACIO INSUFICIENTE A LA MEMORIA
+			4BytesParaIdentificarseComoFile System	4BytesParaIndicarQueNoHayEspacioSuficiente 	4BytesParaElPid
+				FS==5 							ESPACIO_INSUFICIENTE==10							uint32_t
+				
+		FS ENVIA AVISO DE ESPACIO SUFICIENTE A LA MEMORIA
+			4BytesParaIdentificarseComoFile System	4BytesParaIndicarQueHayEspacioSuficiente 	4BytesParaElPid
+				FS==5 											ESPACIO_SUFICIENTE==27				uint32_t
+			
+		FS RECIBE TAMANIO DE PAGINAS DE LA MEMORIA (ver MEMORIA)
+		
+		FS RECIBE PEDIDO DE LECTURA DE PAGINA DE LA MEMORIA (ver MEMORIA)
+		
+		FS RECIBE PEDIDO DE ESCRITURA DE PAGINA DE LA MEMORIA (ver MEMORIA)
+		
+		FS RECIBE PEDIDO DE INICIALIZAR PROGRAMA DE LA MEMORIA (ver MEMORIA)
+		
+		FS RECIBE PEDIDO DE FINALIZAR PROGRAMA DE LA MEMORIA (ver MEMORIA)		

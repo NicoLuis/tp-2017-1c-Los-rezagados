@@ -49,34 +49,6 @@ t_list* listaProcesos;
 t_list* TLB;
 
 
-void mostrarArchivoConfig();
-
-void escucharKERNEL(void*);
-
-void escucharCPU(void*);
-
-void* memoria_real;
-
-void* reservarMemoria(int, int);
-
-void lockProcesos();
-
-void unlockProcesos();
-
-void lockFramesYProcesos();
-
-void unlockFramesYProcesos();
-
-void crearProcesoYAgregarAListaDeProcesos(uint32_t pid,	uint32_t cantidadDePaginas);
-
-void escribirPaginaEnFS(uint32_t pid, uint8_t nroPag, void* contenido_pagina);
-
-void liberarFramesDeProceso(uint32_t unPid);
-
-void eliminarProcesoDeListaDeProcesos(uint32_t unPid);
-
-t_list* crearEInicializarListaDePaginas(uint32_t cantidadDePaginas);
-
 //PROCESO
 typedef struct {
 	uint32_t PID;
@@ -99,6 +71,62 @@ typedef struct {
 	int bit_pres;
 	int bit_uso;
 } t_pag;
+
+
+void mostrarArchivoConfig();
+
+void escucharKERNEL(void*);
+
+void escucharCPU(void*);
+
+void* memoria_real;
+
+void* reservarMemoria(int, int);
+
+void lockProcesos();
+
+void unlockProcesos();
+
+void lockFrames();
+
+void unlockFrames();
+
+void lockFramesYProcesos();
+
+void unlockFramesYProcesos();
+
+void crearProcesoYAgregarAListaDeProcesos(uint32_t pid,	uint32_t cantidadDePaginas);
+
+void escribirPaginaEnFS(uint32_t pid, uint8_t nroPag, void* contenido_pagina);
+
+void liberarFramesDeProceso(uint32_t unPid);
+
+void eliminarProcesoDeListaDeProcesos(uint32_t unPid);
+
+t_list* crearEInicializarListaDePaginas(uint32_t cantidadDePaginas);
+
+void ponerBitUsoEn1(uint32_t pid, uint8_t numero_pagina);
+
+int paginaInvalida(uint32_t pid, uint8_t numero_pagina);
+
+t_pag* buscarPaginaEnListaDePaginas(uint32_t pid, uint8_t numero_pagina);
+
+void* obtenerContenido(int frame, int offset, int tamanio_leer);
+
+void enviarContenidoCPU(void* contenido_leido, uint32_t tamanioContenido,int socket_cpu);
+
+t_proceso* buscarProcesoEnListaProcesos(uint32_t pid);
+
+void* pedirPaginaAFS(uint32_t pid, uint8_t numero_pagina);
+
+void cargarPaginaAMemoria(uint32_t pid, uint8_t numero_pagina,void* paginaLeida, int accion);
+
+int hayFramesLibres();
+
+t_frame* buscarFrameLibre(uint32_t pid);
+
+void escribirContenido(int frame, int offset, int tamanio_escribir,	void* contenido);
+
 
 //Socket FS
 int socket_fs;

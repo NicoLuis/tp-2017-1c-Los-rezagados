@@ -302,8 +302,8 @@ void escucharCPU(void* socket_cpu) {
 	//Casteo socketCPU
 	int socketCPU = (int) socket_cpu;
 
-	//Casteo socket_cpu
-
+	uint32_t PID = 0;
+	t_proceso* proceso;
 	list_add(lista_cpus, socket_cpu);
 
 	printf("Se conecto un CPU\n");
@@ -318,7 +318,7 @@ void escucharCPU(void* socket_cpu) {
 	int bytesRecibidos;
 	while (1) {
 
-			bytesRecibidos = recv(socket_cpu, &header, sizeof(uint32_t), 0);
+			bytesRecibidos = recv(socketCPU, &header, sizeof(uint32_t), 0);
 			if (bytesRecibidos <= 0) {
 				printf("Error recv CPU");
 				pthread_exit(NULL);
@@ -329,25 +329,128 @@ void escucharCPU(void* socket_cpu) {
 				pthread_exit(NULL);
 			}
 
-			bytesRecibidos = recv(socket_cpu, &header, sizeof(uint32_t), 0);
+			bytesRecibidos = recv(socketCPU, &header, sizeof(uint32_t), 0);
 			if (bytesRecibidos <= 0) {
 				printf("Error recv CPU");
 				pthread_exit(NULL);
 			}
 
 			switch (header) {
-			case CAMBIO_PROCESO_ACTIVO: {
 
-				}
-
-			}
-			break;
 			case FIN_CPU: {
-				printf("La CPU %d ha finalizado\n", socket_cpu);
+				printf("La CPU %d ha finalizado\n", socketCPU);
 				pthread_exit(NULL);
 			}
 			break;
 			case LECTURA_PAGINA: {
+				pthread_mutex_lock(&mutexCantAccesosMemoria);
+				cantAccesosMemoria++;
+				pthread_mutex_unlock(&mutexCantAccesosMemoria);
+
+				uint8_t numero_pagina;
+				uint32_t offset;
+				uint32_t tamanio_leer;
+
+				bytesRecibidos = recv(socketCPU, &numero_pagina, sizeof(uint8_t),0);
+				if (bytesRecibidos <= 0) {
+					printf("Error recv CPU");
+					pthread_exit(NULL);
+				}
+
+				bytesRecibidos = recv(socketCPU, &offset, sizeof(uint32_t), 0);
+				if (bytesRecibidos <= 0) {
+					printf("Error recv CPU");
+					pthread_exit(NULL);
+				}
+
+				bytesRecibidos = recv(socketCPU, &tamanio_leer, sizeof(uint32_t),0);
+				if (bytesRecibidos <= 0) {
+					printf("Error recv CPU");
+					pthread_exit(NULL);
+				}
+
+				printf("Solicitud de lectura. Pag:%d Offset:%d Size:%d",numero_pagina, offset, tamanio_leer);
+
+				lockProcesos();
+				ponerBitUsoEn1(PID, numero_pagina);
+				unlockProcesos();
+
+				if (paginaInvalida(PID, numero_pagina)) {
+
+					printf("Stack Overflow proceso %d\n", PID);
+
+					//AVISO FINALIZACION PROGRAMA A LA CPU
+					header = FINALIZAR_PROGRAMA;
+
+					bytesEnviados = send(socketCPU, &header, sizeof(uint32_t), 0);
+					if (bytesEnviados <= 0) {
+						printf("Error send CPU");
+						pthread_exit(NULL);
+					}
+
+					//-----Retardo
+					pthread_mutex_lock(&mutexRetardo);
+					usleep(retardoMemoria * 1000);
+					pthread_mutex_unlock(&mutexRetardo);
+					//------------
+
+					lockProcesos();
+					t_pag* pagina = buscarPaginaEnListaDePaginas(PID,numero_pagina);
+					unlockProcesos();
+
+					void* contenido_leido = obtenerContenido(pagina->nroFrame,offset, tamanio_leer);
+
+					enviarContenidoCPU(contenido_leido, tamanio_leer, socketCPU);
+
+
+				} else {
+
+					lockFrames();
+					int hayFrameLibre = hayFramesLibres();
+					unlockFrames();
+
+					if ((!hayFrameLibre) && (proceso->cantFramesAsignados == 0)) {
+
+						printf("Finalizando programa: %d. No hay frames disponibles\n",PID);
+
+						//AVISO FINALIZACION PROGRAMA A LA CPU
+						header = FINALIZAR_PROGRAMA;
+
+						bytesEnviados = send(socketCPU, &header, sizeof(uint32_t), 0);
+						if (bytesEnviados <= 0) {
+							printf("Error send CPU");
+							pthread_exit(NULL);
+						}
+
+						/*LA CPU LE AVISA AL KERNEL
+						 EL NUCLEO LE AVISA A LA MEMORIA Y A LA CONSOLA
+						 CUANDO ME AVISE EL KERNEL YO AVISARE AL FS*/
+
+					} else {
+
+						printf("La pagina %d NO esta en Memoria Real. Page Fault\n",numero_pagina);
+
+						//Envio solicitud de lectura a FS
+
+						void* paginaLeidaDeFS = pedirPaginaAFS(PID,	numero_pagina);
+
+						//ahora que tengo la pagina la debo cargar en memoria y leer la parte que me pidio la cpu
+						//obtener contenido a enviar segun pag y offset
+
+						lockFramesYProcesos();
+
+						cargarPaginaAMemoria(PID, numero_pagina, paginaLeidaDeFS,LECTURA_PAGINA);
+
+						t_pag* pagina = buscarPaginaEnListaDePaginas(PID,numero_pagina);
+
+						unlockFramesYProcesos();
+
+						void* contenido_leido = obtenerContenido(pagina->nroFrame,offset, tamanio_leer);
+
+						enviarContenidoCPU(contenido_leido, tamanio_leer,socketCPU);
+
+					}
+				}
 
 			}
 				break;
@@ -361,17 +464,8 @@ void escucharCPU(void* socket_cpu) {
 				printf("Error");
 			}
 
+	}
 }
-
-
-
-
-
-
-
-
-
-
 
 void* reservarMemoria(int cantidadMarcos, int capacidadMarco) {
 	// La creo con calloc para que me la llene de \0
@@ -388,6 +482,17 @@ void lockProcesos() {
 void unlockProcesos() {
 
 	pthread_mutex_unlock(&mutexListaProcesos);
+
+}
+
+void lockFrames() {
+
+	pthread_mutex_lock(&mutexListaFrames);
+
+}
+void unlockFrames() {
+
+	pthread_mutex_unlock(&mutexListaFrames);
 
 }
 
@@ -526,5 +631,300 @@ t_list* crearEInicializarListaDePaginas(uint32_t cantidadDePaginas) {
 
 	}
 	return listaDePaginas;
+}
+
+void ponerBitUsoEn1(uint32_t pid, uint8_t numero_pagina) {
+
+	t_pag* pagina = buscarPaginaEnListaDePaginas(pid, numero_pagina);
+
+	if (pagina != NULL) {
+		pagina->bit_uso = 1;
+	}
+}
+int paginaInvalida(uint32_t pid, uint8_t numero_pagina) {
+
+		lockProcesos();
+
+		t_proceso* proceso = buscarProcesoEnListaProcesos(pid);
+
+		int esPagInvalida = (numero_pagina >= proceso->cantPaginas);
+
+		unlockProcesos();
+
+		return esPagInvalida;
+
+}
+
+t_pag* buscarPaginaEnListaDePaginas(uint32_t pid, uint8_t numero_pagina) {
+
+	t_proceso* proceso = buscarProcesoEnListaProcesos(pid);
+
+	int _soy_la_pagina_buscada(t_pag* pag) {
+		return (pag->nroPag == numero_pagina);
+	}
+
+	return list_find(proceso->listaPaginas, (void*) _soy_la_pagina_buscada);
+
+}
+
+void* obtenerContenido(int frame, int offset, int tamanio_leer) {
+
+	//-----Retardo
+	pthread_mutex_lock(&mutexRetardo);
+	usleep(retardoMemoria * 1000);
+	pthread_mutex_unlock(&mutexRetardo);
+	//------------
+	void* contenido = calloc(1, tamanio_leer);
+	int desplazamiento = (frame * tamanioDeMarcos) + offset;
+
+	pthread_mutex_lock(&mutexMemoriaReal);
+	memcpy(contenido, memoria_real + desplazamiento, tamanio_leer);
+	pthread_mutex_unlock(&mutexMemoriaReal);
+
+	return contenido;
+}
+
+void enviarContenidoCPU(void* contenido_leido, uint32_t tamanioContenido,int socketCPU) {
+
+	uint32_t header;
+
+	void* bufferCPU = malloc(tamanioContenido + 20);
+	uint32_t tamanioValidoBuffer = 0;
+
+	header = MEMORIA;
+	memcpy(bufferCPU, &header, sizeof(uint32_t));
+	tamanioValidoBuffer += sizeof(uint32_t);
+
+	header = ENVIO_PARTE_PAGINA;
+	memcpy(bufferCPU + tamanioValidoBuffer, &header, sizeof(uint32_t));
+	tamanioValidoBuffer += sizeof(uint32_t);
+
+	memcpy(bufferCPU + tamanioValidoBuffer, &tamanioContenido,sizeof(uint32_t));
+	tamanioValidoBuffer += sizeof(uint32_t);
+
+	memcpy(bufferCPU + tamanioValidoBuffer, contenido_leido, tamanioContenido);
+	tamanioValidoBuffer += tamanioContenido;
+
+	int bytesEnviados = send(socketCPU, bufferCPU, tamanioValidoBuffer, 0);
+	if (bytesEnviados <= 0) {
+		printf("Error send CPU");
+		pthread_exit(NULL);
+	}
+
+	free(bufferCPU);
+	free(contenido_leido);
+}
+
+t_proceso* buscarProcesoEnListaProcesos(uint32_t pid) {
+
+	int _soy_el_pid_buscado(t_proceso* proceso) {
+		return (proceso->PID == pid);
+	}
+
+	t_proceso* proceso = list_find(listaProcesos, (void*) _soy_el_pid_buscado);
+
+	if (proceso != NULL) {
+		return proceso;
+	}
+
+	else {
+		pthread_mutex_trylock(&mutexListaProcesos);
+		pthread_mutex_unlock(&mutexListaProcesos);
+
+		pthread_mutex_trylock(&mutexListaFrames);
+		pthread_mutex_unlock(&mutexListaFrames);
+
+		pthread_exit(NULL);
+
+		return NULL;
+	}
+}
+
+int hayFramesLibres() {
+
+	int _soy_frame_libre(t_frame* frame) {
+		return (frame->pid == 0);
+	}
+
+	t_frame* frameLibre = list_find(listaFrames, (void*) _soy_frame_libre);
+
+	if (frameLibre != NULL) {
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+void* pedirPaginaAFS(uint32_t pid, uint8_t numero_pagina) {
+
+	int bytesRecibidos;
+
+	void* bufferFS = malloc(20);
+	uint32_t tamanioValidoBufferFS = 0;
+
+	uint32_t header = MEMORIA;
+	memcpy(bufferFS, &header, sizeof(uint32_t));
+	tamanioValidoBufferFS += sizeof(uint32_t);
+
+	header = LECTURA_PAGINA;
+	memcpy(bufferFS + tamanioValidoBufferFS, &header, sizeof(uint32_t));
+	tamanioValidoBufferFS += sizeof(uint32_t);
+
+	memcpy(bufferFS + tamanioValidoBufferFS, &pid, sizeof(uint32_t));
+	tamanioValidoBufferFS += sizeof(uint32_t);
+
+	memcpy(bufferFS + tamanioValidoBufferFS, &numero_pagina,
+			sizeof(uint8_t));
+	tamanioValidoBufferFS += sizeof(uint8_t);
+
+	pthread_mutex_lock(&mutexFS);
+
+	printf("Pido a FS pagina %d del proceso %d", numero_pagina,pid);
+
+	int bytesEnviados = send(socket_fs, bufferFS, tamanioValidoBufferFS,0);
+	if (bytesEnviados <= 0) {
+		printf("Error send FS");
+		pthread_mutex_unlock(&mutexFS);
+		pthread_exit(NULL);
+	}
+
+	free(bufferFS);
+
+	bytesRecibidos = recv(socket_fs, &header, sizeof(uint32_t), 0);
+	if (bytesRecibidos <= 0) {
+		printf("El FS se ha desconectado");
+		pthread_mutex_unlock(&mutexFS);
+		pthread_exit(NULL);
+	}
+
+	if (header != FS) {
+		printf("El FS se desconecto\n");
+		pthread_mutex_unlock(&mutexFS);
+		pthread_exit(NULL);
+	}
+
+	bytesRecibidos = recv(socket_fs, &header, sizeof(uint32_t), 0);
+	if (bytesRecibidos <= 0) {
+		printf( "El FS se ha desconectado");
+		pthread_mutex_unlock(&mutexFS);
+		pthread_exit(NULL);
+	}
+
+	if (header != ENVIO_PAGINA) {
+		printf( "Error en recv accion fs");
+		pthread_mutex_unlock(&mutexFS);
+		pthread_exit(NULL);
+	}
+
+	void* paginaLeida = calloc(1, tamanioDeMarcos);
+
+	bytesRecibidos = recv(socket_fs, &pid, sizeof(uint32_t), 0);
+	if (bytesRecibidos <= 0) {
+		printf("El FS se ha desconectado");
+		pthread_mutex_unlock(&mutexFS);
+		pthread_exit(NULL);
+	}
+
+	bytesRecibidos = recv(socket_fs, &numero_pagina, sizeof(uint8_t), 0);
+	if (bytesRecibidos <= 0) {
+		printf("El FS se ha desconectado");
+		pthread_mutex_unlock(&mutexFS);
+		pthread_exit(NULL);
+	}
+
+	bytesRecibidos = recv(socket_fs, paginaLeida, tamanioDeMarcos, 0);
+	if (bytesRecibidos <= 0) {
+		printf("El FS se ha desconectado");
+		pthread_mutex_unlock(&mutexFS);
+		pthread_exit(NULL);
+	}
+
+	printf("Recibi de FS pagina %d del proceso %d\n", numero_pagina,pid);
+
+	pthread_mutex_unlock(&mutexFS);
+
+	return paginaLeida;
+}
+
+
+
+void cargarPaginaAMemoria(uint32_t pid, uint8_t numero_pagina,void* paginaLeida, int accion) {
+
+	t_frame* frame = buscarFrameLibre(pid);
+
+	if (frame != NULL) {
+
+		//-----Retardo
+		pthread_mutex_lock(&mutexRetardo);
+		usleep(retardoMemoria * 1000);
+		pthread_mutex_unlock(&mutexRetardo);
+		//------------
+
+		t_pag* pag = buscarPaginaEnListaDePaginas(pid, numero_pagina);
+
+		pag->bit_pres = 1;
+		pag->nroFrame = frame->nroFrame;
+
+		if (accion == ESCRITURA_PAGINA)
+			frame->bit_modif = 1;
+		else
+			frame->bit_modif = 0;
+
+		escribirContenido(frame->nroFrame, 0, tamanioDeMarcos, paginaLeida);
+
+		printf("Pagina %d del proceso %d cargada en frame %d\n",numero_pagina, pid, frame->nroFrame);
+
+	}
+
+}
+
+t_frame* buscarFrameLibre(uint32_t pid) {
+
+	int _soy_frame_libre(t_frame* frame) {
+		return (frame->pid == 0);
+	}
+
+	t_proceso* proceso = buscarProcesoEnListaProcesos(pid);
+
+	t_frame* frameLibre;
+
+	if ((hayFramesLibres())) {
+
+		//SI HAY FRAME LIBRES Y EL PROCESO NO TIENE OCUPADOS TODOS LOS MARCOS POR PROCESO ELIJO CUALQUIER FRAME
+
+		frameLibre = list_find(listaFrames, (void*) _soy_frame_libre);
+
+	}
+/*
+	else {
+		//SI NO HAY FRAMES LIBRES O EL PROCESO TIENE OCUPADOS TODOS LOS MARCOS POR PROCESO
+		//REEMPLAZO UN FRAME DE ESE PROCESO
+
+		frameLibre = t_frame*
+	}
+	*/
+	frameLibre->pid = pid;
+
+	proceso->cantFramesAsignados++;
+
+	return frameLibre;
+
+}
+
+void escribirContenido(int frame, int offset, int tamanio_escribir,	void* contenido) {
+
+	//-----Retardo
+	pthread_mutex_lock(&mutexRetardo);
+	usleep(retardoMemoria * 1000);
+	pthread_mutex_unlock(&mutexRetardo);
+	//------------
+
+	int desplazamiento = (frame * tamanioDeMarcos) + offset;
+
+	pthread_mutex_lock(&mutexMemoriaReal);
+	memcpy(memoria_real + desplazamiento, contenido, tamanio_escribir);
+	pthread_mutex_unlock(&mutexMemoriaReal);
+
+	free(contenido);
 }
 

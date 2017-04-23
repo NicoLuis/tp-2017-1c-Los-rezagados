@@ -122,7 +122,7 @@ int main(int argc, char* argv[]) {
 
 
 	//-------------CREAR UN SOCKET DE ESCUCHA PARA LAS CPU's Y EL NUCLEO-------------------------
-	int socketMemoria = crearSocketDeEscucha(puertoMemoria);
+	int socketMemoria = crearSocketDeEscucha(puertoMemoria,0);
 	char* bufferEscucha = malloc(200);
 
 	int falloP_thread;

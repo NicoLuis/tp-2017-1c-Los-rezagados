@@ -314,7 +314,6 @@ void escucharCPU(void* socket_cpu) {
 		pthread_exit(NULL);
 	}
 
-
 	uint32_t header;
 	int bytesRecibidos;
 	while (1) {

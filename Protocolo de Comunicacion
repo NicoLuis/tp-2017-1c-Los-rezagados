@@ -105,7 +105,7 @@ enum{CONSOLA=1,
 		
 	KERNEL -> CPU
 		
-		KERNEL ENVIA PCB A LA CPU(USAR FUNCION enviarPCB de PCB.h)
+		KERNEL ENVIA PCB A LA CPU
 			4BytesParaIdentificarseComoKernel  4BytesParaIndicarQueEstaEnviandoPCB 4BytesParaQuantum 4BytesParaQuantumSleep	4BytesParaPID 4BytesParaPC 4BytesParaCantPaginas 4BytesParaTamanioIndiceDeCodigo NBytesParaIndiceDeCodigo 4BytesParaTamanioIndiceDeEtiquetas MBytesParaIndiceDeEtiquetas 4BytesParaStackPointer	4BytesParaTamanioIndiceDeStack XBytesParaIndiceDeStack  ZBytesConArgumentosyVariablesDeCadaFuncionPresenteEnElIndiceDeStack
 			KERNEL==2								ENVIO_PCB==13						uint32_t		uint32_t				uint32_t	uint32_t		uint32_t				uint32_t == N				indice de codigo				uint32_t == M					indice de etiquetas				uint32_t				uint32_t == X			indice de stack				los bytes que sean necesarios dependiendo el caso
 									
@@ -140,6 +140,19 @@ enum{CONSOLA=1,
 		KERNEL RECIBE SOLICITUD DEL VALOR DE  UNA VARIABLE COMPARTIDA POR PARTE DEL CPU (ver CPU)
 		
 		KERNEL RECIBE AVISO DE FINALIZACION DE LA CPU (ver CPU)
+
+	KERNEL -> FS
+	
+		KERNEL ENVIA VALIDACION DE UN ARCHIVO A EL FS
+
+		KERNEL ENVIA CREACION DE UN ARCHIVO A EL FS
+
+		KERNEL ENVIA ELIMINACION DE UN ARCHIVO A EL FS
+
+		KERNEL ENVIA PEIDO DE LECTURA A EL FS
+
+		KERNEL ENVIA PEDIDO DE ESCRITURA A EL FS
+	
 		
 	
 ----------
@@ -201,7 +214,7 @@ enum{CONSOLA=1,
 		
 		CPU ENVIA PEDIDO DE LECTURA DE PAGINA A LA MEMORIA
 			4BytesParaIdentificarseComoCPU	4BytesParaIndicarQueQuiereLeerParteDeUnaPagina 1ByteParaNumeroDePaginaDelProceso 4BytesParaOffset	4BytesParaTamanioALeer					 
-			CPU==3								LECTURA_PAGINA==23										uint8_t					uint32_t 			uint32_t				
+			CPU==3								LECTURA_PAGINA==23												uint8_t									uint32_t 				uint32_t				
 		CPU ENVIA PEDIDO DE ESCRITURA DE PAGINA A LA MEMORIA
 			4BytesParaIdentificarseComoCPU	4BytesParaIndicarQueQuiereEscribirParteDeUnaPagina 1BytesParaNumeroDePaginaDelProceso  4BytesParaOffset	4BytesParaTamanioAEscribir XBytesParaBuffer													 
 			CPU==3								ESCRITURA_PAGINA==24									uint8_t								uint32_t   		uint32_t == X			buffer de X bytes
@@ -234,6 +247,21 @@ enum{CONSOLA=1,
 		MEMORIA ENVIA QUE HAY SUFICIENTE ESPACIO PARA ALMACENAR EL PROGRAMA AL KERNEL		
 		4BytesParaIdentificarseComoMEMORIA 4BytesParaIndicarQueHayEspacioSuficiente	4BytesParaElPid
 			MEMORIA==16						 ESPACIO_SUFICIENTE==27						uint32_t		
+
+		MEMORIA ENVIA PEDIDO DE LECTURA DE PAGINA AL KERNEL
+			4BytesParaIdentificarseComoMEMORIA	4BytesParaIndicarQueQuiereLeerUnaPagina 4BytesParaElPID	1ByteParaNumeroDePaginaDelProceso				 
+			MEMORIA==4								LECTURA_PAGINA==29						 uint32_t					uint8_t
+			
+		MEMORIA ENVIA PEDIDO DE ESCRITURA DE PAGINA AL KERNEL
+			4BytesParaIdentificarseComoMEMORIA	4BytesParaIndicarQueQuiereEscribirUnaPagina 4BytesParaElPID 1BytesParaNumeroDePaginaDelProceso 	NBytesParaDatosAEscribir(N definido por el tamanio de pagina)
+				MEMORIA==4							ESCRITURA_PAGINA==24						uint32_t  			uint8_t						contenido a escribir (buffer de tamanio fijo)
+			
+		
+		MEMORIA RECIBE PAGINA LEIDA DEL KERNEL (ver kernel)
+		
+		MEMORIA RECIBE AVISO DE ESPACIO INSUFICIENTE DEL KERNEL (ver Kernel)
+		
+		MEMORIA RECIBE AVISO DE ESPACIO SUFICIENTE DEL KERNEL (ver Kernel)
 		
 		MEMORIA RECIBE INICIALIZAR PROCESO DEL KERNEL (ver Kernel)
 		
@@ -258,62 +286,33 @@ enum{CONSOLA=1,
 		MEMORIA RECIBE CAMBIO DE PROCESO ACTIVO DE LA CPU(ver CPU)
 		
 		MEMORIA RECIBE AVISO DE FINALIZACION DE LA CPU (ver CPU)
-		
-	
-	MEMORIA -> SWAP
-		
-		MEMORIA ENVIA TAMANIO DE PAGINA AL SWAP		
-			4BytesParaIdentificarseComoMEMORIA 4BytesParaIndicarEnvioDeTamanioDePaginas  4BytesParaTamanioDePagina
-				MEMORIA==4							TAMANIO_PAGINAS==26							uint32_t
-		
-		MEMORIA ENVIA PEDIDO DE LECTURA DE PAGINA AL SWAP
-			4BytesParaIdentificarseComoMEMORIA	4BytesParaIndicarQueQuiereLeerUnaPagina 4BytesParaElPID	1ByteParaNumeroDePaginaDelProceso				 
-			MEMORIA==4								LECTURA_PAGINA==29						 uint32_t					uint8_t
-		
-	
-		MEMORIA ENVIA PEDIDO DE ESCRITURA DE PAGINA AL SWAP
-			4BytesParaIdentificarseComoMEMORIA	4BytesParaIndicarQueQuiereEscribirUnaPagina 4BytesParaElPID 1BytesParaNumeroDePaginaDelProceso 	NBytesParaDatosAEscribir(N definido por el tamanio de pagina)
-				MEMORIA==4							ESCRITURA_PAGINA==24						uint32_t  			uint8_t						contenido a escribir (buffer de tamanio fijo)
-			
-		MEMORIA ENVIA PEDIDO DE INICIALIZAR PROGRAMA AL SWAP	
-			4BytesParaIdentificarseComoMEMORIA  4BytesParaIndicarInicializarPrograma 4BytesParaElPID 4BytesParaIndicarCantidadDePaginas
-				MEMORIA==4							INICIALIZAR_PROGRAMA==12			uint32_t			uint32_t
-			
-		MEMORIA ENVIA PEDIDO DE FINALIZAR PROGRAMA AL SWAP		
-			4BytesParaIdentificarseComoUmc 4BytesParaIndicarFinalizarPrograma 	4BytesParaElPID
-			MEMORIA==4									FINALIZAR_PROGRAMA==11		uint32_t	
-		
-		MEMORIA RECIBE PAGINA LEIDA DEL SWAP (ver Swap)
-		
-		MEMORIA RECIBE AVISO DE ESPACIO INSUFICIENTE DEL SWAP (ver Swap)
-		
-		MEMORIA RECIBE AVISO DE ESPACIO SUFICIENTE DEL SWAP (ver Swap)
+
 
 ----------
 ---FS---
 ----------
 
-	FS  -> MEMORIA
+	FS  -> KERNEL
 		
-		FS ENVIA PAGINA LEIDA A LA MEMORIA 
+		FS ENVIA PAGINA LEIDA AL KERNEL
 			4BytesParaIdentificarseComoFile System	4BytesParaIndicarQueEnviaUnaPagina   4BytesParaElPID 1ByteParaNumeroDePaginaDelProceso 	NBytesParaDatosAEnviar(N definido por el tamanio de pagina)
 				FS==5										ENVIO_PAGINA==30				uint32_t  			uint8_t						contenido a escribir (buffer de tamanio fijo)
-		
-				
-		FS ENVIA AVISO DE ESPACIO INSUFICIENTE A LA MEMORIA
+						
+		FS ENVIA AVISO DE ESPACIO INSUFICIENTE AL KERNEL
 			4BytesParaIdentificarseComoFile System	4BytesParaIndicarQueNoHayEspacioSuficiente 	4BytesParaElPid
 				FS==5 							ESPACIO_INSUFICIENTE==10							uint32_t
 				
-		FS ENVIA AVISO DE ESPACIO SUFICIENTE A LA MEMORIA
+		FS ENVIA AVISO DE ESPACIO SUFICIENTE AL KERNEL
 			4BytesParaIdentificarseComoFile System	4BytesParaIndicarQueHayEspacioSuficiente 	4BytesParaElPid
 				FS==5 											ESPACIO_SUFICIENTE==27				uint32_t
 			
-		FS RECIBE TAMANIO DE PAGINAS DE LA MEMORIA (ver MEMORIA)
+		FS RECIBE PEDIDO DE LECTURA DE PAGINA DEL KERNEL
+
+		FS RECIBE PEDIDO DE ESCRITURA DE PAGINA DEL KERNEL
 		
-		FS RECIBE PEDIDO DE LECTURA DE PAGINA DE LA MEMORIA (ver MEMORIA)
-		
-		FS RECIBE PEDIDO DE ESCRITURA DE PAGINA DE LA MEMORIA (ver MEMORIA)
-		
-		FS RECIBE PEDIDO DE INICIALIZAR PROGRAMA DE LA MEMORIA (ver MEMORIA)
-		
-		FS RECIBE PEDIDO DE FINALIZAR PROGRAMA DE LA MEMORIA (ver MEMORIA)		
+		FS RECIBE PEDIDO DE VALIDACION DE ARCHIVO DEL KERNEL
+
+		FS RECIBE PEDIDO DE CREACION DE ARCHIVO DEL KERNEL
+
+		FS RECIBE PEDIDO DE ELIMINAR ARCHIVO DEL KERNEL	
+

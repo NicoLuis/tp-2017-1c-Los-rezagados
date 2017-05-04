@@ -28,30 +28,51 @@ void mostrarArchivoConfig() {
 
 
 
-int handshake(int socket_cliente){
-
-	char* bufferEscucha = malloc(200);
+int handshake(int socket_cliente, int tipo){
 	int retorno = 0;
+	char* bufferEscucha = malloc(200);
 
-	send(socket_cliente, "Hola quien sos?", 16, 0);
+	if(tipo == 0)		//si tipo = 0 pregunto, sino me preguntan
+		send(socket_cliente, "Hola quien sos?", 16, 0);
 
 	int bytesRecibidos = recv(socket_cliente, bufferEscucha, 50, 0);
-	if (bytesRecibidos <= 0) {
-		printf("El cliente se ha desconectado");
+	if (bytesRecibidos <= 0){
+		free(bufferEscucha);
 		return -1;
 	}
 
 	bufferEscucha[bytesRecibidos] = '\0';
 
-	if (strcmp("Hola soy la Consola", bufferEscucha) == 0)
-		retorno = 1;
-	else if (strcmp("Hola soy la CPU", bufferEscucha) == 0)
-		retorno = 2;
+	if(tipo == 0){
+		if (strcmp("Hola soy la Consola", bufferEscucha) == 0)
+			retorno = 1;
+		else if (strcmp("Hola soy la CPU", bufferEscucha) == 0)
+			retorno = 2;
 
-	int bytesEnviados = send(socket_cliente, "Conexion Aceptada", 18, 0);
-	if (bytesEnviados <= 0)
-		return -2;
+		int bytesEnviados = send(socket_cliente, "Conexion Aceptada", 18, 0);
+		if (bytesEnviados <= 0)
+			retorno = -2;
+	}else{
+		if(strcmp("Hola quien sos?", bufferEscucha) != 0){
+			free(bufferEscucha);
+			return -2;
+		}
 
+		send(socket_cliente, "Hola soy el KERNEL", 19, 0);
+
+		bytesRecibidos = recv(socket_cliente, bufferEscucha, 50, 0);
+		if (bytesRecibidos <= 0){
+			free(bufferEscucha);
+			return -1;
+		}
+
+		bufferEscucha[bytesRecibidos] = '\0';
+
+		if (strcmp("Conexion aceptada", bufferEscucha) == 0)
+			retorno = 1;
+	}
+
+	free(bufferEscucha);
 
 	return retorno;
 }
@@ -89,10 +110,58 @@ void atender_consola(int socket_consola){
 		list_remove_by_condition(lista_consolas, (void*) _esConsola);
 		close(socket_consola);
 		FD_CLR(socket_consola, &fdsMaestro);
-	}else{
-
-		fprintf(stderr, "tipoMensaje %d\n", msgRecibido->tipoMensaje);
-		fprintf(stderr, "longitud %d\n", msgRecibido->longitud);
-		fprintf(stderr, "texto %s\n", (char*) msgRecibido->data);
+		return;
 	}
+
+	log_trace(logKernel, "Recibi tipoMensaje %d de consola", msgRecibido->tipoMensaje);
+
+	char* script;	//si lo declaro adentro del switch se queja
+	switch(msgRecibido->tipoMensaje){
+
+	case CONSOLA_ENVIA_PATH:
+		script = (char*)msgRecibido->data;
+		log_info(logKernel, script);
+		crearPCB(socket_consola);
+		break;
+
+	}
+
 }
+
+
+
+
+void crearPCB(int socketConsola){
+
+	t_PCB* pcb = malloc(sizeof(t_PCB));
+	pcb->pid = pid;
+	send(socketConsola, &pid, sizeof(uint32_t), 0);
+	pid++;
+	//todo: ver q pija son los indices
+
+	list_add(lista_PCBs, pcb);
+
+}
+
+
+void terminarProceso(){
+
+	list_destroy(lista_cpus);
+	list_destroy(lista_consolas);
+	void destruirPCBs(t_PCB* pcb){
+		//todo: aca libero todos los elementos del pcb (mas q nada los indices)
+		free(pcb);
+	}
+	list_destroy_and_destroy_elements(lista_PCBs, (void*) destruirPCBs);
+
+	log_trace(logKernel, "Terminando Proceso");
+	log_destroy(logKernel);
+}
+
+
+
+
+
+
+
+

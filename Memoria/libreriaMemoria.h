@@ -34,6 +34,7 @@
 
 // TIPOS DE MENSAJES
 #define CPU_TERMINO 100
+#define KERNEL_TAMANIOPAGS 300
 
 //Archivo de Configuracion
 int puertoMemoria;

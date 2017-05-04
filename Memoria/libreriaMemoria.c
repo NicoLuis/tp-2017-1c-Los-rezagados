@@ -44,6 +44,9 @@ void escucharKERNEL(void* socket_kernel) {
 		pthread_exit(NULL);
 	}
 
+	//envio tamaño pags a kernel
+	send(socketKernel, &tamanioDeMarcos, sizeof(uint32_t), 0);
+
 	uint32_t header;
 	while (1) {
 

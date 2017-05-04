@@ -80,7 +80,7 @@ void leerComando(char* comando){
 
 		char* mensajeAEnviar = string_substring_from(comando, 7);
 		fprintf(stderr, "El mensajeAEnviar es %s\n", mensajeAEnviar);
-		msg_enviar_separado(CONSOLA_ENVIA_PATH, string_length(mensajeAEnviar)+1, mensajeAEnviar, (int) socket_kernel);
+		msg_enviar_separado(CONSOLA_ENVIA_PATH, string_length(mensajeAEnviar)+1, mensajeAEnviar, socket_kernel);
 
 	}else
 		fprintf(stderr, "El comando '%s' no es valido\n", comando);
@@ -95,7 +95,11 @@ void iniciarPrograma(char* pathAIniciar){
 
 	char* scriptCompleto = cargarScript(pathAIniciar);		//fixme: preguntar si envio a kernel el script completo o solo el path
 
-	msg_enviar_separado(CONSOLA_ENVIA_PATH, string_length(scriptCompleto), scriptCompleto, (int) socket_kernel);
+	msg_enviar_separado(CONSOLA_ENVIA_PATH, string_length(scriptCompleto), scriptCompleto, socket_kernel);
+
+	uint32_t pid;
+	recv(socket_kernel, &pid, sizeof(uint32_t), 0);
+	fprintf(stderr, "El pid es %d\n", pid);
 
 }
 

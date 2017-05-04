@@ -16,7 +16,6 @@ int main(int argc, char* argv[]) {
 
 
 	//Archivo de configuracion
-
 	if (argc == 1) {
 		printf("Debe ingresar la ruta del archivo en LC \n");
 		return -1;
@@ -30,6 +29,8 @@ int main(int argc, char* argv[]) {
 	//Inicializo listas
 	lista_cpus = list_create();
 	lista_consolas = list_create();
+	lista_PCBs = list_create();
+	pid = 0;
 
 	//Cargo archivo de configuracion
 
@@ -50,79 +51,52 @@ int main(int argc, char* argv[]) {
 
 	mostrarArchivoConfig();
 
+	//Creo archivo log
+	logKernel = log_create("kernel.log", "KERNEL", false, LOG_LEVEL_TRACE);
+	log_trace(logKernel, "  -----------  INICIO KERNEL  -----------  ");
+
+	//Defino señales
+	signal (SIGINT, terminarProceso);
+
+
 	//-------------------------------CONEXION AL LA MEMORIA-------------------------------------
 
-	printf("Me conecto a la Memoria\n");
-
+	log_trace(logKernel, "Me conecto a Memoria");
 	socket_memoria = conectarAServidor(ipMemoria, puertoMemoria);
 
-	char* bufferMemoria = malloc(200);
-
-	int bytesRecibidos = recv(socket_memoria, bufferMemoria, 50, 0);
-	if (bytesRecibidos <= 0) {
-		printf("La Memoria se ha desconectado\n");
+	int retornoHandshake = handshake(socket_memoria, 1);
+	if(retornoHandshake == -1){
+		log_trace(logKernel, "La Memoria se ha desconectado");
+		exit(-1);
 	}
-
-	bufferMemoria[bytesRecibidos] = '\0';
-
-	printf("Recibi %d bytes con el siguiente mensaje: %s\n",bytesRecibidos, bufferMemoria);
-
-	send(socket_memoria, "Hola soy el KERNEL", 19, 0);
-
-	bytesRecibidos = recv(socket_memoria, bufferMemoria, 50, 0);
-
-	if (bytesRecibidos <= 0) {
-		printf("La Memoria se ha desconectado\n");
+	else if(retornoHandshake == -2){
+		log_trace(logKernel, "Error en handshake, no es memoria");
+		exit(-1);
 	}
+	log_trace(logKernel, "Me conecte bien a Memoria");
 
-	bufferMemoria[bytesRecibidos] = '\0';
-
-	printf("Respuesta: %s\n", bufferMemoria);
-
-	if (strcmp("Conexion aceptada", bufferMemoria) == 0) {
-		printf("Me conecte correctamente a la Memoria\n");
-	}
-
+	recv(socket_memoria, &tamanioPag, sizeof(uint32_t), 0);
+	log_trace(logKernel, "Tamaño de paginas: %d", tamanioPag);
 
 
 	//-------------------------------CONEXION AL FILE SYSTEM-------------------------------------
-
-	printf("Me conecto al File System\n");
-
+	log_trace(logKernel, "Me conecto al File System");
 	socket_fs = conectarAServidor(ipFileSystem, puertoFS);
 
-	char* bufferFS = malloc(200);
-
-	bytesRecibidos = recv(socket_fs, bufferFS, 50, 0);
-	if (bytesRecibidos <= 0) {
-		printf("El File System se ha desconectado\n");
+	retornoHandshake = handshake(socket_fs, 1);
+	if(retornoHandshake == -1){
+		log_trace(logKernel, "El File System se ha desconectado");
+		exit(-1);
 	}
-
-	bufferFS[bytesRecibidos] = '\0';
-
-	printf("Recibi %d bytes con el siguiente mensaje: %s\n",bytesRecibidos, bufferFS);
-
-	send(socket_fs, "Hola soy el KERNEL", 19, 0);
-
-	bytesRecibidos = recv(socket_fs, bufferFS, 50, 0);
-
-	if (bytesRecibidos <= 0) {
-		printf("El FIle System se ha desconectado\n");
+	else if(retornoHandshake == -2){
+		log_trace(logKernel, "Error en handshake, no es file system");
+		exit(-1);
 	}
-
-	bufferFS[bytesRecibidos] = '\0';
-
-	printf("Respuesta: %s\n", bufferFS);
-
-	if (strcmp("Conexion aceptada", bufferFS) == 0) {
-		printf("Me conecte correctamente al File System\n");
-	}
+	log_trace(logKernel, "Me conecte bien al File System");
 
 
-
+	//-------------------------------CONEXIONES CPU Y CONSOLA-------------------------------------
 	conectar_select(string_itoa(puertoPrograma));
-
-
 
 
 	return 0;
@@ -171,7 +145,7 @@ int conectar_select(char* puerto_escucha) {
 						if (socket_cliente_aceptado > max_fds) max_fds = socket_cliente_aceptado;
 						log_trace(conectar_select_log, "El select recibio una conexion en el socket %d", socket_cliente_aceptado);
 
-						int tipo = handshake(socket_cliente_aceptado);
+						int tipo = handshake(socket_cliente_aceptado, 0);
 
 						switch(tipo){
 

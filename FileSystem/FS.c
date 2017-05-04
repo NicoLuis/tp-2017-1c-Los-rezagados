@@ -31,6 +31,8 @@ int main(int argc, char* argv[]) {
 
 	mostrarArchivoConfig();
 
+	//Creo archivo log
+	t_log* log_fs = log_create("FS.log", "FS", false, LOG_LEVEL_TRACE);
 
 	//Creo un hilo para comunicarme con el Kernel
 		pthread_t hilo_conexionKERNEL;
@@ -41,7 +43,7 @@ int main(int argc, char* argv[]) {
 		pthread_attr_setdetachstate(&atributo, PTHREAD_CREATE_DETACHED);
 
 		//-------------CREAR UN SOCKET DE ESCUCHA PARA LAS CPU's Y EL KERNEL-------------------------
-		int socket_fs = crearSocketDeEscucha(puertoFS);
+		int socket_fs = crearSocketDeEscucha(string_itoa(puertoFS), log_fs);
 
 		char* bufferEscucha = malloc(200);
 
@@ -62,7 +64,7 @@ int main(int argc, char* argv[]) {
 			int bytesRecibidos = recv(socket_cliente, bufferEscucha, 50, 0);
 			if (bytesRecibidos <= 0) {
 
-				printf("El cliente se ha desconectado\n");
+				fprintf(stderr, "El cliente se ha desconectado\n");
 
 				abort();
 			}
@@ -74,7 +76,7 @@ int main(int argc, char* argv[]) {
 				falloP_thread = pthread_create(&hilo_conexionKERNEL, &atributo,(void*) escucharKERNEL, (void*) socket_cliente);
 				if (falloP_thread < 0) {
 
-					printf("Error Hilo Esucha Kernel\n");
+					fprintf(stderr, "Error Hilo Esucha Kernel\n");
 
 					abort();
 				}

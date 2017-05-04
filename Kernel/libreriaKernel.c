@@ -119,9 +119,11 @@ void atender_consola(int socket_consola){
 	switch(msgRecibido->tipoMensaje){
 
 	case CONSOLA_ENVIA_PATH:
+		pid++;
 		script = (char*)msgRecibido->data;
 		log_info(logKernel, script);
-		crearPCB(socket_consola);
+		int pidActual = crearPCB(socket_consola);
+		enviarScriptAMemoria(script, pidActual);
 		break;
 
 	}
@@ -131,15 +133,33 @@ void atender_consola(int socket_consola){
 
 
 
-void crearPCB(int socketConsola){
+int crearPCB(int socketConsola){
 
 	t_PCB* pcb = malloc(sizeof(t_PCB));
+	pcb->socketConsola = socketConsola;
 	pcb->pid = pid;
 	send(socketConsola, &pid, sizeof(uint32_t), 0);
-	pid++;
+	pcb->pc = 0;
+	pcb->ec = 0;
 	//todo: ver q pija son los indices
 
 	list_add(lista_PCBs, pcb);
+	return pid;
+}
+
+void enviarScriptAMemoria(char* script, int pid){
+
+	bool _buscarPCB(t_PCB* pcb){
+		return pcb->pid == pid;
+	}
+
+	t_PCB* pcb = list_find(lista_PCBs, (void*) _buscarPCB);
+
+	msg_enviar_separado(KERNEL_SCRIPT, string_length(script), script, socket_memoria);
+	uint8_t ok;
+	recv(socket_memoria, &ok, sizeof(uint8_t), 0);		//todo:memoria lo tiene q recibir
+	if(ok == 111)
+		pcb->cantPags = (string_length(script) / tamanioPag) + 1;
 
 }
 

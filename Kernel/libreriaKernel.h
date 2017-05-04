@@ -34,12 +34,15 @@
 
 
 // TIPOS DE MENSAJES
+#define OK 111
 #define CPU_TERMINO 100
 #define CONSOLA_ENVIA_PATH 200
 #define KERNEL_TAMANIOPAGS 300
+#define KERNEL_SCRIPT 301
 
 
 typedef struct {	//todo: reemplazar void* por lo q corresponda
+	int socketConsola;
 	uint32_t pid;
 	int pc;				//Program Counter
 	int cantPags;		//Páginas utilizadas por elcodigo AnSISOP
@@ -89,7 +92,8 @@ void escucharCPU(int);
 
 int handshake(int socket_cliente, int tipo);
 void atender_consola(int socket_consola);
-void crearPCB(int);
+int crearPCB(int);
+void enviarScriptAMemoria(int, char*);
 void terminarProceso();
 
 #endif /* LIBRERIAKERNEL_H_ */

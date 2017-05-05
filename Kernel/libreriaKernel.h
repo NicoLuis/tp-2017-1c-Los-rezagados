@@ -37,8 +37,9 @@
 #define OK 111
 #define CPU_TERMINO 100
 #define CONSOLA_ENVIA_PATH 200
-#define KERNEL_TAMANIOPAGS 300
-#define KERNEL_SCRIPT 301
+#define KERNEL_TAMANIOPAGS 30
+#define KERNEL_INICIAR_PROGRAMA 31
+#define MARCOS_INSUFICIENTES 32
 
 
 typedef struct {	//todo: reemplazar void* por lo q corresponda
@@ -93,7 +94,7 @@ void escucharCPU(int);
 int handshake(int socket_cliente, int tipo);
 void atender_consola(int socket_consola);
 int crearPCB(int);
-void enviarScriptAMemoria(int, char*);
+void enviarScriptAMemoria(uint32_t, char*);
 void terminarProceso();
 
 #endif /* LIBRERIAKERNEL_H_ */

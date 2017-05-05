@@ -97,9 +97,15 @@ void iniciarPrograma(char* pathAIniciar){
 
 	msg_enviar_separado(CONSOLA_ENVIA_PATH, string_length(scriptCompleto), scriptCompleto, socket_kernel);
 
-	uint32_t pid;
-	recv(socket_kernel, &pid, sizeof(uint32_t), 0);
-	fprintf(stderr, "El pid es %d\n", pid);
+	uint8_t pid;
+	uint8_t respuesta;
+	recv(socket_kernel, &respuesta, sizeof(uint8_t), 0);
+	if(respuesta == OK){
+		recv(socket_kernel, &pid, sizeof(uint8_t), 0);
+		fprintf(stderr, "El pid es %d\n", pid);
+	}
+	if(respuesta == MARCOS_INSUFICIENTES)
+		fprintf(stderr, "No hay espacio suficiente en memoria \n");
 
 }
 

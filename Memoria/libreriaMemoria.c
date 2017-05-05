@@ -10,19 +10,19 @@
 void mostrarArchivoConfig() {
 
 	printf("El puerto de la MEMORIA es: %d\n", puertoMemoria);
-	log_info(log_memoria,"El puerto de la MEMORIA es: %d\n", puertoMemoria);
+	log_info(log_memoria,"El puerto de la MEMORIA es: %d", puertoMemoria);
 	printf("La cantidad de Marcos es: %d\n", cantidadDeMarcos);
-	log_info(log_memoria,"La cantidad de Marcos es: %d\n", cantidadDeMarcos);
+	log_info(log_memoria,"La cantidad de Marcos es: %d", cantidadDeMarcos);
 	printf("El tamaño de las Marcos es: %d\n", tamanioDeMarcos);
-	log_info(log_memoria,"El tamaño de las Marcos es: %d\n", tamanioDeMarcos);
+	log_info(log_memoria,"El tamaño de las Marcos es: %d", tamanioDeMarcos);
 	printf("La cantidad de entradas de Cache habilitadas son: %d\n", cantidadaEntradasCache);
-	log_info(log_memoria,"La cantidad de entradas de Cache habilitadas son: %d\n", cantidadaEntradasCache);
+	log_info(log_memoria,"La cantidad de entradas de Cache habilitadas son: %d", cantidadaEntradasCache);
 	printf("La cantidad maxima de entradas a la cache por proceso son: %d\n", cachePorProceso);
-	log_info(log_memoria,"La cantidad maxima de entradas a la cache por proceso son: %d\n", cachePorProceso);
+	log_info(log_memoria,"La cantidad maxima de entradas a la cache por proceso son: %d", cachePorProceso);
 	printf("El algoritmo de reemplaco de la Cache es: %s\n", algoritmoReemplazo);
-	log_info(log_memoria,"El algoritmo de reemplaco de la Cache es: %s\n", algoritmoReemplazo);
+	log_info(log_memoria,"El algoritmo de reemplaco de la Cache es: %s", algoritmoReemplazo);
 	printf("El retardo de la memoria es de: %d\n",retardoMemoria);
-	log_info(log_memoria,"El retardo de la memoria es de: %d\n",retardoMemoria);
+	log_info(log_memoria,"El retardo de la memoria es de: %d",retardoMemoria);
 
 }
 
@@ -33,10 +33,9 @@ void escucharKERNEL(void* socket_kernel) {
 	int socketKernel = (int) socket_kernel;
 
 	uint32_t pid;
-	uint32_t tamanioCodigo;
 	uint32_t cantidadDePaginas;
 
-	log_info(log_memoria,"Se conecto el Kernel\n");
+	log_info(log_memoria,"Se conecto el Kernel");
 
 	int bytesEnviados = send(socketKernel, "Conexion Aceptada", 18, 0);
 	if (bytesEnviados <= 0) {
@@ -50,208 +49,49 @@ void escucharKERNEL(void* socket_kernel) {
 	uint32_t header;
 	while (1) {
 
-		void* bufferKernel = malloc(1000);
-		uint32_t tamanioValidoBufferKernel = 0;
-
-		int bytesRecibidos = recv(socketKernel, &header, sizeof(uint32_t), 0);
-		if (bytesRecibidos <= 0) {
+		if (recv(socketKernel, &pid, sizeof(uint32_t), 0) <= 0) {
 			log_info(log_memoria,"El Kernel se ha desconectado");
 			pthread_exit(NULL);
 		}
+		t_msg* msg = msg_recibir(socketKernel);
+		msg_recibir_data(socketKernel, msg);
 
-		if (header != KERNEL) {
-			log_error(log_memoria,"Error recv header nucleo");
-			pthread_exit(NULL);
-		}
-
-		bytesRecibidos = recv(socketKernel, &header, sizeof(uint32_t), 0);
-		if (bytesRecibidos <= 0) {
-			log_info(log_memoria,"El Kernel se ha desconectado");
-			pthread_exit(NULL);
-		}
+		header = msg->tipoMensaje;
 
 		switch (header) {
-		case INICIALIZAR_PROGRAMA: {
 
-			bytesRecibidos = recv(socketKernel, &pid, sizeof(uint32_t), 0);
-			if (bytesRecibidos <= 0) {
-					log_info(log_memoria,"El Kernel se ha desconectado");
-					pthread_exit(NULL);
+		case KERNEL_INICIAR_PROGRAMA:
+
+			cantidadDePaginas = msg->longitud / tamanioDeMarcos;
+			cantidadDePaginas = (msg->longitud % tamanioDeMarcos) == 0? cantidadDePaginas: cantidadDePaginas + 1;
+
+			log_info(log_memoria, "Solicitud de inicializar proceso %d con %d paginas", pid, cantidadDePaginas);
+
+			crearProcesoYAgregarAListaDeProcesos(pid, cantidadDePaginas);
+
+			//guardo codigo en memoria
+
+			if(hayFramesLibres()){
+				int i = 0;
+				t_frame* marcoLibre;
+				for(; i < cantidadDePaginas; i++){
+					marcoLibre = buscarFrameLibre(pid);
+					escribirContenido(marcoLibre->nroFrame, 0, tamanioDeMarcos, msg->data + i*tamanioDeMarcos);
+					free(marcoLibre);
 				}
-
-			bytesRecibidos = recv(socketKernel, &cantidadDePaginas,sizeof(uint32_t), 0);
-			if (bytesRecibidos <= 0) {
-					log_info(log_memoria,"El Kernel se ha desconectado");
-					pthread_exit(NULL);
-				}
-
-			bytesRecibidos = recv(socketKernel, &tamanioCodigo,sizeof(uint32_t), 0);
-			if (bytesRecibidos <= 0) {
-					log_info(log_memoria,"El Kernel se ha desconectado");
-					pthread_exit(NULL);
-				}
-
-			void* codigoAnSISOP = calloc(cantidadDePaginas, tamanioDeMarcos);
-
-			bytesRecibidos = recv(socketKernel, codigoAnSISOP, tamanioCodigo,0);
-			if (bytesRecibidos <= 0) {
-				log_info(log_memoria,"El Kernel se ha desconectado");
-				pthread_exit(NULL);
+				log_info(log_memoria, "Asigne correctamente");
+		 		header = OK;
+				send(socketKernel, &header, sizeof(uint8_t), 0);
+			}else{
+				log_warning(log_memoria, "No hay libres");
+				header = MARCOS_INSUFICIENTES;
+				send(socketKernel, &header, sizeof(uint8_t), 0);
 			}
-
-			log_info(log_memoria,"Solicitud de inicializar proceso %d con %d paginas", pid,cantidadDePaginas);
-
-			//Inicializo programa en FS
-
-			void* bufferFS = malloc(50);
-			uint32_t tamanioValidoBufferFS = 0;
-
-			header = MEMORIA;
-			memcpy(bufferFS, &header, sizeof(uint32_t));
-			tamanioValidoBufferFS += sizeof(uint32_t);
-
-			header = INICIALIZAR_PROGRAMA;
-			memcpy(bufferFS + tamanioValidoBufferFS, &header,
-			sizeof(uint32_t));
-			tamanioValidoBufferFS += sizeof(uint32_t);
-
-			memcpy(bufferFS + tamanioValidoBufferFS, &pid,sizeof(uint32_t));
-			tamanioValidoBufferFS += sizeof(uint32_t);
-
-			memcpy(bufferFS + tamanioValidoBufferFS, &cantidadDePaginas,sizeof(uint32_t));
-			tamanioValidoBufferFS += sizeof(uint32_t);
-
-			pthread_mutex_lock(&mutexFS);
-
-			bytesEnviados = send(socket_fs, bufferFS,tamanioValidoBufferFS, 0);
-			if (bytesEnviados <= 0) {
-				log_error(log_memoria,"Error send FS");
-				pthread_mutex_unlock(&mutexFS);
-				pthread_exit(NULL);
-				}
-
-			free(bufferFS);
-
-			//espero la respuesta del FS si hay o no espacio
-
-			bytesRecibidos = recv(socket_fs, &header, sizeof(uint32_t), 0);
-			if (bytesRecibidos <= 0) {
-				log_info(log_memoria,"El FS se ha desconectado");
-				pthread_mutex_unlock(&mutexFS);
-				pthread_exit(NULL);
-			}
-
-			if (header != FS) {
-				log_error(log_memoria,"Error recv header FS");
-				pthread_mutex_unlock(&mutexFS);
-				pthread_exit(NULL);
-			}
-
-			bytesRecibidos = recv(socket_fs, &header, sizeof(uint32_t), 0);
-			if (bytesRecibidos <= 0) {
-				log_info(log_memoria,"El FS se ha desconectado");
-				pthread_mutex_unlock(&mutexFS);
-				pthread_exit(NULL);
-			}
-
-			switch (header) {
-			case ESPACIO_INSUFICIENTE: {
-				tamanioValidoBufferKernel = 0;
-
-				bytesRecibidos = recv(socket_fs, &pid, sizeof(uint32_t), 0);
-				if (bytesRecibidos <= 0) {
-					log_info(log_memoria,"El FS se ha desconectado");
-					pthread_mutex_unlock(&mutexFS);
-					pthread_exit(NULL);
-					}
-
-				pthread_mutex_unlock(&mutexFS);
-
-				log_info(log_memoria,"Espacio insuficiente para proceso: %d\n",pid);
-
-				header = MEMORIA;
-				memcpy(bufferKernel, &header, sizeof(uint32_t));
-				tamanioValidoBufferKernel += sizeof(uint32_t);
-
-				header = ESPACIO_INSUFICIENTE;
-				memcpy(bufferKernel + tamanioValidoBufferKernel, &header,sizeof(uint32_t));
-				tamanioValidoBufferKernel += sizeof(uint32_t);
-
-				memcpy(bufferKernel + tamanioValidoBufferKernel, &pid,sizeof(uint32_t));
-				tamanioValidoBufferKernel += sizeof(uint32_t);
-
-				bytesEnviados = send(socketKernel, bufferKernel,tamanioValidoBufferKernel, 0);
-				if (bytesEnviados <= 0) {
-					log_error(log_memoria,"Error send Kernel");
-					pthread_exit(NULL);
-				}
-
-				free(bufferKernel);
-			}
-				break;
-
-			case ESPACIO_SUFICIENTE: {
-				bytesRecibidos = recv(socket_fs, &pid, sizeof(uint32_t), 0);
-				if (bytesRecibidos <= 0) {
-					log_info(log_memoria,"El FS se ha desconectado");
-					pthread_mutex_unlock(&mutexFS);
-					pthread_exit(NULL);
-				}
-
-				pthread_mutex_unlock(&mutexFS);
-
-				log_info(log_memoria,"Espacio suficiente para proceso: %d\n", pid);
-
-				//Crear el proceso inicializando su lista de pags y agregarlo a la lista de procesos
-
-				lockProcesos();
-
-				crearProcesoYAgregarAListaDeProcesos(pid, cantidadDePaginas);
-
-				unlockProcesos();
-
-				//Enviarle el codigo al FS pagina por pagina
-
-				uint8_t nroPag = 0;
-				while (nroPag < cantidadDePaginas) {
-
-					escribirPaginaEnFS(pid, nroPag,	codigoAnSISOP + (nroPag * tamanioDeMarcos));
-
-					nroPag++;
-
-				}
-
-				free(codigoAnSISOP);
-
-				tamanioValidoBufferKernel = 0;
-
-				header = MEMORIA;
-				memcpy(bufferKernel, &header, sizeof(uint32_t));
-				tamanioValidoBufferKernel += sizeof(uint32_t);
-
-				header = ESPACIO_SUFICIENTE;
-				memcpy(bufferKernel + tamanioValidoBufferKernel, &header,sizeof(uint32_t));
-				tamanioValidoBufferKernel += sizeof(uint32_t);
-
-				memcpy(bufferKernel + tamanioValidoBufferKernel, &pid,sizeof(uint32_t));
-				tamanioValidoBufferKernel += sizeof(uint32_t);
-
-				bytesEnviados = send(socketKernel, bufferKernel,tamanioValidoBufferKernel, 0);
-				if (bytesEnviados <= 0) {
-					log_error(log_memoria,"Error send Kernel");
-					pthread_exit(NULL);
-				}
-
-				free(bufferKernel);
-			}
-				break;
-			}
-
-		}
 			break;
-		case FINALIZAR_PROGRAMA: {
-			bytesRecibidos = recv(socketKernel, &pid, sizeof(uint32_t), 0);
-			if (bytesRecibidos <= 0) {
+
+
+		case FINALIZAR_PROGRAMA:
+			if (recv(socketKernel, &pid, sizeof(uint32_t), 0) <= 0) {
 				log_info(log_memoria,"El Kernel se ha desconectado");
 				pthread_exit(NULL);
 			}
@@ -290,7 +130,6 @@ void escucharKERNEL(void* socket_kernel) {
 				pthread_mutex_unlock(&mutexFS);
 
 				free(bufferFS);
-				free(bufferKernel);
 
 				pthread_exit(NULL);
 			}
@@ -298,11 +137,11 @@ void escucharKERNEL(void* socket_kernel) {
 			pthread_mutex_unlock(&mutexFS);
 
 			free(bufferFS);
-			free(bufferKernel);
 
-		}
 			break;
 		}
+
+		msg_destruir(msg);
 
 	}
 }
@@ -898,7 +737,7 @@ t_frame* buscarFrameLibre(uint32_t pid) {
 
 	t_frame* frameLibre;
 
-	if ((hayFramesLibres())) {
+	if (hayFramesLibres()) {
 
 		//SI HAY FRAME LIBRES Y EL PROCESO NO TIENE OCUPADOS TODOS LOS MARCOS POR PROCESO ELIJO CUALQUIER FRAME
 
@@ -935,6 +774,39 @@ void escribirContenido(int frame, int offset, int tamanio_escribir,	void* conten
 	memcpy(memoria_real + desplazamiento, contenido, tamanio_escribir);
 	pthread_mutex_unlock(&mutexMemoriaReal);
 
-	free(contenido);
+	//free(contenido); fixme:liberar en otro momento
+}
+
+void inicializarFrames(){
+	listaFrames = list_create();
+
+	int i=0;
+	for(; i < cantidadDeMarcos ; i++){
+		t_frame* frame = malloc(sizeof(t_frame));
+		frame->nroFrame = i;
+		frame->bit_modif = 0;
+		frame->pid = 0;
+		list_add(listaFrames, frame);
+	}
+
+}
+
+void terminarProceso(){			//aca libero todos
+
+	list_destroy(lista_cpus);
+	void destruirFrames(t_frame* frame){
+		free(frame);
+	}
+	list_destroy_and_destroy_elements(listaFrames, (void*) destruirFrames);
+	void destruirProcesos(t_proceso* proc){
+		free(proc);
+	}
+	list_destroy_and_destroy_elements(listaProcesos, (void*) destruirProcesos);
+
+	free(memoria_real);
+
+	log_trace(log_memoria, "Termino Proceso");
+	log_destroy(log_memoria);
+	exit(1);
 }
 

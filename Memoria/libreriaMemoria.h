@@ -33,9 +33,11 @@
 
 
 // TIPOS DE MENSAJES
+#define OK 111
 #define CPU_TERMINO 100
-#define KERNEL_TAMANIOPAGS 300
-#define KERNEL_SCRIPT 301
+#define KERNEL_TAMANIOPAGS 30
+#define KERNEL_INICIAR_PROGRAMA 31
+#define MARCOS_INSUFICIENTES 32
 
 //Archivo de Configuracion
 int puertoMemoria;
@@ -129,9 +131,10 @@ t_frame* buscarFrameLibre(uint32_t pid);
 
 void escribirContenido(int frame, int offset, int tamanio_escribir,	void* contenido);
 
+void inicializarFrames();
 
-//Socket FS
-int socket_fs;
+void terminarProceso();
+
 
 //Variable Global para LRU
 int cantAccesosMemoria;
@@ -144,7 +147,15 @@ pthread_mutex_t mutexTLB;
 pthread_mutex_t mutexCantAccesosMemoria;
 pthread_mutex_t mutexRetardo;
 pthread_mutex_t mutexMemoriaReal;
-pthread_mutex_t mutexFS;
 pthread_mutex_t mutexDump;
+
+
+//todo: a eliminar
+int socket_fs;
+pthread_mutex_t mutexFS;
+
+
+
+
 
 #endif /* MEMORIA_LIBRERIAMEMORIA_H_ */

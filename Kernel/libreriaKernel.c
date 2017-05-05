@@ -93,6 +93,7 @@ void escucharCPU(int socket_cpu) {
 			list_remove_by_condition(lista_cpus, (void*) _esCpu);
 			pthread_exit(NULL);
 		}
+		free(mensajeRecibido);
 	}
 
 }
@@ -123,7 +124,7 @@ void atender_consola(int socket_consola){
 		script = (char*)msgRecibido->data;
 		log_info(logKernel, script);
 		int pidActual = crearPCB(socket_consola);
-		enviarScriptAMemoria(script, pidActual);
+		enviarScriptAMemoria((uint32_t) pidActual, script);
 		break;
 
 	}
@@ -138,7 +139,6 @@ int crearPCB(int socketConsola){
 	t_PCB* pcb = malloc(sizeof(t_PCB));
 	pcb->socketConsola = socketConsola;
 	pcb->pid = pid;
-	send(socketConsola, &pid, sizeof(uint32_t), 0);
 	pcb->pc = 0;
 	pcb->ec = 0;
 	//todo: ver q pija son los indices
@@ -147,7 +147,7 @@ int crearPCB(int socketConsola){
 	return pid;
 }
 
-void enviarScriptAMemoria(char* script, int pid){
+void enviarScriptAMemoria(uint32_t pid, char* script){
 
 	bool _buscarPCB(t_PCB* pcb){
 		return pcb->pid == pid;
@@ -155,16 +155,25 @@ void enviarScriptAMemoria(char* script, int pid){
 
 	t_PCB* pcb = list_find(lista_PCBs, (void*) _buscarPCB);
 
-	msg_enviar_separado(KERNEL_SCRIPT, string_length(script), script, socket_memoria);
-	uint8_t ok;
-	recv(socket_memoria, &ok, sizeof(uint8_t), 0);		//todo:memoria lo tiene q recibir
-	if(ok == 111)
-		pcb->cantPags = (string_length(script) / tamanioPag) + 1;
+	send(socket_memoria, &pid, sizeof(uint32_t), 0);
+	msg_enviar_separado(KERNEL_INICIAR_PROGRAMA, (uint32_t) string_length(script), script, socket_memoria);
+	uint8_t respuesta;
+	recv(socket_memoria, &respuesta, sizeof(uint8_t), 0);
+	if(respuesta == OK){
+		pcb->cantPags = (string_length(script) / tamanioPag);
+		pcb->cantPags = (string_length(script) % tamanioPag) == 0? pcb->cantPags: pcb->cantPags + 1;
+		send(pcb->socketConsola, &respuesta, sizeof(uint8_t), 0);
+		send(pcb->socketConsola, &pcb->pid, sizeof(uint32_t), 0);
+	}
+	if(respuesta == MARCOS_INSUFICIENTES){
+		log_trace(logKernel, "MARCOS INSUFICIENTES");
+		send(pcb->socketConsola, &respuesta, sizeof(uint8_t), 0);
+	}
 
 }
 
 
-void terminarProceso(){
+void terminarProceso(){			//aca libero todos
 
 	list_destroy(lista_cpus);
 	list_destroy(lista_consolas);
@@ -174,8 +183,11 @@ void terminarProceso(){
 	}
 	list_destroy_and_destroy_elements(lista_PCBs, (void*) destruirPCBs);
 
+	FD_ZERO(&fdsMaestro);
+
 	log_trace(logKernel, "Terminando Proceso");
 	log_destroy(logKernel);
+	exit(1);
 }
 
 

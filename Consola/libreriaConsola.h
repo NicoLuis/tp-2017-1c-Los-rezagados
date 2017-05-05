@@ -32,7 +32,8 @@
 
 #define CONSOLA_ENVIA_PATH 200
 #define CONSOLA_ENVIA_TEXTO 201
-#define KERNEL_PID 301
+#define OK 111
+#define MARCOS_INSUFICIENTES 32
 
 //Archivo de Configuracion
 char* ipKernel;

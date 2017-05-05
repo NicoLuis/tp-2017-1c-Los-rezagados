@@ -49,80 +49,21 @@ int main(int argc, char* argv[]) {
 	//reservo memoria para la memoria real
 	memoria_real = reservarMemoria(cantidadDeMarcos, tamanioDeMarcos);
 
+	// inicializo el resto
 	lista_cpus = list_create();
+	listaProcesos = list_create();
+	inicializarFrames();
+
+	//Defino señales
+	signal (SIGINT, terminarProceso);
 
 
 	//Creo un hilo para comunicarme con el Kernel
-		pthread_t hilo_conexionKERNEL;
-
-
-		//Atributo Detached
-		pthread_attr_t atributo;
-		pthread_attr_init(&atributo);
-		pthread_attr_setdetachstate(&atributo, PTHREAD_CREATE_DETACHED);
-/*
-		//-------------CREAR UN SOCKET DE ESCUCHA PARA LAS CPU's Y EL KERNEL-------------------------
-		int socket_memoria = crearSocketDeEscucha(puertoMemoria);
-
-		char* bufferEscucha = malloc(200);
-
-		int falloP_thread;
-
-
-		while (1) {
-			int socket_cliente = aceptarCliente(socket_memoria);
-			if ((socket_cliente) == -1) {
-
-				printf("Error en el accept()\n");
-
-				abort();
-			}
-
-			send(socket_cliente, "Hola quien sos?", 16, 0);
-
-			int bytesRecibidos = recv(socket_cliente, bufferEscucha, 50, 0);
-			if (bytesRecibidos <= 0) {
-
-				printf("El cliente se ha desconectado\n");
-
-				abort();
-			}
-
-			bufferEscucha[bytesRecibidos] = '\0';
-
-			if (strcmp("Hola soy el KERNEL", bufferEscucha) == 0) {
-
-				falloP_thread = pthread_create(&hilo_conexionKERNEL, &atributo,(void*) escucharKERNEL, (void*) socket_cliente);
-				if (falloP_thread < 0) {
-
-					printf("Error Hilo Esucha Kernel\n");
-
-					abort();
-				}
-				else if (strcmp("Hola soy el CPU", bufferEscucha) == 0){
-					falloP_thread = pthread_create(&hilo_conexionKERNEL, &atributo,(void*) escucharKERNEL, (void*) socket_cliente);
-					if (falloP_thread < 0) {
-
-						printf("Error Hilo Esucha Kernel\n");
-
-						abort();
-					}
-				}
-			}
-
-		}
-
-		//Liberar memoria
-
-		printf("Liberando Memoria");
-
-		free(bufferEscucha);
-
-		printf("Memoria Liberada\n");
-
-		pthread_attr_destroy(&atributo);
-
-*/
+	pthread_t hilo_conexionKERNEL;
+	//Atributo Detached
+	pthread_attr_t atributo;
+	pthread_attr_init(&atributo);
+	pthread_attr_setdetachstate(&atributo, PTHREAD_CREATE_DETACHED);
 
 
 	//-------------CREAR UN SOCKET DE ESCUCHA PARA LAS CPU's Y EL NUCLEO-------------------------

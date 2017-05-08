@@ -32,13 +32,6 @@
 #include <herramientas/enum.h>
 
 
-// TIPOS DE MENSAJES
-#define OK 111
-#define CPU_TERMINO 100
-#define KERNEL_TAMANIOPAGS 30
-#define KERNEL_INICIAR_PROGRAMA 31
-#define MARCOS_INSUFICIENTES 32
-
 //Archivo de Configuracion
 int puertoMemoria;
 int cantidadDeMarcos;

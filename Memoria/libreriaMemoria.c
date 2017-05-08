@@ -60,7 +60,7 @@ void escucharKERNEL(void* socket_kernel) {
 
 		switch (header) {
 
-		case KERNEL_INICIAR_PROGRAMA:
+		case INICIALIZAR_PROGRAMA:
 
 			cantidadDePaginas = msg->longitud / tamanioDeMarcos;
 			cantidadDePaginas = (msg->longitud % tamanioDeMarcos) == 0? cantidadDePaginas: cantidadDePaginas + 1;

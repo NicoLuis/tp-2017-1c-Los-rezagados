@@ -13,7 +13,7 @@ void mostrarArchivoConfig() {
 void terminar(){
 
 	fprintf(stderr, "\nMe voy\n");
-	uint8_t mensaje8 = CPU_TERMINE;
+	uint8_t mensaje8 = FIN_CPU;
 	void* mensaje = malloc(sizeof(uint8_t));
 	memcpy(mensaje, &mensaje8, sizeof(uint8_t));
 

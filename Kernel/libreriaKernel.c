@@ -104,7 +104,7 @@ void escucharCPU(int socket_cpu) {
 		uint8_t tipoMensaje;
 		memcpy(&tipoMensaje, mensajeRecibido, sizeof(uint8_t));
 
-		if (bytesRecibidos <= 0 || tipoMensaje == CPU_TERMINO) {
+		if (bytesRecibidos <= 0 || tipoMensaje == FIN_CPU) {
 			fprintf(stderr, "La cpu %d se ha desconectado \n", socket_cpu);
 
 			//si la cpu se desconecto la saco de la lista
@@ -138,7 +138,7 @@ void atender_consola(int socket_consola){
 	char* script;	//si lo declaro adentro del switch se queja
 	switch(msgRecibido->tipoMensaje){
 
-	case CONSOLA_ENVIA_PATH:
+	case ENVIO_CODIGO:
 		pid++;
 		script = (char*)msgRecibido->data;
 		log_info(logKernel, script);
@@ -206,17 +206,17 @@ int enviarScriptAMemoria(uint32_t pid, char* script){
 	t_PCB* pcb = list_find(lista_PCBs, (void*) _buscarPCB);
 
 	send(socket_memoria, &pid, sizeof(uint32_t), 0);
-	msg_enviar_separado(KERNEL_INICIAR_PROGRAMA, (uint32_t) string_length(script), script, socket_memoria);
+	msg_enviar_separado(INICIALIZAR_PROGRAMA, (uint32_t) string_length(script), script, socket_memoria);
 	uint8_t respuesta;
 	recv(socket_memoria, &respuesta, sizeof(uint8_t), 0);
-	if(respuesta == OK){
+	switch(respuesta){
+	case OK:
 		pcb->cantPags = (string_length(script) / tamanioPag);
 		pcb->cantPags = (string_length(script) % tamanioPag) == 0? pcb->cantPags: pcb->cantPags + 1;
 		send(pcb->socketConsola, &respuesta, sizeof(uint8_t), 0);
 		send(pcb->socketConsola, &pcb->pid, sizeof(uint32_t), 0);
 		return 1;
-	}
-	if(respuesta == MARCOS_INSUFICIENTES){
+	case MARCOS_INSUFICIENTES:
 		log_trace(logKernel, "MARCOS INSUFICIENTES");
 		send(pcb->socketConsola, &respuesta, sizeof(uint8_t), 0);
 		return -1;

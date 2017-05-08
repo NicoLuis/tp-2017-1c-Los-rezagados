@@ -31,15 +31,8 @@
 #include <commons/log.h>
 #include <commons/process.h>
 #include <herramientas/sockets.h>
+#include <herramientas/enum.h>
 
-
-// TIPOS DE MENSAJES
-#define OK 111
-#define CPU_TERMINO 100
-#define CONSOLA_ENVIA_PATH 200
-#define KERNEL_TAMANIOPAGS 30
-#define KERNEL_INICIAR_PROGRAMA 31
-#define MARCOS_INSUFICIENTES 32
 
 
 typedef struct {	//todo: reemplazar void* por lo q corresponda

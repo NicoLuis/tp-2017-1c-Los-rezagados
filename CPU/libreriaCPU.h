@@ -22,10 +22,8 @@
 #include <commons/log.h>
 #include <commons/process.h>
 #include <herramientas/sockets.h>
+#include <herramientas/enum.h>
 #include <signal.h>
-
-// TIPOS DE MENSAJES
-#define CPU_TERMINE 100
 
 //Archivo de Configuracion
 char* ipKernel;

@@ -29,11 +29,8 @@
 #include <commons/log.h>
 #include <commons/process.h>
 #include <herramientas/sockets.h>
+#include <herramientas/enum.h>
 
-#define CONSOLA_ENVIA_PATH 200
-#define CONSOLA_ENVIA_TEXTO 201
-#define OK 111
-#define MARCOS_INSUFICIENTES 32
 
 //Archivo de Configuracion
 char* ipKernel;

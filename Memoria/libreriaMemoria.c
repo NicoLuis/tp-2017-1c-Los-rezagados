@@ -71,7 +71,7 @@ void escucharKERNEL(void* socket_kernel) {
 
 			//guardo codigo en memoria
 
-			if(hayFramesLibres()){
+			if(hayFramesLibres(cantidadDePaginas)){
 				int i = 0;
 				t_frame* marcoLibre;
 				for(; i < cantidadDePaginas; i++){
@@ -255,7 +255,7 @@ void escucharCPU(void* socket_cpu) {
 				} else {
 
 					lockFrames();
-					int hayFrameLibre = hayFramesLibres();
+					bool hayFrameLibre = hayFramesLibres(1);
 					unlockFrames();
 
 					if ((!hayFrameLibre) && (proceso->cantFramesAsignados == 0)) {
@@ -589,19 +589,13 @@ t_proceso* buscarProcesoEnListaProcesos(uint32_t pid) {
 	}
 }
 
-int hayFramesLibres() {
+bool hayFramesLibres(int cantidadDeFrames) {
 
 	int _soy_frame_libre(t_frame* frame) {
 		return (frame->pid == 0);
 	}
 
-	t_frame* frameLibre = list_find(listaFrames, (void*) _soy_frame_libre);
-
-	if (frameLibre != NULL) {
-		return 1;
-	} else {
-		return 0;
-	}
+	return list_count_satisfying(listaFrames, (void*) _soy_frame_libre) >= cantidadDeFrames;
 }
 
 void* pedirPaginaAFS(uint32_t pid, uint8_t numero_pagina) {
@@ -737,7 +731,7 @@ t_frame* buscarFrameLibre(uint32_t pid) {
 
 	t_frame* frameLibre;
 
-	if (hayFramesLibres()) {
+	if (hayFramesLibres(1)) {
 
 		//SI HAY FRAME LIBRES Y EL PROCESO NO TIENE OCUPADOS TODOS LOS MARCOS POR PROCESO ELIJO CUALQUIER FRAME
 

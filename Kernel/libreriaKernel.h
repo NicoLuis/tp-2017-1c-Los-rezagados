@@ -54,8 +54,30 @@ typedef struct {	//todo: reemplazar void* por lo q corresponda
 }t_PCB;
 
 
+typedef struct {
+	char* nombre;
+	void* valor;
+}t_VariableCompartida;
+t_list* lista_variablesCompartidas;
 
+typedef struct {
+	char* nombre;
+	sem_t semaforo;
+}t_VariableSemaforo;
+t_list* lista_variablesSemaforo;
 
+typedef struct {
+	int nroPag;
+	int pid;
+	int espacioLibre;
+}t_heap;
+t_list* tabla_heap;
+// todo: "En el caso que el tamaño disponible en una página no sea suficiente para almacenar el valor requerido, se pedirá una nueva tabla a la Memoria."	?????
+
+typedef struct HeapMetadata {
+	uint32_t size;
+	bool isFree;
+}t_HeapMetadata;
 
 
 t_list* lista_cpus;
@@ -80,6 +102,7 @@ int gradoMultiprogramacion;
 int stackSize;
 
 void mostrarArchivoConfig();
+void inicializarSemaforosYVariables(char**, char**, char**);
 
 int socket_memoria;
 int socket_fs;
@@ -94,7 +117,9 @@ void escucharCPU(int);
 int handshake(int socket_cliente, int tipo);
 void atender_consola(int socket_consola);
 int crearPCB(int);
-void enviarScriptAMemoria(uint32_t, char*);
-void terminarProceso();
+void borrarPCB(int);
+void setearExitCode(int, int);
+int enviarScriptAMemoria(uint32_t, char*);
+void terminarKernel();
 
 #endif /* LIBRERIAKERNEL_H_ */

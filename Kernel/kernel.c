@@ -46,6 +46,10 @@ int main(int argc, char* argv[]) {
 	algoritmo = config_get_string_value(configuracion, "ALGORITMO");
 	gradoMultiprogramacion = config_get_int_value(configuracion, "GRADO_MULTIPROG");
 	stackSize = config_get_int_value(configuracion, "STACK_SIZE");
+	char** ids = config_get_array_value(configuracion, "SEM_IDS");
+	char** valores = config_get_array_value(configuracion, "SEM_INIT");
+	char** shared_vars = config_get_array_value(configuracion, "SHARED_VARS");
+	inicializarSemaforosYVariables(ids, valores, shared_vars);
 
 	//Muestro archivo de configuracion
 
@@ -56,7 +60,7 @@ int main(int argc, char* argv[]) {
 	log_trace(logKernel, "  -----------  INICIO KERNEL  -----------  ");
 
 	//Defino señales
-	signal (SIGINT, terminarProceso);
+	signal (SIGINT, terminarKernel);
 
 
 	//-------------------------------CONEXION AL LA MEMORIA-------------------------------------

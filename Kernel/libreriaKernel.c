@@ -26,6 +26,25 @@ void mostrarArchivoConfig() {
 	printf("El tamaño del Stack es de: %d\n", stackSize);
 }
 
+void inicializarSemaforosYVariables(char** ids, char** valores, char** shared_vars){
+	lista_variablesSemaforo = list_create();
+	int i;
+	for(i = 0; ids[i] != NULL ;i++){
+		t_VariableSemaforo* semaforo = malloc(sizeof(t_VariableSemaforo));
+		semaforo->nombre = ids[i];
+		sem_init(&semaforo->semaforo, 0, (int)valores[i]);
+		list_add(lista_variablesSemaforo, semaforo);
+	}
+
+	lista_variablesCompartidas = list_create();
+	for(i = 0; shared_vars[i] != NULL ;i++){
+		t_VariableCompartida* variable = malloc(sizeof(t_VariableCompartida));
+		variable->nombre = shared_vars[i];
+		variable->valor = 0;
+		list_add(lista_variablesSemaforo, variable);
+	}
+}
+
 
 
 int handshake(int socket_cliente, int tipo){
@@ -124,7 +143,8 @@ void atender_consola(int socket_consola){
 		script = (char*)msgRecibido->data;
 		log_info(logKernel, script);
 		int pidActual = crearPCB(socket_consola);
-		enviarScriptAMemoria((uint32_t) pidActual, script);
+		if(enviarScriptAMemoria((uint32_t) pidActual, script) < 0)
+			setearExitCode(pidActual, -1);
 		break;
 
 	}
@@ -140,14 +160,43 @@ int crearPCB(int socketConsola){
 	pcb->socketConsola = socketConsola;
 	pcb->pid = pid;
 	pcb->pc = 0;
-	pcb->ec = 0;
 	//todo: ver q pija son los indices
 
 	list_add(lista_PCBs, pcb);
 	return pid;
 }
 
-void enviarScriptAMemoria(uint32_t pid, char* script){
+
+
+void borrarPCB(int pidActual){		//todo: hay q borrar pcb?
+	bool _buscarPCB(t_PCB* pcb){
+		return pcb->pid == pid;
+	}
+
+	void _liberarPCB(t_PCB* pcb){
+		//free pcb->indiceCodigo;
+		//free pcb->indiceEtiquetas;
+		//free pcb->indiceStack;
+		free(pcb);
+	}
+
+	list_remove_and_destroy_by_condition(lista_PCBs, (void*) _buscarPCB, (void*) _liberarPCB);
+}
+
+void setearExitCode(int pid, int exitCode){
+	bool _buscarPCB(t_PCB* pcb){
+		return pcb->pid == pid;
+	}
+
+	t_PCB* pcb = list_find(lista_PCBs, (void*) _buscarPCB);
+	pcb->ec = exitCode;
+}
+
+
+
+
+
+int enviarScriptAMemoria(uint32_t pid, char* script){
 
 	bool _buscarPCB(t_PCB* pcb){
 		return pcb->pid == pid;
@@ -164,16 +213,18 @@ void enviarScriptAMemoria(uint32_t pid, char* script){
 		pcb->cantPags = (string_length(script) % tamanioPag) == 0? pcb->cantPags: pcb->cantPags + 1;
 		send(pcb->socketConsola, &respuesta, sizeof(uint8_t), 0);
 		send(pcb->socketConsola, &pcb->pid, sizeof(uint32_t), 0);
+		return 1;
 	}
 	if(respuesta == MARCOS_INSUFICIENTES){
 		log_trace(logKernel, "MARCOS INSUFICIENTES");
 		send(pcb->socketConsola, &respuesta, sizeof(uint8_t), 0);
+		return -1;
 	}
-
+	return 0;
 }
 
 
-void terminarProceso(){			//aca libero todos
+void terminarKernel(){			//aca libero todos
 
 	list_destroy(lista_cpus);
 	list_destroy(lista_consolas);
@@ -182,6 +233,15 @@ void terminarProceso(){			//aca libero todos
 		free(pcb);
 	}
 	list_destroy_and_destroy_elements(lista_PCBs, (void*) destruirPCBs);
+	void destruirVariablesCompartidas(t_VariableCompartida* variable){
+		free(variable);
+	}
+	list_destroy_and_destroy_elements(lista_variablesCompartidas, (void*) destruirVariablesCompartidas);
+	void destruirSemaforos(t_VariableSemaforo* variable){
+		sem_destroy(&variable->semaforo);
+		free(variable);
+	}
+	list_destroy_and_destroy_elements(lista_variablesSemaforo, (void*) destruirSemaforos);
 
 	FD_ZERO(&fdsMaestro);
 

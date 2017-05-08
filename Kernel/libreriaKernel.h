@@ -120,6 +120,7 @@ int crearPCB(int);
 void borrarPCB(int);
 void setearExitCode(int, int);
 int enviarScriptAMemoria(uint32_t, char*);
+void consolaKernel();
 void terminarKernel();
 
 #endif /* LIBRERIAKERNEL_H_ */

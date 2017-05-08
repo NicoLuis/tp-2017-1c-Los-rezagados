@@ -99,6 +99,15 @@ int main(int argc, char* argv[]) {
 	log_trace(logKernel, "Me conecte bien al File System");
 
 
+	//-------------------------------HILO CONSOLA DE KERNEL-------------------------------------
+
+	pthread_attr_t atributo;
+	pthread_attr_init(&atributo);
+	pthread_attr_setdetachstate(&atributo, PTHREAD_CREATE_DETACHED);
+	pthread_t hiloInterpreteDeComandos;
+	pthread_create(&hiloInterpreteDeComandos, &atributo,(void*) consolaKernel, NULL);
+	pthread_attr_destroy(&atributo);
+
 	//-------------------------------CONEXIONES CPU Y CONSOLA-------------------------------------
 	conectar_select(string_itoa(puertoPrograma));
 

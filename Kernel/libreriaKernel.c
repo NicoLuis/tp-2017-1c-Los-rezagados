@@ -196,6 +196,7 @@ void setearExitCode(int pid, int exitCode){
 
 
 
+
 int enviarScriptAMemoria(uint32_t pid, char* script){
 
 	bool _buscarPCB(t_PCB* pcb){
@@ -224,6 +225,101 @@ int enviarScriptAMemoria(uint32_t pid, char* script){
 }
 
 
+
+void consolaKernel(){
+
+	/*
+	 * Faltan implementar solo estos:
+	1. Obtener el listado de procesos del sistema, permitiendo mostrar todos o solo los que estén
+		en algún estado (cola).
+	2. Obtener para un proceso dado:
+		a. La cantidad de rafagas ejecutadas.
+		b. La cantidad de operaciones privilegiadas que ejecutó.
+		c. Obtener la tabla de archivos abiertos por el proceso.
+		d. La cantidad de páginas de Heap utilizadas
+		i. Cantidad de acciones alocar realizadas en cantidad de operaciones y en
+		bytes
+		ii. Cantidad de acciones liberar realizadas en cantidad de operaciones y en
+		bytes
+		e. Cantidad de syscalls ejecutadas
+	3. Obtener la tabla global de archivos.
+	5. Finalizar un proceso. En caso de que el proceso esté en ejecución, se deberá esperar a que la
+		CPU devuelva el PCB actualizado para luego finalizarlo.
+	6. Detener la planificación a fin de que no se produzcan cambios de estado de los procesos.
+	*/
+
+	while(1){
+		char* comando = malloc(200);
+		fgets(comando, 200, stdin);
+
+		comando[strlen(comando)-1] = '\0';
+
+		if(string_equals_ignore_case(comando, "listado procesos")){
+			printf("Mostrar todos? (s/n) ");
+			fgets(comando, 200, stdin);
+			comando[strlen(comando)-1] = '\0';
+
+			//todo: implementar
+			if(string_equals_ignore_case(comando, "s")){
+				printf("Muestro todos\n");
+			}
+			else if(string_starts_with(comando, "n")){
+				printf("Muestro solo los que estén en algún estado\n");
+			}else printf("Flasheaste era s/n \n");
+
+		}else if(string_starts_with(comando, "obtener info ")){
+
+			int pid = atoi(string_substring_from(comando, 13));
+
+			//todo: implementar
+			printf( "Cantidad de rafagas ejecutadas: %d \n"
+					"Cantidad de operaciones privilegiadas que ejecutó: %d \n"
+					//"Obtener la tabla de archivos abiertos por el proceso \n"
+					"Cantidad de páginas de Heap utilizadas: %d \n"
+					"Cantidad de acciones alocar realizadas en cantidad de operaciones y en bytes \n"
+					"Cantidad de acciones liberar realizadas en cantidad de operaciones y en bytes \n"
+					"Cantidad de syscalls ejecutadas \n",
+					pid, pid, pid);		//esto no va pero me da paja
+
+		}else if(string_equals_ignore_case(comando, "tabla archivos")){
+
+			//todo: implementar
+
+		}else if(string_starts_with(comando, "grado mp ")){
+
+			gradoMultiprogramacion = atoi(string_substring_from(comando, 9));
+			printf("Nuevo grado de multiprogramacion: %d\n", gradoMultiprogramacion);
+
+		}else if(string_starts_with(comando, "kill ")){
+
+			int pid = atoi(string_substring_from(comando, 5));
+			//todo: implementar
+			printf("Finalizo pid %d\n", pid);
+
+		}else if(string_equals_ignore_case(comando, "detener")){
+
+			//todo: implementar
+
+		}else if(string_equals_ignore_case(comando, "help")){
+			printf("Comandos:\n"
+					"● listado procesos: Obtener listado de procesos\n"
+					"● obtener info [pid]: Obtener informacion de proceso\n"
+					"● tabla archivos: Obtener informacion de proceso\n"
+					"● grado mp [grado]: Setear grado de multiprogramacion\n"
+					"● kill [pid]: Finalizar proceso\n"
+					"● detener: Detener la planificación\n");
+
+		}else
+			fprintf(stderr, "El comando '%s' no es valido\n", comando);
+
+	}
+
+
+
+
+
+
+}
 void terminarKernel(){			//aca libero todos
 
 	list_destroy(lista_cpus);

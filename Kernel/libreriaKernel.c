@@ -160,6 +160,8 @@ int crearPCB(int socketConsola){
 	pcb->socketConsola = socketConsola;
 	pcb->pid = pid;
 	pcb->pc = 0;
+	pcb->indiceCodigo = list_create();
+	pcb->indiceStack = list_create();
 	//todo: ver q pija son los indices
 
 	list_add(lista_PCBs, pcb);
@@ -324,20 +326,32 @@ void terminarKernel(){			//aca libero todos
 
 	list_destroy(lista_cpus);
 	list_destroy(lista_consolas);
-	void destruirPCBs(t_PCB* pcb){
+
+	void _destruirStackMetadata(t_StackMetadata* stack){
+		free(stack);
+	}
+	void _destruirIndiceStack(t_Stack* stack){
+		list_destroy_and_destroy_elements(stack->args, (void*) _destruirStackMetadata);
+		list_destroy_and_destroy_elements(stack->vars, (void*) _destruirStackMetadata);
+		free(stack);
+	}
+	void _destruirPCBs(t_PCB* pcb){
 		//todo: aca libero todos los elementos del pcb (mas q nada los indices)
+		list_destroy(pcb->indiceCodigo);
+		list_destroy_and_destroy_elements(pcb->indiceStack, (void*) _destruirIndiceStack);
 		free(pcb);
 	}
-	list_destroy_and_destroy_elements(lista_PCBs, (void*) destruirPCBs);
-	void destruirVariablesCompartidas(t_VariableCompartida* variable){
+	list_destroy_and_destroy_elements(lista_PCBs, (void*) _destruirPCBs);
+
+	void _destruirVariablesCompartidas(t_VariableCompartida* variable){
 		free(variable);
 	}
-	list_destroy_and_destroy_elements(lista_variablesCompartidas, (void*) destruirVariablesCompartidas);
-	void destruirSemaforos(t_VariableSemaforo* variable){
+	list_destroy_and_destroy_elements(lista_variablesCompartidas, (void*) _destruirVariablesCompartidas);
+	void _destruirSemaforos(t_VariableSemaforo* variable){
 		sem_destroy(&variable->semaforo);
 		free(variable);
 	}
-	list_destroy_and_destroy_elements(lista_variablesSemaforo, (void*) destruirSemaforos);
+	list_destroy_and_destroy_elements(lista_variablesSemaforo, (void*) _destruirSemaforos);
 
 	FD_ZERO(&fdsMaestro);
 

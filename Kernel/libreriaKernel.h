@@ -40,9 +40,9 @@ typedef struct {	//todo: reemplazar void* por lo q corresponda
 	uint32_t pid;
 	int pc;				//Program Counter
 	int cantPags;		//Páginas utilizadas por elcodigo AnSISOP
-	void* indiceCodigo;		//Estructura auxiliar que contiene el offset del inicio y del fin de cada sentencia del Programa.
-	void* indiceEtiquetas;	//Estructura auxiliar utilizada para conocer las líneas de código correspondientes al inicio de los procedimientos y a las etiquetas.
-	void* indiceStack;		//Estructura auxiliar encargada de ordenar los valores almacenados en el Stack.
+	t_list* indiceCodigo;		//Lista de int[2]
+	void* indiceEtiquetas;		// no se
+	t_list* indiceStack;		//Lista de t_Stack
 	int ec; 		//Exit Code
 }t_PCB;
 
@@ -71,6 +71,18 @@ typedef struct HeapMetadata {
 	uint32_t size;
 	bool isFree;
 }t_HeapMetadata;
+
+typedef struct {
+	t_list* args; //listaArgumentos
+	t_list* vars; //listaVariables
+	int retPos;
+	int retVar[3];
+}t_Stack;
+
+typedef struct {
+	char* id;
+	int posicionMemoria[3];
+}t_StackMetadata;
 
 
 t_list* lista_cpus;

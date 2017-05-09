@@ -128,6 +128,11 @@ void inicializarFrames();
 
 void terminarProceso();
 
+void ponerBitModificadoEn1(int nroFrame);
+
+t_frame* buscarFrame(int numeroFrame);
+
+int estaEnMemoriaReal(uint32_t pid, uint8_t numero_pagina);
 
 //Variable Global para LRU
 int cantAccesosMemoria;

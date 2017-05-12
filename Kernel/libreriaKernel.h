@@ -38,14 +38,18 @@
 typedef struct {	//todo: reemplazar void* por lo q corresponda
 	int socketConsola;
 	uint32_t pid;
-	int pc;				//Program Counter
-	int cantPags;		//Páginas utilizadas por elcodigo AnSISOP
-	t_list* indiceCodigo;		//Lista de int[2]
+	uint32_t pc;				//Program Counter
+	uint32_t cantPagsCodigo;	//Páginas utilizadas por elcodigo AnSISOP
+	t_list* indiceCodigo;		//Lista de t_indiceCodigo
 	void* indiceEtiquetas;		// no se
 	t_list* indiceStack;		//Lista de t_Stack
-	int ec; 		//Exit Code
+	uint32_t ec; 				//Exit Code
 }t_PCB;
 
+typedef struct {
+	uint32_t offset_inicio;
+	uint32_t size;
+}t_indiceCodigo;
 
 typedef struct {
 	char* nombre;
@@ -75,13 +79,13 @@ typedef struct HeapMetadata {
 typedef struct {
 	t_list* args; //listaArgumentos
 	t_list* vars; //listaVariables
-	int retPos;
-	int retVar[3];
+	uint32_t retPos;
+	uint32_t retVar[3];
 }t_Stack;
 
 typedef struct {
 	char* id;
-	int posicionMemoria[3];
+	uint32_t posicionMemoria[3];
 }t_StackMetadata;
 
 
@@ -121,9 +125,14 @@ void escucharCPU(int);
 
 int handshake(int socket_cliente, int tipo);
 void atender_consola(int socket_consola);
+
+//PCB
 int crearPCB(int);
 void borrarPCB(int);
 void setearExitCode(int, int);
+
+
+
 int enviarScriptAMemoria(uint32_t, char*);
 void consolaKernel();
 void terminarKernel();

@@ -19,6 +19,8 @@ int main(int argc, char* argv[]) {
 	}
 
 	signal (SIGINT, terminar);
+	signal (SIGUSR1, ultimaEjec);
+	ultimaEjecucion = true;
 
 	//Cargo archivo de configuracion
 
@@ -105,19 +107,20 @@ int main(int argc, char* argv[]) {
 
 	while(1){
 
-		// lo unico q esta haciendo es mostrar lo que se recibio
 		t_msg* msgRecibido = msg_recibir(socket_kernel);
 		msg_recibir_data(socket_kernel, msgRecibido);
 
-		if (msgRecibido->tipoMensaje == 0) {
+		switch(msgRecibido->tipoMensaje){
+		case PCB:
+
+			desserializarPCB(msgRecibido->data);
+
+			break;
+		case 0:
 			fprintf(stderr, "El Kernel %d se ha desconectado \n", socket_kernel);
-			pthread_exit(NULL);
+			terminar();
+			break;
 		}
-
-		fprintf(stderr, "tipoMensaje %d\n", msgRecibido->tipoMensaje);
-		fprintf(stderr, "longitud %d\n", msgRecibido->longitud);
-		fprintf(stderr, "texto %s\n", (char*) msgRecibido->data);
-
 	}
 
 	return 0;

@@ -33,9 +33,11 @@ int puertoMemoria;
 
 void mostrarArchivoConfig();
 void terminar();
+void ultimaEjec();
 
 int socket_kernel;
 int socket_memoria;
 
+bool ultimaEjecucion;
 
 #endif

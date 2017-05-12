@@ -99,20 +99,20 @@ int handshake(int socket_cliente, int tipo){
 void escucharCPU(int socket_cpu) {
 
 	while(1){
-		void* mensajeRecibido = malloc(sizeof(uint8_t));
-		int bytesRecibidos = recv(socket_cpu, mensajeRecibido, sizeof(uint8_t), 0);
-		uint8_t tipoMensaje;
-		memcpy(&tipoMensaje, mensajeRecibido, sizeof(uint8_t));
 
-		if (bytesRecibidos <= 0 || tipoMensaje == FIN_CPU) {
+		t_msg* msgRecibido = msg_recibir(socket_cpu);
+		switch(msgRecibido->tipoMensaje){
+
+		case 0: case FIN_CPU:
 			fprintf(stderr, "La cpu %d se ha desconectado \n", socket_cpu);
-
 			//si la cpu se desconecto la saco de la lista
 			bool _esCpu(int socketC){ return socketC == socket_cpu; }
 			list_remove_by_condition(lista_cpus, (void*) _esCpu);
 			pthread_exit(NULL);
+			break;
 		}
-		free(mensajeRecibido);
+
+		msg_destruir(msgRecibido);
 	}
 
 }
@@ -121,17 +121,6 @@ void atender_consola(int socket_consola){
 
 	t_msg* msgRecibido = msg_recibir(socket_consola);
 	msg_recibir_data(socket_consola, msgRecibido);
-
-	if (msgRecibido->tipoMensaje == 0) {
-		fprintf(stderr, "La consola %d se ha desconectado \n", socket_consola);
-
-		//si la consola se desconecto la saco de la lista
-		bool _esConsola(int socketC){ return socketC == socket_consola; }
-		list_remove_by_condition(lista_consolas, (void*) _esConsola);
-		close(socket_consola);
-		FD_CLR(socket_consola, &fdsMaestro);
-		return;
-	}
 
 	log_trace(logKernel, "Recibi tipoMensaje %d de consola", msgRecibido->tipoMensaje);
 
@@ -147,7 +136,19 @@ void atender_consola(int socket_consola){
 			setearExitCode(pidActual, -1);
 		break;
 
+	case 0:
+		fprintf(stderr, "La consola %d se ha desconectado \n", socket_consola);
+
+		//si la consola se desconecto la saco de la lista
+		bool _esConsola(int socketC){ return socketC == socket_consola; }
+		list_remove_by_condition(lista_consolas, (void*) _esConsola);
+		close(socket_consola);
+		FD_CLR(socket_consola, &fdsMaestro);
+		break;
+
 	}
+
+	msg_destruir(msgRecibido);
 
 }
 
@@ -195,6 +196,120 @@ void setearExitCode(int pid, int exitCode){
 }
 
 
+int _tamanioIndiceCodigo(t_list* indiceCodigo){
+	return list_size(indiceCodigo) * sizeof(uint32_t) * 2;
+}
+
+int _tamanioIndiceEtiquetas(t_list* indiceEtiquetas){
+	//	todo: implementar
+	return 0;
+}
+
+int _tamanioIndiceStack(t_list* indiceStack){
+	//	todo: implementar
+	return 0;
+}
+
+void *_serializarIndiceCodigo(t_list* indiceCodigo, int tamanio){
+	int offset = 0, tmpsize, i = 0;
+	void *buffer = malloc(tamanio);
+
+	for(; i < list_size(indiceCodigo) ; i++){
+		t_indiceCodigo *aux = list_get(indiceCodigo, i);
+		memcpy(buffer + offset, &aux->offset_inicio, tmpsize = sizeof(uint32_t));
+		offset += tmpsize;
+		memcpy(buffer + offset, &aux->size, tmpsize = sizeof(uint32_t));
+		offset += tmpsize;
+		free(aux);
+	}
+
+	return buffer;
+}
+
+void *_serializarIndiceEtiquetas(t_list* indiceEtiquetas, int tamanio){
+	//int offset = 0, tmpsize;
+	void *buffer = malloc(tamanio);
+
+	//	todo: implementar
+
+	return buffer;
+}
+
+
+void *_serializarIndiceStack(t_list* indiceStack, int tamanio){
+	//int offset = 0, tmpsize, i = 0;
+	void *buffer = malloc(tamanio);
+
+	//	todo: implementar
+
+	return buffer;
+}
+
+
+
+
+
+void *serializarPCB(t_PCB* pcb){
+	int offset = 0;
+	uint32_t tmpsize;
+	void *buffer = malloc(sizeof(t_PCB)), *tmpBuffer;
+
+	memcpy(buffer + offset, &pcb->pid, tmpsize = sizeof(uint32_t));
+		offset += tmpsize;
+	memcpy(buffer + offset, &pcb->pc, tmpsize = sizeof(uint32_t));
+		offset += tmpsize;
+	memcpy(buffer + offset, &pcb->cantPagsCodigo, tmpsize = sizeof(uint32_t));
+		offset += tmpsize;
+	memcpy(buffer + offset, &pcb->ec, tmpsize = sizeof(uint32_t));
+		offset += tmpsize;
+
+	tmpsize = _tamanioIndiceCodigo(pcb->indiceCodigo);
+	tmpBuffer = _serializarIndiceCodigo(pcb->indiceCodigo, tmpsize);
+	memcpy(buffer + offset, &tmpsize, sizeof(uint32_t));
+	memcpy(buffer + offset, tmpBuffer, tmpsize);
+	offset += tmpsize;
+	free(tmpBuffer);
+
+	tmpsize = _tamanioIndiceEtiquetas(pcb->indiceEtiquetas);
+	tmpBuffer = _serializarIndiceEtiquetas(pcb->indiceEtiquetas, tmpsize);
+	memcpy(buffer + offset, &tmpsize, sizeof(uint32_t));
+	memcpy(buffer + offset, tmpBuffer, tmpsize);
+	offset += tmpsize;
+	free(tmpBuffer);
+
+	tmpsize = _tamanioIndiceStack(pcb->indiceStack);
+	tmpBuffer = _serializarIndiceStack(pcb->indiceStack, tmpsize);
+	memcpy(buffer + offset, &tmpsize, sizeof(uint32_t));
+	memcpy(buffer + offset, tmpBuffer, tmpsize);
+	offset += tmpsize;
+	free(tmpBuffer);
+
+	return buffer;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -213,8 +328,8 @@ int enviarScriptAMemoria(uint32_t pid, char* script){
 	recv(socket_memoria, &respuesta, sizeof(uint8_t), 0);
 	switch(respuesta){
 	case OK:
-		pcb->cantPags = (string_length(script) / tamanioPag);
-		pcb->cantPags = (string_length(script) % tamanioPag) == 0? pcb->cantPags: pcb->cantPags + 1;
+		pcb->cantPagsCodigo = (string_length(script) / tamanioPag);
+		pcb->cantPagsCodigo = (string_length(script) % tamanioPag) == 0? pcb->cantPagsCodigo: pcb->cantPagsCodigo + 1;
 		send(pcb->socketConsola, &respuesta, sizeof(uint8_t), 0);
 		send(pcb->socketConsola, &pcb->pid, sizeof(uint32_t), 0);
 		return 1;

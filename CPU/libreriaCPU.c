@@ -12,20 +12,19 @@ void mostrarArchivoConfig() {
 
 void terminar(){
 
-	fprintf(stderr, "\nMe voy\n");
-	uint8_t mensaje8 = FIN_CPU;
-	void* mensaje = malloc(sizeof(uint8_t));
-	memcpy(mensaje, &mensaje8, sizeof(uint8_t));
-
 	if(socket_kernel != 0){
-		send(socket_kernel, mensaje, sizeof(uint8_t), 0);
+		msg_enviar_separado(FIN_CPU, 1, 0, socket_kernel);
 		close(socket_kernel);
 	}
 
 	if(socket_memoria != 0){
-		send(socket_memoria, mensaje, sizeof(uint8_t), 0);
+		msg_enviar_separado(FIN_CPU, 1, 0, socket_memoria);
 		close(socket_memoria);
 	}
 
 	exit(1);
+}
+
+void ultimaEjec(){
+	ultimaEjecucion = true;
 }

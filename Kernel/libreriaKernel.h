@@ -34,23 +34,6 @@
 #include <herramientas/enum.h>
 
 
-
-typedef struct {	//todo: reemplazar void* por lo q corresponda
-	int socketConsola;
-	uint32_t pid;
-	uint32_t pc;				//Program Counter
-	uint32_t cantPagsCodigo;	//Páginas utilizadas por elcodigo AnSISOP
-	t_list* indiceCodigo;		//Lista de t_indiceCodigo
-	void* indiceEtiquetas;		// no se
-	t_list* indiceStack;		//Lista de t_Stack
-	uint32_t ec; 				//Exit Code
-}t_PCB;
-
-typedef struct {
-	uint32_t offset_inicio;
-	uint32_t size;
-}t_indiceCodigo;
-
 typedef struct {
 	char* nombre;
 	void* valor;
@@ -76,17 +59,6 @@ typedef struct HeapMetadata {
 	bool isFree;
 }t_HeapMetadata;
 
-typedef struct {
-	t_list* args; //listaArgumentos
-	t_list* vars; //listaVariables
-	uint32_t retPos;
-	uint32_t retVar[3];
-}t_Stack;
-
-typedef struct {
-	char* id;
-	uint32_t posicionMemoria[3];
-}t_StackMetadata;
 
 
 t_list* lista_cpus;
@@ -110,6 +82,19 @@ int gradoMultiprogramacion;
 //t_list* identificadorVariables;
 int stackSize;
 
+
+
+t_queue* cola_New;
+t_queue* cola_Ready;
+t_queue* cola_Exec;
+t_queue* cola_Block;
+t_queue* cola_Exit;
+
+sem_t sem_gradoMp;
+
+
+
+
 void mostrarArchivoConfig();
 void inicializarSemaforosYVariables(char**, char**, char**);
 
@@ -126,14 +111,7 @@ void escucharCPU(int);
 int handshake(int socket_cliente, int tipo);
 void atender_consola(int socket_consola);
 
-//PCB
-int crearPCB(int);
-void borrarPCB(int);
-void setearExitCode(int, int);
 
-
-
-int enviarScriptAMemoria(uint32_t, char*);
 void consolaKernel();
 void terminarKernel();
 

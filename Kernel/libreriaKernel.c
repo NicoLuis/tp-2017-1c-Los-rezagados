@@ -7,6 +7,7 @@
 
 
 #include "libreriaKernel.h"
+#include "operacionesPCB.h"
 
 void mostrarArchivoConfig() {
 
@@ -43,6 +44,8 @@ void inicializarSemaforosYVariables(char** ids, char** valores, char** shared_va
 		variable->valor = 0;
 		list_add(lista_variablesSemaforo, variable);
 	}
+
+	sem_init(&sem_gradoMp, 0, gradoMultiprogramacion);
 }
 
 
@@ -117,6 +120,44 @@ void escucharCPU(int socket_cpu) {
 
 }
 
+
+typedef struct {
+	uint32_t pid;
+	char* script;
+}_t_hiloEspera;
+
+void enviarScriptAMemoria(_t_hiloEspera* aux){
+
+	bool _buscarPCB(t_PCB* pcb){
+		return pcb->pid == aux->pid;
+	}
+
+	sem_wait(&sem_gradoMp);
+	_sacarDeCola(aux->pid, cola_New);
+
+	t_PCB* pcb = list_find(lista_PCBs, (void*) _buscarPCB);
+
+	send(socket_memoria, &aux->pid, sizeof(uint32_t), 0);
+	msg_enviar_separado(INICIALIZAR_PROGRAMA, (uint32_t) string_length(aux->script), aux->script, socket_memoria);
+	uint8_t respuesta;
+	recv(socket_memoria, &respuesta, sizeof(uint8_t), 0);
+	switch(respuesta){
+	case OK:
+		pcb->cantPagsCodigo = (string_length(aux->script) / tamanioPag);
+		pcb->cantPagsCodigo = (string_length(aux->script) % tamanioPag) == 0? pcb->cantPagsCodigo: pcb->cantPagsCodigo + 1;
+		send(pcb->socketConsola, &respuesta, sizeof(uint8_t), 0);
+		send(pcb->socketConsola, &pcb->pid, sizeof(uint32_t), 0);
+		queue_push(cola_Ready, &aux->pid);
+		break;
+	case MARCOS_INSUFICIENTES:
+		log_trace(logKernel, "MARCOS INSUFICIENTES");
+		send(pcb->socketConsola, &respuesta, sizeof(uint8_t), 0);
+		setearExitCode(pcb->pid, -1);
+		break;
+	}
+	free(aux);
+}
+
 void atender_consola(int socket_consola){
 
 	t_msg* msgRecibido = msg_recibir(socket_consola);
@@ -132,8 +173,20 @@ void atender_consola(int socket_consola){
 		script = (char*)msgRecibido->data;
 		log_info(logKernel, script);
 		int pidActual = crearPCB(socket_consola);
-		if(enviarScriptAMemoria((uint32_t) pidActual, script) < 0)
-			setearExitCode(pidActual, -1);
+		queue_push(cola_New, &pidActual);
+
+		_t_hiloEspera* aux = malloc(sizeof(_t_hiloEspera));
+
+		aux->pid = pidActual;
+		aux->script = script;
+
+		pthread_attr_t atributo;
+		pthread_attr_init(&atributo);
+		pthread_attr_setdetachstate(&atributo, PTHREAD_CREATE_DETACHED);
+		pthread_t hiloEspera;
+		pthread_create(&hiloEspera, &atributo,(void*) enviarScriptAMemoria, aux);
+		pthread_attr_destroy(&atributo);
+
 		break;
 
 	case 0:
@@ -155,191 +208,11 @@ void atender_consola(int socket_consola){
 
 
 
-int crearPCB(int socketConsola){
 
-	t_PCB* pcb = malloc(sizeof(t_PCB));
-	pcb->socketConsola = socketConsola;
-	pcb->pid = pid;
-	pcb->pc = 0;
-	pcb->indiceCodigo = list_create();
-	pcb->indiceStack = list_create();
-	//todo: ver q pija son los indices
 
-	list_add(lista_PCBs, pcb);
-	return pid;
-}
 
 
 
-void borrarPCB(int pidActual){		//todo: hay q borrar pcb?
-	bool _buscarPCB(t_PCB* pcb){
-		return pcb->pid == pid;
-	}
-
-	void _liberarPCB(t_PCB* pcb){
-		//free pcb->indiceCodigo;
-		//free pcb->indiceEtiquetas;
-		//free pcb->indiceStack;
-		free(pcb);
-	}
-
-	list_remove_and_destroy_by_condition(lista_PCBs, (void*) _buscarPCB, (void*) _liberarPCB);
-}
-
-void setearExitCode(int pid, int exitCode){
-	bool _buscarPCB(t_PCB* pcb){
-		return pcb->pid == pid;
-	}
-
-	t_PCB* pcb = list_find(lista_PCBs, (void*) _buscarPCB);
-	pcb->ec = exitCode;
-}
-
-
-int _tamanioIndiceCodigo(t_list* indiceCodigo){
-	return list_size(indiceCodigo) * sizeof(uint32_t) * 2;
-}
-
-int _tamanioIndiceEtiquetas(t_list* indiceEtiquetas){
-	//	todo: implementar
-	return 0;
-}
-
-int _tamanioIndiceStack(t_list* indiceStack){
-	//	todo: implementar
-	return 0;
-}
-
-void *_serializarIndiceCodigo(t_list* indiceCodigo, int tamanio){
-	int offset = 0, tmpsize, i = 0;
-	void *buffer = malloc(tamanio);
-
-	for(; i < list_size(indiceCodigo) ; i++){
-		t_indiceCodigo *aux = list_get(indiceCodigo, i);
-		memcpy(buffer + offset, &aux->offset_inicio, tmpsize = sizeof(uint32_t));
-		offset += tmpsize;
-		memcpy(buffer + offset, &aux->size, tmpsize = sizeof(uint32_t));
-		offset += tmpsize;
-		free(aux);
-	}
-
-	return buffer;
-}
-
-void *_serializarIndiceEtiquetas(t_list* indiceEtiquetas, int tamanio){
-	//int offset = 0, tmpsize;
-	void *buffer = malloc(tamanio);
-
-	//	todo: implementar
-
-	return buffer;
-}
-
-
-void *_serializarIndiceStack(t_list* indiceStack, int tamanio){
-	//int offset = 0, tmpsize, i = 0;
-	void *buffer = malloc(tamanio);
-
-	//	todo: implementar
-
-	return buffer;
-}
-
-
-
-
-
-void *serializarPCB(t_PCB* pcb){
-	int offset = 0;
-	uint32_t tmpsize;
-	void *buffer = malloc(sizeof(t_PCB)), *tmpBuffer;
-
-	memcpy(buffer + offset, &pcb->pid, tmpsize = sizeof(uint32_t));
-		offset += tmpsize;
-	memcpy(buffer + offset, &pcb->pc, tmpsize = sizeof(uint32_t));
-		offset += tmpsize;
-	memcpy(buffer + offset, &pcb->cantPagsCodigo, tmpsize = sizeof(uint32_t));
-		offset += tmpsize;
-	memcpy(buffer + offset, &pcb->ec, tmpsize = sizeof(uint32_t));
-		offset += tmpsize;
-
-	tmpsize = _tamanioIndiceCodigo(pcb->indiceCodigo);
-	tmpBuffer = _serializarIndiceCodigo(pcb->indiceCodigo, tmpsize);
-	memcpy(buffer + offset, &tmpsize, sizeof(uint32_t));
-	memcpy(buffer + offset, tmpBuffer, tmpsize);
-	offset += tmpsize;
-	free(tmpBuffer);
-
-	tmpsize = _tamanioIndiceEtiquetas(pcb->indiceEtiquetas);
-	tmpBuffer = _serializarIndiceEtiquetas(pcb->indiceEtiquetas, tmpsize);
-	memcpy(buffer + offset, &tmpsize, sizeof(uint32_t));
-	memcpy(buffer + offset, tmpBuffer, tmpsize);
-	offset += tmpsize;
-	free(tmpBuffer);
-
-	tmpsize = _tamanioIndiceStack(pcb->indiceStack);
-	tmpBuffer = _serializarIndiceStack(pcb->indiceStack, tmpsize);
-	memcpy(buffer + offset, &tmpsize, sizeof(uint32_t));
-	memcpy(buffer + offset, tmpBuffer, tmpsize);
-	offset += tmpsize;
-	free(tmpBuffer);
-
-	return buffer;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-int enviarScriptAMemoria(uint32_t pid, char* script){
-
-	bool _buscarPCB(t_PCB* pcb){
-		return pcb->pid == pid;
-	}
-
-	t_PCB* pcb = list_find(lista_PCBs, (void*) _buscarPCB);
-
-	send(socket_memoria, &pid, sizeof(uint32_t), 0);
-	msg_enviar_separado(INICIALIZAR_PROGRAMA, (uint32_t) string_length(script), script, socket_memoria);
-	uint8_t respuesta;
-	recv(socket_memoria, &respuesta, sizeof(uint8_t), 0);
-	switch(respuesta){
-	case OK:
-		pcb->cantPagsCodigo = (string_length(script) / tamanioPag);
-		pcb->cantPagsCodigo = (string_length(script) % tamanioPag) == 0? pcb->cantPagsCodigo: pcb->cantPagsCodigo + 1;
-		send(pcb->socketConsola, &respuesta, sizeof(uint8_t), 0);
-		send(pcb->socketConsola, &pcb->pid, sizeof(uint32_t), 0);
-		return 1;
-	case MARCOS_INSUFICIENTES:
-		log_trace(logKernel, "MARCOS INSUFICIENTES");
-		send(pcb->socketConsola, &respuesta, sizeof(uint8_t), 0);
-		return -1;
-	}
-	return 0;
-}
 
 
 

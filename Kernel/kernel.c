@@ -26,11 +26,17 @@ int main(int argc, char* argv[]) {
 		return -2;
 	}
 
-	//Inicializo listas
+	//Inicializo listas pid y colas
 	lista_cpus = list_create();
 	lista_consolas = list_create();
 	lista_PCBs = list_create();
 	pid = 0;
+	cola_New = queue_create();
+	cola_Ready = queue_create();
+	cola_Exec = queue_create();
+	cola_Block = queue_create();
+	cola_Exit = queue_create();
+
 
 	//Cargo archivo de configuracion
 

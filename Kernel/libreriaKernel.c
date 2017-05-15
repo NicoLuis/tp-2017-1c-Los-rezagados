@@ -46,6 +46,7 @@ void inicializarSemaforosYVariables(char** ids, char** valores, char** shared_va
 	}
 
 	sem_init(&sem_gradoMp, 0, gradoMultiprogramacion);
+	sem_init(&sem_cantColaReady, 0, 0);
 }
 
 
@@ -148,6 +149,7 @@ void enviarScriptAMemoria(_t_hiloEspera* aux){
 		send(pcb->socketConsola, &respuesta, sizeof(uint8_t), 0);
 		send(pcb->socketConsola, &pcb->pid, sizeof(uint32_t), 0);
 		queue_push(cola_Ready, &aux->pid);
+		sem_post(&sem_cantColaReady);
 		break;
 	case MARCOS_INSUFICIENTES:
 		log_trace(logKernel, "MARCOS INSUFICIENTES");

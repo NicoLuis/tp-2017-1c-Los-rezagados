@@ -91,6 +91,7 @@ t_queue* cola_Block;
 t_queue* cola_Exit;
 
 sem_t sem_gradoMp;
+sem_t sem_cantColaReady;
 
 
 

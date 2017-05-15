@@ -123,7 +123,13 @@ void *_serializarIndiceStack(t_list* indiceStack, int tamanio){
 
 
 
-
+int tamanioTotalPCB(t_PCB* pcb){
+	return
+		sizeof(uint32_t) * 4
+			+ _tamanioIndiceCodigo(pcb->indiceCodigo)
+			+ _tamanioIndiceEtiquetas(pcb->indiceEtiquetas)
+			+ _tamanioIndiceStack(pcb->indiceStack);
+}
 
 void *serializarPCB(t_PCB* pcb){
 	int offset = 0;
@@ -161,4 +167,75 @@ void *serializarPCB(t_PCB* pcb){
 	free(tmpBuffer);
 
 	return buffer;
+}
+
+
+t_list* _desserializarIndiceCodigo(void* buffer, uint32_t size){
+	t_list *lista = list_create();
+	int tamanioLista = size / (sizeof(uint32_t)*2), i, offset = 0, tmpsize;
+
+	for(i = 0; i < tamanioLista ; i++){
+		t_indiceCodigo *aux = malloc(sizeof(t_indiceCodigo));
+		memcpy(&aux->offset_inicio, buffer + offset, tmpsize = sizeof(uint32_t));
+		offset += tmpsize;
+		memcpy(&aux->size, buffer + offset, tmpsize = sizeof(uint32_t));
+		offset += tmpsize;
+		list_add(lista, aux);
+	}
+
+	return lista;
+}
+
+t_list* _desserializarIndiceEtiquetas(void* buffer, uint32_t size){
+	t_list *lista = list_create();
+
+	return lista;
+}
+
+t_list* _desserializarIndiceStack(void* buffer, uint32_t size){
+	t_list *lista = list_create();
+
+	return lista;
+}
+
+
+t_PCB *desserealizarPCB(void* buffer){
+
+	t_PCB* pcb = malloc(sizeof(t_PCB));
+
+	int offset = 0;
+	uint32_t tmpsize;
+	void *tmpBuffer;
+
+	memcpy(&pcb->pid, buffer + offset, tmpsize = sizeof(uint32_t));
+		offset += tmpsize;
+	memcpy(&pcb->pc, buffer + offset, tmpsize = sizeof(uint32_t));
+		offset += tmpsize;
+	memcpy(&pcb->cantPagsCodigo, buffer + offset, tmpsize = sizeof(uint32_t));
+		offset += tmpsize;
+	memcpy(&pcb->ec, buffer + offset, tmpsize = sizeof(uint32_t));
+		offset += tmpsize;
+
+	memcpy(&tmpsize, buffer + offset, sizeof(uint32_t));
+	tmpBuffer = malloc(tmpsize);
+	memcpy(tmpBuffer, buffer + offset, tmpsize);
+	pcb->indiceCodigo = _desserializarIndiceCodigo(tmpBuffer, tmpsize);
+	offset += tmpsize;
+	free(tmpBuffer);
+
+	memcpy(&tmpsize, buffer + offset, sizeof(uint32_t));
+	tmpBuffer = malloc(tmpsize);
+	memcpy(tmpBuffer, buffer + offset, tmpsize);
+	pcb->indiceEtiquetas = _desserializarIndiceEtiquetas(tmpBuffer, tmpsize);
+	offset += tmpsize;
+	free(tmpBuffer);
+
+	memcpy(&tmpsize, buffer + offset, sizeof(uint32_t));
+	tmpBuffer = malloc(tmpsize);
+	memcpy(tmpBuffer, buffer + offset, tmpsize);
+	pcb->indiceStack = _desserializarIndiceStack(tmpBuffer, tmpsize);
+	offset += tmpsize;
+	free(tmpBuffer);
+
+	return pcb;
 }

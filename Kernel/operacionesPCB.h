@@ -42,7 +42,9 @@ typedef struct {
 
 int crearPCB(int);
 void setearExitCode(int, int);
+int tamanioTotalPCB(t_PCB* pcb);
 void *serializarPCB(t_PCB* pcb);
+t_PCB *desserealizarPCB(void*);
 
 bool _sacarDeCola(int pid, t_queue* cola);
 

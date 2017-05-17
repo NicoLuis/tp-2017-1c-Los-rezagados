@@ -83,7 +83,7 @@ void escucharKERNEL(void* socket_kernel) {
 		 		header = 29;//OK
 				send(socketKernel, &header, sizeof(uint8_t), 0);
 			}else{
-				log_warning(log_memoria, "No hay libres");
+				log_warning(log_memoria, "No hay frames libres");
 				header = 30;//MARCOS_INSUFICIENTES
 				send(socketKernel, &header, sizeof(uint8_t), 0);
 			}
@@ -119,6 +119,7 @@ void escucharCPU(void* socket_cpu) {
 	int socketCPU = (int) socket_cpu;
 
 	uint32_t PID = 0;
+	uint32_t pidAnterior;
 	t_proceso* proceso;
 	list_add(lista_cpus, socket_cpu);
 
@@ -198,20 +199,31 @@ void escucharCPU(void* socket_cpu) {
 
 				if (paginaInvalida(PID, numero_pagina)) {
 
-					log_info(log_memoria,"Stack Overflow proceso %d\n", PID);
+					log_error(log_memoria, "Stack Overflow proceso %d\n", PID);
 
 					//AVISO FINALIZACION PROGRAMA A LA CPU
 					header = FINALIZAR_PROGRAMA;
 
-					bytesEnviados = send(socketCPU, &header, sizeof(uint32_t), 0);
+					bytesEnviados = send(socket_cpu, &header, sizeof(uint32_t), 0);
 					if (bytesEnviados <= 0) {
-						log_error(log_memoria,"Error send CPU");
+						log_error(log_memoria, "Error send CPU");
 						pthread_exit(NULL);
 					}
 
+				} else if ((TLB_Activada()) && (estaEnTLB(PID, numero_pagina))) {
+
+					void* contenido_leido = obtenerContenidoSegunTLB(PID,numero_pagina, offset, tamanio_leer);
+
+					enviarContenidoCPU(contenido_leido, tamanio_leer, socket_cpu);
+
+				} else if (estaEnMemoriaReal(PID, numero_pagina)) {
+
+					log_info(log_memoria, "La pagina %d esta en Memoria Real\n",
+							numero_pagina);
+
 					//-----Retardo
 					pthread_mutex_lock(&mutexRetardo);
-					usleep(retardoMemoria * 1000);
+					usleep(retardo * 1000);
 					pthread_mutex_unlock(&mutexRetardo);
 					//------------
 
@@ -221,13 +233,16 @@ void escucharCPU(void* socket_cpu) {
 
 					void* contenido_leido = obtenerContenido(pagina->nroFrame,offset, tamanio_leer);
 
-					enviarContenidoCPU(contenido_leido, tamanio_leer, socketCPU);
+					enviarContenidoCPU(contenido_leido, tamanio_leer, socket_cpu);
 
+					if (TLB_Activada()) {
+						agregarEntradaTLB(PID, numero_pagina, pagina->nroFrame);
+					}
 
 				} else {
 
 					lockFrames();
-					bool hayFrameLibre = hayFramesLibres(1);
+					int hayFrameLibre = hayFramesLibres();
 					unlockFrames();
 
 					if ((!hayFrameLibre) && (proceso->cantFramesAsignados == 0)) {
@@ -237,44 +252,23 @@ void escucharCPU(void* socket_cpu) {
 						//AVISO FINALIZACION PROGRAMA A LA CPU
 						header = FINALIZAR_PROGRAMA;
 
-						bytesEnviados = send(socketCPU, &header, sizeof(uint32_t), 0);
+						bytesEnviados = send(socket_cpu, &header, sizeof(uint32_t),
+								0);
 						if (bytesEnviados <= 0) {
-							log_error(log_memoria,"Error send CPU");
+							log_error(log_memoria, "Error send CPU");
 							pthread_exit(NULL);
 						}
 
-						/*
-
-					} else {
-
-						log_info(log_memoria,"La pagina %d NO esta en Memoria Real. Page Fault\n",numero_pagina);
-
-						//Envio solicitud de lectura a FS
-
-						void* paginaLeidaDeFS = pedirPaginaAFS(PID,	numero_pagina);
-
-						//ahora que tengo la pagina la debo cargar en memoria y leer la parte que me pidio la cpu
-						//obtener contenido a enviar segun pag y offset
-
-						lockFramesYProcesos();
-
-						cargarPaginaAMemoria(PID, numero_pagina, paginaLeidaDeFS,LECTURA_PAGINA);
-
-						t_pag* pagina = buscarPaginaEnListaDePaginas(PID,numero_pagina);
-
-						unlockFramesYProcesos();
-
-						void* contenido_leido = obtenerContenido(pagina->nroFrame,offset, tamanio_leer);
-
-						enviarContenidoCPU(contenido_leido, tamanio_leer,socketCPU);
+						/*LA CPU LE AVISA AL NUCLEO
+						 EL NUCLEO LE AVISA A LA UMC Y A LA CONSOLA
+						 CUANDO ME AVISE EL NUCLEO YO AVISARE AL SWAP*/
 
 					}
-					*/
-					}
-
 				}
+
 			}
 				break;
+
 
 			case ESCRITURA_PAGINA: {
 

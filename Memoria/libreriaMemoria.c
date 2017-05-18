@@ -119,9 +119,9 @@ void escucharCPU(void* socket_cpu) {
 	int socketCPU = (int) socket_cpu;
 
 	uint32_t PID = 0;
-	uint32_t pidAnterior;
+	//uint32_t pidAnterior;
 	t_proceso* proceso;
-	list_add(lista_cpus, socket_cpu);
+	//list_add(listaCPUs, socketCPU);
 
 	log_info(log_memoria,"Se conecto un CPU\n");
 
@@ -204,17 +204,17 @@ void escucharCPU(void* socket_cpu) {
 					//AVISO FINALIZACION PROGRAMA A LA CPU
 					header = FINALIZAR_PROGRAMA;
 
-					bytesEnviados = send(socket_cpu, &header, sizeof(uint32_t), 0);
+					bytesEnviados = send(socketCPU, &header, sizeof(uint32_t), 0);
 					if (bytesEnviados <= 0) {
 						log_error(log_memoria, "Error send CPU");
 						pthread_exit(NULL);
 					}
 
-				} else if ((TLB_Activada()) && (estaEnTLB(PID, numero_pagina))) {
+				} else if ((Cache_Activada()) && (estaEnCache(PID, numero_pagina))) {
 
-					void* contenido_leido = obtenerContenidoSegunTLB(PID,numero_pagina, offset, tamanio_leer);
+					void* contenido_leido = obtenerContenidoSegunCache(PID,numero_pagina, offset, tamanio_leer);
 
-					enviarContenidoCPU(contenido_leido, tamanio_leer, socket_cpu);
+					enviarContenidoCPU(contenido_leido, tamanio_leer, socketCPU);
 
 				} else if (estaEnMemoriaReal(PID, numero_pagina)) {
 
@@ -223,7 +223,7 @@ void escucharCPU(void* socket_cpu) {
 
 					//-----Retardo
 					pthread_mutex_lock(&mutexRetardo);
-					usleep(retardo * 1000);
+					usleep(retardoMemoria * 1000);
 					pthread_mutex_unlock(&mutexRetardo);
 					//------------
 
@@ -233,10 +233,10 @@ void escucharCPU(void* socket_cpu) {
 
 					void* contenido_leido = obtenerContenido(pagina->nroFrame,offset, tamanio_leer);
 
-					enviarContenidoCPU(contenido_leido, tamanio_leer, socket_cpu);
+					enviarContenidoCPU(contenido_leido, tamanio_leer, socketCPU);
 
-					if (TLB_Activada()) {
-						agregarEntradaTLB(PID, numero_pagina, pagina->nroFrame);
+					if (Cache_Activada()) {
+						agregarEntradaCache(PID, numero_pagina, pagina->nroFrame);
 					}
 
 				} else {
@@ -252,16 +252,12 @@ void escucharCPU(void* socket_cpu) {
 						//AVISO FINALIZACION PROGRAMA A LA CPU
 						header = FINALIZAR_PROGRAMA;
 
-						bytesEnviados = send(socket_cpu, &header, sizeof(uint32_t),
+						bytesEnviados = send(socketCPU, &header, sizeof(uint32_t),
 								0);
 						if (bytesEnviados <= 0) {
 							log_error(log_memoria, "Error send CPU");
 							pthread_exit(NULL);
 						}
-
-						/*LA CPU LE AVISA AL NUCLEO
-						 EL NUCLEO LE AVISA A LA UMC Y A LA CONSOLA
-						 CUANDO ME AVISE EL NUCLEO YO AVISARE AL SWAP*/
 
 					}
 				}
@@ -451,6 +447,7 @@ void crearProcesoYAgregarAListaDeProcesos(uint32_t pid,	uint32_t cantidadDePagin
 
 }
 
+/*
 void escribirPaginaEnFS(uint32_t pid, uint8_t nroPag, void* contenido_pagina) {
 
 	void* bufferFS = malloc(100 + tamanioDeMarcos);
@@ -490,6 +487,7 @@ void escribirPaginaEnFS(uint32_t pid, uint8_t nroPag, void* contenido_pagina) {
 
 	free(bufferFS);
 }
+*/
 
 void liberarFramesDeProceso(uint32_t unPid) {
 
@@ -670,15 +668,22 @@ t_proceso* buscarProcesoEnListaProcesos(uint32_t pid) {
 	}
 }
 
-bool hayFramesLibres(int cantidadDeFrames) {
+int hayFramesLibres() {
 
 	int _soy_frame_libre(t_frame* frame) {
 		return (frame->pid == 0);
 	}
 
-	return list_count_satisfying(listaFrames, (void*) _soy_frame_libre) >= cantidadDeFrames;
+	t_frame* frameLibre = list_find(listaFrames, (void*) _soy_frame_libre);
+
+	if (frameLibre != NULL) {
+		return 1;
+	} else {
+		return 0;
+	}
 }
 
+/*
 void* pedirPaginaAFS(uint32_t pid, uint8_t numero_pagina) {
 
 	int bytesRecibidos;
@@ -769,6 +774,7 @@ void* pedirPaginaAFS(uint32_t pid, uint8_t numero_pagina) {
 
 	return paginaLeida;
 }
+*/
 
 void cargarPaginaAMemoria(uint32_t pid, uint8_t numero_pagina,void* paginaLeida, int accion) {
 
@@ -866,10 +872,9 @@ void inicializarFrames(){
 
 void terminarProceso(){			//aca libero todos
 
-	list_destroy(lista_cpus);
+	//list_destroy(listaCPUs);
 	void destruirFrames(t_frame* frame){
 		free(frame);
-		fixme(frame);
 	}
 	list_destroy_and_destroy_elements(listaFrames, (void*) destruirFrames);
 	void destruirProcesos(t_proceso* proc){
@@ -917,3 +922,172 @@ int estaEnMemoriaReal(uint32_t pid, uint8_t numero_pagina) {
 
 	}
 }
+
+t_list* crearCache() {
+	t_list* cache = list_create();
+	return cache;
+}
+
+t_cache* buscarEntradaCache(uint32_t pid, uint8_t numero_pagina) {
+
+	int _soy_la_entrada_cache_buscada(t_cache* entradaCache) {
+		return ((entradaCache->pid == pid) && (entradaCache->numPag == numero_pagina));
+	}
+
+	return list_find(Cache, (void*) _soy_la_entrada_cache_buscada);
+
+}
+
+int estaEnCache(uint32_t pid, uint8_t numero_pagina) {
+
+	pthread_mutex_lock(&mutexCache);
+	t_cache* entradaCache = buscarEntradaCache(pid, numero_pagina);
+
+	if (entradaCache != NULL) {
+		log_info(log_memoria, "La pagina %d esta en la Cache\n", numero_pagina);
+		return 1;
+	} else {
+		log_info(log_memoria, "Cache Miss\n");
+		pthread_mutex_unlock(&mutexCache);
+		return 0;
+	}
+}
+
+t_cache* crearRegistroCache(uint32_t pid, uint8_t numPag, int numFrame) {
+
+	t_cache* unaEntradaCache = malloc(sizeof(t_cache));
+	unaEntradaCache->pid = pid;
+	unaEntradaCache->numPag = numPag;
+	unaEntradaCache->numFrame = numFrame;
+
+	pthread_mutex_lock(&mutexCantAccesosMemoria);
+	unaEntradaCache->ultimoAcceso = cantAccesosMemoria;
+	pthread_mutex_unlock(&mutexCantAccesosMemoria);
+
+	return unaEntradaCache;
+}
+
+void eliminarCache(t_list* unaCache) {
+	list_destroy(unaCache);
+}
+
+int hayEspacioEnCache() {
+
+	int tamanioCache = list_size(Cache);
+
+	return tamanioCache < cantidadEntradasCache;
+}
+
+void agregarEntradaCache(uint32_t pid, uint8_t numero_pagina, int nroFrame) {
+
+	t_cache* nuevaEntradaCache = crearRegistroCache(pid, numero_pagina, nroFrame);
+
+	pthread_mutex_lock(&mutexCache);
+	if (hayEspacioEnCache()) {
+		list_add(Cache, nuevaEntradaCache);
+	}
+
+	else {
+		//algoritmoLRU();
+		list_add(Cache, nuevaEntradaCache);
+	}
+
+	log_info(log_memoria, "Pagina %d del proceso %d agregada a Cache\n", numero_pagina,pid);
+
+	pthread_mutex_unlock(&mutexCache);
+}
+
+void* obtenerContenidoSegunCache(uint32_t pid, uint8_t numero_pagina,uint32_t offset, uint32_t tamanio_leer) {
+
+	t_cache* entradaCache = buscarEntradaCache(pid, numero_pagina);
+
+	pthread_mutex_lock(&mutexCantAccesosMemoria);
+	entradaCache->ultimoAcceso = cantAccesosMemoria;
+	pthread_mutex_unlock(&mutexCantAccesosMemoria);
+
+	void* contenido = obtenerContenido(entradaCache->numFrame, offset,tamanio_leer);
+
+	pthread_mutex_unlock(&mutexCache);
+
+	return contenido;
+
+}
+
+void escribirContenidoSegunCache(uint32_t pid, uint8_t numero_pagina,uint32_t offset, uint32_t tamanio_escritura, void* contenido_escribir) {
+
+	t_cache* entradaCache = buscarEntradaCache(pid, numero_pagina);
+
+	pthread_mutex_lock(&mutexCantAccesosMemoria);
+	entradaCache->ultimoAcceso = cantAccesosMemoria;
+	pthread_mutex_unlock(&mutexCantAccesosMemoria);
+
+	escribirContenido(entradaCache->numFrame, offset, tamanio_escritura,contenido_escribir);
+
+	ponerBitModificadoEn1(entradaCache->numFrame);
+
+	pthread_mutex_unlock(&mutexCache);
+
+}
+
+void vaciarCache() {
+
+	if (Cache_Activada()) {
+		pthread_mutex_lock(&mutexCache);
+		eliminarCache(Cache);
+		Cache = crearCache();
+		pthread_mutex_unlock(&mutexCache);
+
+		printf("Flush Cache realizado\n");
+		log_info(log_memoria, "Flush Cache realizado\n");
+
+	} else
+		printf("Se intento hacer flush cache pero no esta activada\n");
+		log_error(log_memoria, "Se intento hacer flush cache pero no esta activada\n");
+
+}
+
+void borrarEntradasCacheSegunPID(uint32_t pid) {
+
+	int _no_es_entrada_Cache_de_PID(t_cache* entradaCache) {
+		return (entradaCache->pid != pid);
+	}
+
+	pthread_mutex_lock(&mutexCache);
+
+	t_list* nuevaCache = list_filter(Cache, (void*) _no_es_entrada_Cache_de_PID);
+
+	list_destroy(Cache);
+
+	Cache = nuevaCache;
+
+	pthread_mutex_unlock(&mutexCache);
+}
+
+void borrarEntradaCacheSegunFrame(int nroFrame) {
+
+	int index = -1;
+
+	int _soy_la_entrada_Cache_de_ese_frame(t_cache* entradaCache) {
+
+		index++;
+		return (entradaCache->numFrame == nroFrame);
+	}
+
+	pthread_mutex_lock(&mutexCache);
+
+	list_find(Cache, (void*) _soy_la_entrada_Cache_de_ese_frame);
+
+	t_cache* entrada_Cache_borrada = list_remove(Cache, index);
+
+	free(entrada_Cache_borrada);
+
+	pthread_mutex_unlock(&mutexCache);
+
+}
+
+int Cache_Activada() {
+
+	return (cantidadaEntradasCache > 0);
+
+}
+

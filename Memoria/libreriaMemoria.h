@@ -37,13 +37,14 @@ int puertoMemoria;
 int cantidadDeMarcos;
 uint32_t tamanioDeMarcos;
 int cantidadaEntradasCache;
+int cantidadEntradasCache;
 int cachePorProceso;
 char* algoritmoReemplazo;
 int retardoMemoria;
 t_list* lista_cpus;
 t_list* listaFrames;
 t_list* listaProcesos;
-t_list* TLB;
+t_list* Cache;
 t_log* log_memoria;
 
 //PROCESO
@@ -68,6 +69,14 @@ typedef struct {
 	int bit_pres;
 	int bit_uso;
 } t_pag;
+
+//ENTRADA Cache
+typedef struct {
+	uint32_t pid;
+	uint8_t numPag;
+	int numFrame;
+	int ultimoAcceso;
+} t_cache;
 
 
 void mostrarArchivoConfig();
@@ -118,7 +127,7 @@ void* pedirPaginaAFS(uint32_t pid, uint8_t numero_pagina);
 
 void cargarPaginaAMemoria(uint32_t pid, uint8_t numero_pagina,void* paginaLeida, int accion);
 
-bool hayFramesLibres(int cantidadDeFrames);
+int hayFramesLibres();
 
 t_frame* buscarFrameLibre(uint32_t pid);
 
@@ -134,6 +143,34 @@ t_frame* buscarFrame(int numeroFrame);
 
 int estaEnMemoriaReal(uint32_t pid, uint8_t numero_pagina);
 
+//Cache
+
+t_list* crearCache();
+
+t_cache* buscarEntradaCache(uint32_t pid, uint8_t numero_pagina);
+
+int estaEnCache(uint32_t pid, uint8_t numero_pagina);
+
+t_cache* crearRegistroCache(uint32_t pid, uint8_t numPag, int numFrame);
+
+void eliminarCache(t_list* unaCache);
+
+int hayEspacioEnCache();
+
+void agregarEntradaCache(uint32_t pid, uint8_t numero_pagina, int nroFrame);
+
+void* obtenerContenidoSegunCache(uint32_t pid, uint8_t numero_pagina,uint32_t offset, uint32_t tamanio_leer);
+
+void escribirContenidoSegunCache(uint32_t pid, uint8_t numero_pagina,uint32_t offset, uint32_t tamanio_escritura, void* contenido_escribir);
+
+void vaciarCache();
+
+void borrarEntradasCacheSegunPID(uint32_t pid);
+
+void borrarEntradaCacheSegunFrame(int nroFrame);
+
+int Cache_Activada();
+
 //Variable Global para LRU
 int cantAccesosMemoria;
 
@@ -141,19 +178,10 @@ int cantAccesosMemoria;
 
 pthread_mutex_t mutexListaProcesos;
 pthread_mutex_t mutexListaFrames;
-pthread_mutex_t mutexTLB;
+pthread_mutex_t mutexCache;
 pthread_mutex_t mutexCantAccesosMemoria;
 pthread_mutex_t mutexRetardo;
 pthread_mutex_t mutexMemoriaReal;
 pthread_mutex_t mutexDump;
-
-
-//todo: a eliminar
-int socket_fs;
-pthread_mutex_t mutexFS;
-
-
-
-
 
 #endif /* MEMORIA_LIBRERIAMEMORIA_H_ */

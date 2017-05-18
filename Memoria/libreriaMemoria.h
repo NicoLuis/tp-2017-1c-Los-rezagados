@@ -171,6 +171,8 @@ void borrarEntradaCacheSegunFrame(int nroFrame);
 
 int Cache_Activada();
 
+void algoritmoLRU();
+
 //Variable Global para LRU
 int cantAccesosMemoria;
 

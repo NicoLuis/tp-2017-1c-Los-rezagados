@@ -988,7 +988,7 @@ void agregarEntradaCache(uint32_t pid, uint8_t numero_pagina, int nroFrame) {
 	}
 
 	else {
-		//algoritmoLRU();
+		algoritmoLRU();
 		list_add(Cache, nuevaEntradaCache);
 	}
 
@@ -1091,3 +1091,19 @@ int Cache_Activada() {
 
 }
 
+void algoritmoLRU() {
+
+	int _menor_ultimo_acceso(t_cache* unRegistroTLB, t_cache* otroRegistroTLB) {
+		return (unRegistroTLB->ultimoAcceso < otroRegistroTLB->ultimoAcceso);
+	}
+
+	log_info(log_memoria, "Algoritmo LRU");
+
+	list_sort(Cache, (void*) _menor_ultimo_acceso);
+
+	t_cache* entradaTLBreemplazada = list_remove(Cache, 0);
+
+	log_info(log_memoria, "En TLB se reemplazo la pagina %d del proceso %d",entradaTLBreemplazada->numPag, entradaTLBreemplazada->pid);
+
+	free(entradaTLBreemplazada);
+}

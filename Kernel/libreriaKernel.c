@@ -123,7 +123,7 @@ void escucharCPU(int socket_cpu) {
 
 
 typedef struct {
-	uint32_t pid;
+	t_num pid;
 	char* script;
 }_t_hiloEspera;
 
@@ -138,8 +138,8 @@ void enviarScriptAMemoria(_t_hiloEspera* aux){
 
 	t_PCB* pcb = list_find(lista_PCBs, (void*) _buscarPCB);
 
-	send(socket_memoria, &aux->pid, sizeof(uint32_t), 0);
-	msg_enviar_separado(INICIALIZAR_PROGRAMA, (uint32_t) string_length(aux->script), aux->script, socket_memoria);
+	send(socket_memoria, &aux->pid, sizeof(t_num), 0);
+	msg_enviar_separado(INICIALIZAR_PROGRAMA, (t_num) string_length(aux->script), aux->script, socket_memoria);
 	uint8_t respuesta;
 	recv(socket_memoria, &respuesta, sizeof(uint8_t), 0);
 	switch(respuesta){
@@ -147,7 +147,7 @@ void enviarScriptAMemoria(_t_hiloEspera* aux){
 		pcb->cantPagsCodigo = (string_length(aux->script) / tamanioPag);
 		pcb->cantPagsCodigo = (string_length(aux->script) % tamanioPag) == 0? pcb->cantPagsCodigo: pcb->cantPagsCodigo + 1;
 		send(pcb->socketConsola, &respuesta, sizeof(uint8_t), 0);
-		send(pcb->socketConsola, &pcb->pid, sizeof(uint32_t), 0);
+		send(pcb->socketConsola, &pcb->pid, sizeof(t_num), 0);
 		queue_push(cola_Ready, &aux->pid);
 		sem_post(&sem_cantColaReady);
 		break;
@@ -175,6 +175,7 @@ void atender_consola(int socket_consola){
 		script = (char*)msgRecibido->data;
 		log_info(logKernel, script);
 		int pidActual = crearPCB(socket_consola);
+		llenarCargarIndicesPCB(pidActual, script);
 		queue_push(cola_New, &pidActual);
 
 		_t_hiloEspera* aux = malloc(sizeof(_t_hiloEspera));
@@ -309,8 +310,6 @@ void consolaKernel(){
 
 
 
-
-
 }
 void terminarKernel(){			//aca libero todos
 
@@ -327,7 +326,8 @@ void terminarKernel(){			//aca libero todos
 	}
 	void _destruirPCBs(t_PCB* pcb){
 		//todo: aca libero todos los elementos del pcb (mas q nada los indices)
-		list_destroy(pcb->indiceCodigo);
+		free(pcb->indiceCodigo.serializado);
+		free(pcb->indiceEtiquetas.serializado);
 		list_destroy_and_destroy_elements(pcb->indiceStack, (void*) _destruirIndiceStack);
 		free(pcb);
 	}

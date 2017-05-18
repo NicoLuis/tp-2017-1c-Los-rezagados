@@ -10,6 +10,8 @@
 
 #include "libreriaKernel.h"
 
+int sigoFIFO;
+
 void planificar();
 void planificar_FIFO();
 void planificar_RR();

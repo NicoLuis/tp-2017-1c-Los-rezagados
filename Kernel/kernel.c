@@ -85,7 +85,7 @@ int main(int argc, char* argv[]) {
 	}
 	log_trace(logKernel, "Me conecte bien a Memoria");
 
-	recv(socket_memoria, &tamanioPag, sizeof(uint32_t), 0);
+	recv(socket_memoria, &tamanioPag, sizeof(t_num), 0);
 	log_trace(logKernel, "Tamaño de paginas: %d", tamanioPag);
 
 

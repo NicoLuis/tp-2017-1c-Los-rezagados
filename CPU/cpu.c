@@ -113,7 +113,7 @@ int main(int argc, char* argv[]) {
 		switch(msgRecibido->tipoMensaje){
 		case PCB:
 
-			desserializarPCB(msgRecibido->data);
+			//desserializarPCB(msgRecibido->data);
 
 			break;
 		case 0:

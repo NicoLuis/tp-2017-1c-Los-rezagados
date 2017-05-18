@@ -86,7 +86,7 @@ void planificar_FIFO(){
 	sem_post(&sem_cantColaReady);		//una vez q entre xq wait me resto 1 sin cambiar el tamaniodeCola
 
 	log_trace(logKernel, "Inicio FIFO");
-	int pidPCB = (int) queue_pop(cola_Ready), aux;
+	int pidPCB = (int) queue_peek(cola_Ready), aux;
 	int _es_PCB(t_PCB* p){
 		return p->pid == pidPCB;
 	}
@@ -95,7 +95,8 @@ void planificar_FIFO(){
 	if(pcb == NULL)
 		log_error(logKernel, "no existe el proceso con pid %d", pidPCB);
 
-	int cpuUsada = (int) list_take_and_remove(lista_cpus, 1), sigo = 1;
+	int cpuUsada = (int) list_take_and_remove(lista_cpus, 1);
+	sigoFIFO = 1;
 
 	uint32_t size = tamanioTotalPCB(pcb);
 	void* pcbSerializado = serializarPCB(pcb);
@@ -104,7 +105,7 @@ void planificar_FIFO(){
 
 	log_trace(logKernel, "Planifico proceso %d", pcb->pid);
 
-	while(sigo){
+	while(sigoFIFO){
 
 		msg_enviar_separado(EJECUTAR_INSTRUCCION, 1, 0, cpuUsada);
 
@@ -120,14 +121,16 @@ void planificar_FIFO(){
 			pcb = desserealizarPCB(msgRecibido);
 			pcb->socketConsola = aux;
 			list_add(lista_cpus, &cpuUsada);
-			sigo = 0;
+			queue_pop(cola_Ready);
+			sigoFIFO = 0;
 			setearExitCode(pcb->pid, 0);
 
 			break;
 		case 0:
 			log_trace(logKernel, "Se desconecto cpu %d", cpuUsada);
 			setearExitCode(pcb->pid, -20);
-			sigo = 0;
+			queue_pop(cola_Ready);
+			sigoFIFO = 0;
 			break;
 		}
 

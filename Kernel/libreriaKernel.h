@@ -32,6 +32,7 @@
 #include <commons/process.h>
 #include <herramientas/sockets.h>
 #include <herramientas/enum.h>
+#include <parser/metadata_program.h>
 
 
 typedef struct {
@@ -55,7 +56,7 @@ t_list* tabla_heap;
 // todo: "En el caso que el tamaño disponible en una página no sea suficiente para almacenar el valor requerido, se pedirá una nueva tabla a la Memoria."	?????
 
 typedef struct HeapMetadata {
-	uint32_t size;
+	t_num size;
 	bool isFree;
 }t_HeapMetadata;
 
@@ -64,7 +65,7 @@ typedef struct HeapMetadata {
 t_list* lista_cpus;
 t_list* lista_consolas;
 t_list* lista_PCBs;
-uint32_t pid;
+t_num pid;
 
 //Archivo de Configuracion
 int puertoPrograma;
@@ -105,7 +106,7 @@ fd_set fdsMaestro;
 
 t_log* logKernel;
 
-uint32_t tamanioPag;
+t_num tamanioPag;
 
 void escucharCPU(int);
 

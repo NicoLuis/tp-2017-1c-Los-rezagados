@@ -1416,13 +1416,30 @@ t_proceso* buscarProcesoEnListaProcesosParaDump(uint32_t pid) {
 	return list_find(listaProcesos, (void*) _soy_el_pid_buscado);
 }
 
-void mostrarContenidoTodosLosProcesos(){
 
+void mostrarContenidoTodosLosProcesos(){
+	int size = list_size(listaProcesos);
+	int aux = 0;
+	while (aux <= size){
+		t_proceso* proceso = list_get(listaProcesos,aux);
+		mostrarContenidoDeUnProceso(proceso->PID);
+	}
 }
 
 void mostrarContenidoDeUnProceso(uint32_t pid){
 
-	t_proceso* proceso = buscarProcesoEnListaProcesosParaDump(pid);
+	t_proceso* proceso = buscarProcesoEnListaProcesos(pid);
+	int numeroPagina = 0;
+	while(numeroPagina <= proceso->cantPaginas){
+		lockProcesos();
+		t_pag* pagina = buscarPaginaEnListaDePaginas(pid,numeroPagina);
+		unlockProcesos();
+		void* contenido_leido = obtenerContenido(pagina->nroFrame, 0, tamanioDeMarcos);
 
+		printf("Numero de Pagina: %d \n",numeroPagina);
+		printf("Contenido: %p",contenido_leido);
+
+		pagina++;
+	}
 
 }

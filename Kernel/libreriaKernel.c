@@ -316,22 +316,7 @@ void terminarKernel(){			//aca libero todos
 	list_destroy(lista_cpus);
 	list_destroy(lista_consolas);
 
-	void _destruirStackMetadata(t_StackMetadata* stack){
-		free(stack);
-	}
-	void _destruirIndiceStack(t_Stack* stack){
-		list_destroy_and_destroy_elements(stack->args, (void*) _destruirStackMetadata);
-		list_destroy_and_destroy_elements(stack->vars, (void*) _destruirStackMetadata);
-		free(stack);
-	}
-	void _destruirPCBs(t_PCB* pcb){
-		//todo: aca libero todos los elementos del pcb (mas q nada los indices)
-		free(pcb->indiceCodigo.serializado);
-		free(pcb->indiceEtiquetas.serializado);
-		list_destroy_and_destroy_elements(pcb->indiceStack, (void*) _destruirIndiceStack);
-		free(pcb);
-	}
-	list_destroy_and_destroy_elements(lista_PCBs, (void*) _destruirPCBs);
+	list_destroy_and_destroy_elements(lista_PCBs, (void*) liberarPCB);
 
 	void _destruirVariablesCompartidas(t_VariableCompartida* variable){
 		free(variable);

@@ -28,6 +28,7 @@
 #include <commons/config.h>
 #include <commons/string.h>
 #include <commons/collections/queue.h>
+#include <commons/collections/dictionary.h>
 #include <commons/log.h>
 #include <commons/process.h>
 #include <herramientas/sockets.h>

@@ -173,6 +173,26 @@ int Cache_Activada();
 
 void algoritmoLRU();
 
+void ejecutarComandos();
+
+void dumpTablaDePaginasDeProceso(t_proceso* proceso, FILE* archivoDump);
+
+void dumpEstructurasMemoriaTodosLosProcesos(FILE* archivoDump);
+
+void dumpTodosLosProcesos();
+
+void dumpContenidoMemoriaProceso(t_proceso* proceso, FILE* archivoDump);
+
+void dumpProcesoParticular(int pid);
+
+void flushMemoria();
+
+t_proceso* buscarProcesoEnListaProcesosParaDump(uint32_t pid);
+
+void mostrarContenidoTodosLosProcesos();
+
+void mostrarContenidoDeUnProceso(uint32_t pid);
+
 //Variable Global para LRU
 int cantAccesosMemoria;
 

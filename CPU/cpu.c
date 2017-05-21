@@ -1,5 +1,6 @@
 #include <herramientas/sockets.c>
 #include "libreriaCPU.h"
+#include "operacionesPCB.h"
 
 
 
@@ -17,6 +18,10 @@ int main(int argc, char* argv[]) {
 		printf("Numero incorrecto de argumentos");
 		return -2;
 	}
+
+	//Creo archivo log
+	logCPU = log_create("kernel.log", "KERNEL", false, LOG_LEVEL_TRACE);
+	log_trace(logCPU, "  -----------  INICIO KERNEL  -----------  ");
 
 	signal (SIGINT, terminar);
 	signal (SIGUSR1, ultimaEjec);
@@ -111,9 +116,16 @@ int main(int argc, char* argv[]) {
 		msg_recibir_data(socket_kernel, msgRecibido);
 
 		switch(msgRecibido->tipoMensaje){
-		case PCB:
+		case ENVIO_PCB:
 
-			//desserializarPCB(msgRecibido->data);
+			log_trace(logCPU, "Recibi ENVIO_PCB");
+			pcb = desserealizarPCB(msgRecibido->data);
+
+			break;
+		case EJECUTAR_INSTRUCCION:
+			log_trace(logCPU, "Recibi EJECUTAR_INSTRUCCION");
+
+			ejecutar();
 
 			break;
 		case 0:

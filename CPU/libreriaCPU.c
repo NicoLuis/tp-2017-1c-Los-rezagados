@@ -28,3 +28,7 @@ void terminar(){
 void ultimaEjec(){
 	ultimaEjecucion = true;
 }
+
+void ejecutar(){
+
+}

@@ -86,7 +86,7 @@ void planificar_FIFO(){
 	sem_post(&sem_cantColaReady);		//una vez q entre xq wait me resto 1 sin cambiar el tamaniodeCola
 
 	log_trace(logKernel, "Inicio FIFO");
-	int pidPCB = (int) queue_peek(cola_Ready), aux;
+	int pidPCB = (int) queue_peek(cola_Ready);
 	int _es_PCB(t_PCB* p){
 		return p->pid == pidPCB;
 	}
@@ -97,6 +97,15 @@ void planificar_FIFO(){
 
 	int cpuUsada = (int) list_take_and_remove(lista_cpus, 1);
 	sigoFIFO = 1;
+	t_infosocket* info = malloc(sizeof(t_infosocket));
+	info->pid = pcb->pid; info->socket = cpuUsada;
+	list_add(lista_PCB_cpu, info);
+	bool _esCpu(t_infosocket* a){
+		return a->socket == cpuUsada;
+	}
+	void _lib(t_infosocket* a){
+		free(a);
+	}
 
 	uint32_t size = tamanioTotalPCB(pcb);
 	void* pcbSerializado = serializarPCB(pcb);
@@ -117,10 +126,9 @@ void planificar_FIFO(){
 
 		case ENVIO_PCB:		// si me devuelve el PCB es porque fue la ultima instruccion
 			msg_recibir_data(cpuUsada, msgRecibido);
-			aux = pcb->socketConsola;
 			pcb = desserealizarPCB(msgRecibido);
-			pcb->socketConsola = aux;
 			list_add(lista_cpus, &cpuUsada);
+			list_remove_and_destroy_by_condition(lista_PCB_cpu, (void*) _esCpu, (void*) _lib);
 			queue_pop(cola_Ready);
 			sigoFIFO = 0;
 			setearExitCode(pcb->pid, 0);
@@ -128,6 +136,7 @@ void planificar_FIFO(){
 			break;
 		case 0:
 			log_trace(logKernel, "Se desconecto cpu %d", cpuUsada);
+			list_remove_and_destroy_by_condition(lista_PCB_cpu, (void*) _esCpu, (void*) _lib);
 			setearExitCode(pcb->pid, -20);
 			queue_pop(cola_Ready);
 			sigoFIFO = 0;
@@ -135,9 +144,6 @@ void planificar_FIFO(){
 		}
 
 	}
-
-
-
 
 	log_trace(logKernel, "Fin FIFO");
 

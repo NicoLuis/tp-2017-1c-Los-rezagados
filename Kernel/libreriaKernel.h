@@ -61,11 +61,18 @@ typedef struct HeapMetadata {
 	bool isFree;
 }t_HeapMetadata;
 
+typedef struct {
+	int socket;
+	int pid;
+}t_infosocket;
+
 
 
 t_list* lista_cpus;
 t_list* lista_consolas;
 t_list* lista_PCBs;
+t_list* lista_PCB_consola;
+t_list* lista_PCB_cpu;
 t_num pid;
 
 //Archivo de Configuracion

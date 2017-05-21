@@ -8,7 +8,7 @@
 #ifndef OPERACIONESPCB_H_
 #define OPERACIONESPCB_H_
 
-#include "libreriaKernel.h"
+#include "libreriaCPU.h"
 
 typedef struct {
 	t_num size;
@@ -24,6 +24,7 @@ typedef struct {
 	t_list* indiceStack;		//Lista de t_Stack
 	t_num ec; 				//Exit Code
 }t_PCB;
+t_PCB* pcb;
 
 typedef struct {
 	t_list* args; 	//lista de t_StackMetadata
@@ -33,13 +34,14 @@ typedef struct {
 }t_Stack;
 
 typedef struct {
-	char* id;
+	char id;
 	t_num posicionMemoria[3];
 }t_StackMetadata;
 
 int crearPCB(int);
 void llenarIndicesPCB(int, char*);
 void setearExitCode(int, int);
+int tamanioArgVar(t_list* lista);
 int tamanioTotalPCB(t_PCB* pcb);
 void *serializarPCB(t_PCB* pcb);
 t_PCB *desserealizarPCB(void*);

@@ -31,9 +31,12 @@ int puertoKernel;
 char* ipMemoria;
 int puertoMemoria;
 
+t_log* logCPU;
+
 void mostrarArchivoConfig();
 void terminar();
 void ultimaEjec();
+void ejecutar();
 
 int socket_kernel;
 int socket_memoria;

@@ -100,11 +100,28 @@ int handshake(int socket_cliente, int tipo){
 	return retorno;
 }
 
+
+void* _buscarPCB(int socket, t_list* lista){
+
+	bool _esSocket(t_infosocket* aux){
+		return aux->socket == socket;
+	}
+	t_infosocket* aux = list_find(lista, (void*) _esSocket);
+	int _es_PCB(t_PCB* p){
+		return p->pid == aux->pid;
+	}
+
+	return list_find(lista_PCBs, (void*) _es_PCB);
+}
+
 void escucharCPU(int socket_cpu) {
 
 	while(1){
 
 		t_msg* msgRecibido = msg_recibir(socket_cpu);
+
+		t_PCB* pcb = _buscarPCB(socket_cpu, lista_PCB_cpu);
+
 		switch(msgRecibido->tipoMensaje){
 
 		case 0: case FIN_CPU:
@@ -132,9 +149,15 @@ void enviarScriptAMemoria(_t_hiloEspera* aux){
 	bool _buscarPCB(t_PCB* pcb){
 		return pcb->pid == aux->pid;
 	}
+	bool _buscarConsola(t_infosocket* a){
+		return a->pid == aux->pid;
+	}
+	t_infosocket* a = list_find(lista_PCB_consola, (void*) _buscarConsola);
+	int socketConsola = a->socket;
 
 	sem_wait(&sem_gradoMp);
 	_sacarDeCola(aux->pid, cola_New);
+
 
 	t_PCB* pcb = list_find(lista_PCBs, (void*) _buscarPCB);
 
@@ -146,14 +169,14 @@ void enviarScriptAMemoria(_t_hiloEspera* aux){
 	case OK:
 		pcb->cantPagsCodigo = (string_length(aux->script) / tamanioPag);
 		pcb->cantPagsCodigo = (string_length(aux->script) % tamanioPag) == 0? pcb->cantPagsCodigo: pcb->cantPagsCodigo + 1;
-		send(pcb->socketConsola, &respuesta, sizeof(uint8_t), 0);
-		send(pcb->socketConsola, &pcb->pid, sizeof(t_num), 0);
+		send(socketConsola, &respuesta, sizeof(uint8_t), 0);
+		send(socketConsola, &pcb->pid, sizeof(t_num), 0);
 		queue_push(cola_Ready, &aux->pid);
 		sem_post(&sem_cantColaReady);
 		break;
 	case MARCOS_INSUFICIENTES:
 		log_trace(logKernel, "MARCOS INSUFICIENTES");
-		send(pcb->socketConsola, &respuesta, sizeof(uint8_t), 0);
+		send(socketConsola, &respuesta, sizeof(uint8_t), 0);
 		setearExitCode(pcb->pid, -1);
 		break;
 	}
@@ -175,7 +198,7 @@ void atender_consola(int socket_consola){
 		script = (char*)msgRecibido->data;
 		log_info(logKernel, script);
 		int pidActual = crearPCB(socket_consola);
-		llenarCargarIndicesPCB(pidActual, script);
+		llenarIndicesPCB(pidActual, script);
 		queue_push(cola_New, &pidActual);
 
 		_t_hiloEspera* aux = malloc(sizeof(_t_hiloEspera));

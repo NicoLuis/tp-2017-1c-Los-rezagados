@@ -38,6 +38,8 @@ void terminar();
 void ultimaEjec();
 void ejecutar();
 
+t_puntero asignarMemoria(void* buffer, int size);
+
 int socket_kernel;
 int socket_memoria;
 

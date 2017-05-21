@@ -1,5 +1,6 @@
 
 #include "libreriaCPU.h"
+#include "operacionesPCB.h"
 
 void mostrarArchivoConfig() {
 
@@ -32,3 +33,49 @@ void ultimaEjec(){
 void ejecutar(){
 
 }
+
+
+t_puntero asignarMemoria(void* buffer, int size){
+
+	t_puntero puntero;
+
+	msg_enviar_separado(ASIGNACION_MEMORIA, size, buffer, socket_memoria);
+	send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
+	t_msg* msgRecibido = msg_recibir(socket_memoria);
+	msg_recibir_data(socket_memoria, msgRecibido);
+
+	switch(msgRecibido->tipoMensaje){
+	case ASIGNACION_MEMORIA:
+		puntero = (t_puntero) msgRecibido->data;
+		log_error(logCPU, "Recibi %d", puntero);
+		break;
+	case 0:
+		log_error(logCPU, "Se desconecto Memoria");
+		break;
+	}
+
+	return puntero;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

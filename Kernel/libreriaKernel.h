@@ -89,7 +89,7 @@ int gradoMultiprogramacion;
 //t_list* identificadoresSemaforos;
 //t_list* inicializacionSemaforos;
 //t_list* identificadorVariables;
-int stackSize;
+t_num8 stackSize;
 
 
 

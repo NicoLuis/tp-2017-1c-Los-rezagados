@@ -34,6 +34,7 @@
 #include <parser/metadata_program.h>
 
 typedef uint32_t t_num;
+typedef uint8_t t_num8;
 
 typedef struct {
 	uint8_t tipoMensaje;

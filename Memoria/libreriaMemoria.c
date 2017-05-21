@@ -54,15 +54,21 @@ void escucharKERNEL(void* socket_kernel) {
 		}
 		t_msg* msg = msg_recibir(socketKernel);
 		msg_recibir_data(socketKernel, msg);
+		void* tmpBuffer;
 
 		header = msg->tipoMensaje;
+		t_num8 aux;
 
 		switch (header) {
 
 		case INICIALIZAR_PROGRAMA:
 
+			recv(socketKernel, &aux, sizeof(t_num8), 0);
+
 			cantidadDePaginas = msg->longitud / tamanioDeMarcos;
 			cantidadDePaginas = (msg->longitud % tamanioDeMarcos) == 0? cantidadDePaginas: cantidadDePaginas + 1;
+
+			cantidadDePaginas += aux;
 
 			log_info(log_memoria, "Solicitud de inicializar proceso %d con %d paginas", pid, cantidadDePaginas);
 
@@ -75,9 +81,11 @@ void escucharKERNEL(void* socket_kernel) {
 				t_frame* marcoLibre;
 				for(; i < cantidadDePaginas; i++){
 					marcoLibre = buscarFrameLibre(pid);
-					escribirContenido(marcoLibre->nroFrame, 0, tamanioDeMarcos, msg->data + i*tamanioDeMarcos);
-					free(marcoLibre);
+					tmpBuffer = malloc(tamanioDeMarcos);
+					memcpy(tmpBuffer, msg->data + i*tamanioDeMarcos, tamanioDeMarcos);
+					escribirContenido(marcoLibre->nroFrame, 0, tamanioDeMarcos, tmpBuffer);
 				}
+				free(marcoLibre);
 				log_info(log_memoria, "Asigne correctamente");
 		 		header = 29;//OK
 				send(socketKernel, &header, sizeof(uint8_t), 0);
@@ -1414,7 +1422,7 @@ void mostrarContenidoTodosLosProcesos(){
 
 void mostrarContenidoDeUnProceso(uint32_t pid){
 
-	t_proceso* proceso = buscarProcesoEnListaProcesoParaDump(pid);
+	t_proceso* proceso = buscarProcesoEnListaProcesosParaDump(pid);
 
 
 }

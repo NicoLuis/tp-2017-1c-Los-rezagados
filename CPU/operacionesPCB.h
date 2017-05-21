@@ -16,7 +16,7 @@ typedef struct {
 }t_indice;
 
 typedef struct {
-	t_num pid;
+	t_num8 pid;
 	t_num pc;				//Program Counter
 	t_num cantPagsCodigo;	//Páginas utilizadas por elcodigo AnSISOP
 	t_indice indiceCodigo;
@@ -30,12 +30,12 @@ typedef struct {
 	t_list* args; 	//lista de t_StackMetadata
 	t_list* vars; 	//lista de t_StackMetadata
 	t_num retPos;
-	t_num retVar[3];
+	t_num8 retVar[3];
 }t_Stack;
 
 typedef struct {
 	char id;
-	t_num posicionMemoria[3];
+	t_num posicionMemoria;
 }t_StackMetadata;
 
 int crearPCB(int);

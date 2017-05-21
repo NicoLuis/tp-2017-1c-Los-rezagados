@@ -30,6 +30,8 @@ int main(int argc, char* argv[]) {
 	lista_cpus = list_create();
 	lista_consolas = list_create();
 	lista_PCBs = list_create();
+	lista_PCB_consola = list_create();
+	lista_PCB_cpu = list_create();
 	pid = 0;
 	cola_New = queue_create();
 	cola_Ready = queue_create();
@@ -51,7 +53,7 @@ int main(int argc, char* argv[]) {
 	quantumSleep = config_get_int_value(configuracion, "QUANTUM_SLEEP");
 	algoritmo = config_get_string_value(configuracion, "ALGORITMO");
 	gradoMultiprogramacion = config_get_int_value(configuracion, "GRADO_MULTIPROG");
-	stackSize = config_get_int_value(configuracion, "STACK_SIZE");
+	stackSize = (t_num8) config_get_int_value(configuracion, "STACK_SIZE");
 	char** ids = config_get_array_value(configuracion, "SEM_IDS");
 	char** valores = config_get_array_value(configuracion, "SEM_INIT");
 	char** shared_vars = config_get_array_value(configuracion, "SHARED_VARS");

@@ -9,7 +9,7 @@
 
 
 int tamanioArgVar(t_list* lista){
-	return (sizeof(t_num)*3 + sizeof(char)) * list_size(lista);
+	return (sizeof(t_num) + sizeof(char)) * list_size(lista);
 }
 
 void *_serializarArgVar(t_list* lista, int tamanio){
@@ -20,11 +20,7 @@ void *_serializarArgVar(t_list* lista, int tamanio){
 		t_StackMetadata *aux = list_get(lista, i);
 		memcpy(buffer + offset, &aux->id, tmpsize = sizeof(char));
 		offset += tmpsize;
-		memcpy(buffer + offset, &aux->posicionMemoria[0], tmpsize = sizeof(t_num));
-		offset += tmpsize;
-		memcpy(buffer + offset, &aux->posicionMemoria[1], tmpsize = sizeof(t_num));
-		offset += tmpsize;
-		memcpy(buffer + offset, &aux->posicionMemoria[2], tmpsize = sizeof(t_num));
+		memcpy(buffer + offset, &aux->posicionMemoria, tmpsize = sizeof(t_num));
 		offset += tmpsize;
 	}
 
@@ -35,7 +31,8 @@ int _tamanioIndiceStack(t_list* indiceStack){
 	int i = 0, sizeTotal = 0;
 	for(; i < list_size(indiceStack) ; i++){
 		t_Stack *aux = list_get(indiceStack, i);
-		sizeTotal += sizeof(t_num)*6;
+		sizeTotal += sizeof(t_num8)*3;
+		sizeTotal += sizeof(t_num)*3;
 		sizeTotal += tamanioArgVar(aux->args);
 		sizeTotal += tamanioArgVar(aux->vars);
 	}
@@ -50,14 +47,14 @@ void *_serializarIndiceStack(t_list* indiceStack, int tamanio){
 		t_Stack *aux = list_get(indiceStack, i);
 		memcpy(buffer + offset, &aux->retPos, tmpsize = sizeof(t_num));
 		offset += tmpsize;
-		memcpy(buffer + offset, &aux->retVar[0], tmpsize = sizeof(t_num));
+		memcpy(buffer + offset, &aux->retVar[0], tmpsize = sizeof(t_num8));
 		offset += tmpsize;
-		memcpy(buffer + offset, &aux->retVar[1], tmpsize = sizeof(t_num));
+		memcpy(buffer + offset, &aux->retVar[1], tmpsize = sizeof(t_num8));
 		offset += tmpsize;
-		memcpy(buffer + offset, &aux->retVar[2], tmpsize = sizeof(t_num));
+		memcpy(buffer + offset, &aux->retVar[2], tmpsize = sizeof(t_num8));
 		offset += tmpsize;
 
-		tmpsize = _tamanioArgVar(aux->args);
+		tmpsize = tamanioArgVar(aux->args);
 		tmpBuffer = _serializarArgVar(aux->args, tmpsize);
 		memcpy(buffer + offset, &tmpsize, sizeof(t_num));
 		offset += sizeof(t_num);
@@ -65,7 +62,7 @@ void *_serializarIndiceStack(t_list* indiceStack, int tamanio){
 		offset += tmpsize;
 		free(tmpBuffer);
 
-		tmpsize = _tamanioArgVar(aux->vars);
+		tmpsize = tamanioArgVar(aux->vars);
 		tmpBuffer = _serializarArgVar(aux->vars, tmpsize);
 		memcpy(buffer + offset, &tmpsize, sizeof(t_num));
 		offset += sizeof(t_num);
@@ -84,7 +81,7 @@ int tamanioTotalPCB(t_PCB* pcb){
 	int tamanioIndiceEtiquetas =
 			sizeof(t_size) + pcb->indiceEtiquetas.size;
 
-	return sizeof(t_num) * 4 +
+	return sizeof(t_num8) + sizeof(t_num) * 3 +
 		tamanioIndiceCodigo + tamanioIndiceEtiquetas + _tamanioIndiceStack(pcb->indiceStack);
 }
 
@@ -93,7 +90,7 @@ void *serializarPCB(t_PCB* pcb){
 	t_num tmpsize;
 	void *buffer = malloc(sizeof(t_PCB)), *tmpBuffer;
 
-	memcpy(buffer + offset, &pcb->pid, tmpsize = sizeof(t_num));
+	memcpy(buffer + offset, &pcb->pid, tmpsize = sizeof(t_num8));
 		offset += tmpsize;
 	memcpy(buffer + offset, &pcb->pc, tmpsize = sizeof(t_num));
 		offset += tmpsize;
@@ -131,11 +128,7 @@ void _desserializarArgVar(void* buffer, int tamanio, t_list* lista){
 		t_StackMetadata *aux = malloc(sizeof(t_StackMetadata));
 		memcpy(&aux->id, buffer + offset, tmpsize = sizeof(char));
 		offset += tmpsize;
-		memcpy(&aux->posicionMemoria[0], buffer + offset, tmpsize = sizeof(t_num));
-		offset += tmpsize;
-		memcpy(&aux->posicionMemoria[1], buffer + offset, tmpsize = sizeof(t_num));
-		offset += tmpsize;
-		memcpy(&aux->posicionMemoria[2], buffer + offset, tmpsize = sizeof(t_num));
+		memcpy(&aux->posicionMemoria, buffer + offset, tmpsize = sizeof(t_num));
 		offset += tmpsize;
 		list_add(lista, aux);
 	}
@@ -152,11 +145,11 @@ void _desserializarIndiceStack(void* buffer, t_num size, t_list* indiceStack){
 
 		memcpy(&aux->retPos, buffer + offset, tmpsize = sizeof(t_num));
 		offset += tmpsize;
-		memcpy(&aux->retVar[0], buffer + offset, tmpsize = sizeof(t_num));
+		memcpy(&aux->retVar[0], buffer + offset, tmpsize = sizeof(t_num8));
 		offset += tmpsize;
-		memcpy(&aux->retVar[1], buffer + offset, tmpsize = sizeof(t_num));
+		memcpy(&aux->retVar[1], buffer + offset, tmpsize = sizeof(t_num8));
 		offset += tmpsize;
-		memcpy(&aux->retVar[2], buffer + offset, tmpsize = sizeof(t_num));
+		memcpy(&aux->retVar[2], buffer + offset, tmpsize = sizeof(t_num8));
 		offset += tmpsize;
 
 		memcpy(&tmpsize, buffer + offset, sizeof(t_num));

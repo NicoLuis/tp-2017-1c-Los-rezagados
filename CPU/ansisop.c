@@ -43,14 +43,13 @@ t_puntero definirVariable(t_nombre_variable identificador_variable){
 	t_StackMetadata* metadata = malloc(sizeof(t_StackMetadata));
 	metadata->id = identificador_variable;
 
-	//todo:
-	//t_num posicionMemoria[3] = pedirMemoria(pcb->pid, identificador_variable);
-	//metadata->posicionMemoria = posicionMemoria;
+	t_puntero puntero = asignarMemoria(&identificador_variable, sizeof(t_nombre_variable));
+	metadata->posicionMemoria = puntero;
 
 	t_Stack* stackActual = list_get(pcb->indiceStack, list_size(pcb->indiceStack)-1 );
 	list_add(stackActual->vars, metadata);
 
-	return 0;
+	return puntero;
 }
 
 t_valor_variable dereferenciar(t_puntero direccion_variable){

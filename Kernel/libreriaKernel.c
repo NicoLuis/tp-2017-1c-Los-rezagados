@@ -146,6 +146,8 @@ typedef struct {
 
 void enviarScriptAMemoria(_t_hiloEspera* aux){
 
+	log_trace(logKernel, "Envio script a memoria");
+
 	bool _buscarPCB(t_PCB* pcb){
 		return pcb->pid == aux->pid;
 	}
@@ -163,20 +165,22 @@ void enviarScriptAMemoria(_t_hiloEspera* aux){
 
 	send(socket_memoria, &aux->pid, sizeof(t_num), 0);
 	msg_enviar_separado(INICIALIZAR_PROGRAMA, (t_num) string_length(aux->script), aux->script, socket_memoria);
-	uint8_t respuesta;
-	recv(socket_memoria, &respuesta, sizeof(uint8_t), 0);
+	send(socket_memoria, &stackSize, sizeof(t_num8), 0);
+	t_num8 respuesta;
+	recv(socket_memoria, &respuesta, sizeof(t_num8), 0);
+	log_trace(logKernel, "Recibi de memoria %d", respuesta);
 	switch(respuesta){
 	case OK:
 		pcb->cantPagsCodigo = (string_length(aux->script) / tamanioPag);
 		pcb->cantPagsCodigo = (string_length(aux->script) % tamanioPag) == 0? pcb->cantPagsCodigo: pcb->cantPagsCodigo + 1;
-		send(socketConsola, &respuesta, sizeof(uint8_t), 0);
+		send(socketConsola, &respuesta, sizeof(t_num8), 0);
 		send(socketConsola, &pcb->pid, sizeof(t_num), 0);
 		queue_push(cola_Ready, &aux->pid);
 		sem_post(&sem_cantColaReady);
 		break;
 	case MARCOS_INSUFICIENTES:
 		log_trace(logKernel, "MARCOS INSUFICIENTES");
-		send(socketConsola, &respuesta, sizeof(uint8_t), 0);
+		send(socketConsola, &respuesta, sizeof(t_num8), 0);
 		setearExitCode(pcb->pid, -1);
 		break;
 	}
@@ -199,6 +203,12 @@ void atender_consola(int socket_consola){
 		log_info(logKernel, script);
 		int pidActual = crearPCB(socket_consola);
 		llenarIndicesPCB(pidActual, script);
+
+		t_infosocket* info = malloc(sizeof(info));
+		info->pid = pidActual;
+		info->socket = socket_consola;
+		list_add(lista_PCB_consola, info);
+
 		queue_push(cola_New, &pidActual);
 
 		_t_hiloEspera* aux = malloc(sizeof(_t_hiloEspera));

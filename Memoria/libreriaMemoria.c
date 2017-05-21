@@ -26,7 +26,6 @@ void mostrarArchivoConfig() {
 
 }
 
-
 void escucharKERNEL(void* socket_kernel) {
 
 	//Casteo socketKernel
@@ -101,6 +100,7 @@ void escucharKERNEL(void* socket_kernel) {
 			lockFramesYProcesos();
 
 			liberarFramesDeProceso(pid);
+
 			eliminarProcesoDeListaDeProcesos(pid);
 
 			unlockFramesYProcesos();
@@ -160,6 +160,7 @@ void escucharCPU(void* socket_cpu) {
 			switch (header) {
 
 			case FIN_CPU: {
+				//MATO ES HILO
 				log_info(log_memoria,"La CPU %d ha finalizado\n", socketCPU);
 				pthread_exit(NULL);
 			}
@@ -218,8 +219,7 @@ void escucharCPU(void* socket_cpu) {
 
 				} else if (estaEnMemoriaReal(PID, numero_pagina)) {
 
-					log_info(log_memoria, "La pagina %d esta en Memoria Real\n",
-							numero_pagina);
+					log_info(log_memoria, "La pagina %d esta en Memoria Real\n",numero_pagina);
 
 					//-----Retardo
 					pthread_mutex_lock(&mutexRetardo);
@@ -318,16 +318,16 @@ void escucharCPU(void* socket_cpu) {
 
 				if (paginaInvalida(PID, numero_pagina)) {
 
-				log_error(log_memoria, "Stack Overflow proceso %d\n", PID);
+					log_error(log_memoria, "Stack Overflow proceso %d\n", PID);
 
-				//AVISO FINALIZACION PROGRAMA A LA CPU
+					//AVISO FINALIZACION PROGRAMA A LA CPU
 
-				header = FINALIZAR_PROGRAMA;
+					header = FINALIZAR_PROGRAMA;
 
-				bytesEnviados = send(socketCPU, &header, sizeof(uint32_t), 0);
-				if (bytesEnviados <= 0) {
-					log_error(log_memoria, "Error send CPU");
-					pthread_exit(NULL);
+					bytesEnviados = send(socketCPU, &header, sizeof(uint32_t), 0);
+					if (bytesEnviados <= 0) {
+						log_error(log_memoria, "Error send CPU");
+						pthread_exit(NULL);
 					}
 
 				} else if (estaEnMemoriaReal(PID, numero_pagina)) {
@@ -351,7 +351,7 @@ void escucharCPU(void* socket_cpu) {
 						unlockFrames();
 
 						//ENVIO ESCRITURA OK
-						header = ESCRITURA_PAGINA;
+						header = 29;//OK
 
 						bytesEnviados = send(socketCPU, &header, sizeof(uint32_t), 0);
 						if (bytesEnviados <= 0) {
@@ -853,7 +853,7 @@ void escribirContenido(int frame, int offset, int tamanio_escribir,	void* conten
 	memcpy(memoria_real + desplazamiento, contenido, tamanio_escribir);
 	pthread_mutex_unlock(&mutexMemoriaReal);
 
-	//free(contenido); fixme:liberar en otro momento
+	free(contenido); //fixme:liberar en otro momento
 }
 
 void inicializarFrames(){
@@ -1106,4 +1106,315 @@ void algoritmoLRU() {
 	log_info(log_memoria, "En TLB se reemplazo la pagina %d del proceso %d",entradaTLBreemplazada->numPag, entradaTLBreemplazada->pid);
 
 	free(entradaTLBreemplazada);
+}
+
+
+void ejecutarComandos() {
+	char buffer[1000];
+
+	while (1) {
+		printf("Ingrese comando:\n");
+		scanf("%s", buffer);
+
+		if (!strcmp(buffer, "retardo")) {
+
+			int retardoNuevo;
+
+			printf("\nIngrese nuevo valor de retardo:\n");
+			scanf("%d", &retardoNuevo);
+
+			pthread_mutex_lock(&mutexRetardo);
+			retardoMemoria = retardoNuevo;
+			pthread_mutex_unlock(&mutexRetardo);
+
+			printf("Retardo modificado correctamente a %d ms\n\n", retardoMemoria);
+
+			log_info(log_memoria, "Retardo modificado correctamente a %d ms\n\n",retardoMemoria);
+
+		} else if (!strcmp(buffer, "dump")) {
+
+				printf("Ingrese cache, estructura_memoria o contenido_memoria para el reporte que prefiera");
+				scanf("%d",buffer);
+				if (!strcmp(buffer,"estructura_memoria")){
+					int pid;
+
+					printf("Ingrese 0 si quiere un reporte de todos los procesos o ingrese el pid del proceso para un reporte particular\n");
+					scanf("%d", &pid);
+
+					lockFramesYProcesos();
+
+					if (pid == 0) {
+						dumpTodosLosProcesos();
+
+					} else {
+						dumpProcesoParticular(pid);
+					}
+
+					unlockFramesYProcesos();
+				}
+				else if (!strcmp(buffer,"cache")){
+
+				}
+				else if(strcmp(buffer,"contenido_memoria")){
+					int pid;
+
+					printf("Ingrese 0 si quiere un reporte de todos los procesos o ingrese el pid del proceso para un reporte particular\n");
+					scanf("%d", &pid);
+
+					lockFramesYProcesos();
+
+					if (pid == 0) {
+						mostrarContenidoTodosLosProcesos();
+					}
+					else {
+						mostrarContenidoDeUnProceso(pid);
+					}
+
+					unlockFramesYProcesos();
+				}
+				else{
+					printf("Comando Incorrecto\n");
+				}
+
+		} else if (!strcmp(buffer, "flush")) {
+
+			printf("Escriba cache o memory\n");
+			scanf("%s", buffer);
+
+			if (!strcmp(buffer, "cache")) {
+
+				vaciarCache();
+
+			} else if (!strcmp(buffer, "memory")) {
+
+				lockFrames();
+
+				flushMemoria();
+
+				unlockFrames();
+
+				printf("Flush memory realizado\n\n");
+
+				log_info(log_memoria, "Flush memory realizado\n\n");
+
+			} else {
+				printf("Comando Incorrecto\n");
+			}
+
+		} else if(!strcmp(buffer,"size")) {
+			printf("Ingrese memory o pid");
+			scanf("%s",buffer);
+			if(!strcmp(buffer,"memory")){
+
+			}
+			else if(!strcmp(buffer,"pid")){
+
+			}
+			else{
+				printf("Comando Incorrecto\n");
+			}
+		}
+		else{
+			printf("Comando Incorrecto\n\n");
+		}
+
+	}
+}
+
+void dumpTablaDePaginasDeProceso(t_proceso* proceso, FILE* archivoDump) {
+
+	int sizeListaPaginas = list_size(proceso->listaPaginas);
+	int i = 0;
+	fprintf(archivoDump, "Tabla de paginas:\n\n");
+	printf("Tabla de paginas:\n\n");
+
+	fprintf(archivoDump,
+			"Nro de pagina\tNro de frame\tBit de presencia\tBit de modificado\n");
+	printf(
+			"Nro de pagina\tNro de frame\tBit de presencia\tBit de modificado\n");
+
+	while (i < sizeListaPaginas) {
+		t_pag* pagina = buscarPaginaEnListaDePaginas(proceso->PID, i);
+
+		if (pagina->bit_pres == 1) {
+			t_frame* frame = buscarFrame(pagina->nroFrame);
+
+			fprintf(archivoDump,
+					"      %d             %d                  %d                       %d\n",
+					pagina->nroPag, pagina->nroFrame, pagina->bit_pres,
+					frame->bit_modif);
+			printf(
+					"      %d             %d                  %d                       %d\n",
+					pagina->nroPag, pagina->nroFrame, pagina->bit_pres,
+					frame->bit_modif);
+		} else {
+			fprintf(archivoDump,
+					"      %d             %d                  %d                       %d\n",
+					pagina->nroPag, pagina->nroFrame, pagina->bit_pres, 0);
+			printf(
+					"      %d             %d                  %d                       %d\n",
+					pagina->nroPag, pagina->nroFrame, pagina->bit_pres, 0);
+		}
+
+		i++;
+	}
+}
+
+void dumpEstructurasMemoriaTodosLosProcesos(FILE* archivoDump) {
+
+	int cantidadProcesos = list_size(listaProcesos);
+	int i = 0;
+
+	while (i < cantidadProcesos) {
+		t_proceso* proceso = list_get(listaProcesos, i);
+		fprintf(archivoDump,
+				"\n//////////////ESTRUCTURA DE MEMORIA PROCESO %d//////////////\n",
+				proceso->PID);
+		printf(
+				"\n//////////////ESTRUCTURA DE MEMORIA PROCESO %d//////////////\n",
+				proceso->PID);
+		fprintf(archivoDump, "\nCantidad de frames asignados: %d\n",
+				proceso->cantFramesAsignados);
+		printf("\nCantidad de frames asignados: %d\n",
+				proceso->cantFramesAsignados);
+		fprintf(archivoDump, "\nCantidad de paginas: %d\n",
+				proceso->cantPaginas);
+		printf("\nCantidad de paginas: %d\n", proceso->cantPaginas);
+
+		dumpTablaDePaginasDeProceso(proceso, archivoDump);
+		i++;
+	}
+}
+
+void dumpTodosLosProcesos() {
+
+	char nombreArchivoDump[40] = "dumpTotal_";
+	int pidLinux = process_getpid();
+	strcat(nombreArchivoDump, string_itoa(pidLinux));
+	strcat(nombreArchivoDump, ".txt");
+	FILE* archivoDump = fopen(nombreArchivoDump, "w+");
+
+	unsigned int tamanioTotalMemoria = tamanioDeMarcos * cantidadDeMarcos;
+
+	dumpEstructurasMemoriaTodosLosProcesos(archivoDump);
+
+	fprintf(archivoDump,
+			"\n//////////////////MEMORIA PRINCIPAL//////////////////\n");
+
+	printf("\n//////////////////MEMORIA PRINCIPAL//////////////////\n\n");
+
+	pthread_mutex_lock(&mutexMemoriaReal);
+	//hexdump(memoria_real, tamanioTotalMemoria, archivoDump);
+	pthread_mutex_unlock(&mutexMemoriaReal);
+
+	printf("\nDUMP DE MEMORIA PRINCIPAL PARA TODOS LOS PROCESOS REALIZADO\n");
+	fprintf(archivoDump,
+			"\n//////////////////MEMORIA PRINCIPAL//////////////////\n");
+
+	fclose(archivoDump);
+}
+
+void dumpContenidoMemoriaProceso(t_proceso* proceso, FILE* archivoDump) {
+
+	int i = 0;
+	void* contenidoFrame;
+
+	fprintf(archivoDump,
+			"\n//////////////////MEMORIA PRINCIPAL//////////////////\n");
+
+	printf("\n//////////////////MEMORIA PRINCIPAL//////////////////\n\n");
+
+	while (i < proceso->cantPaginas) {
+		t_pag* pagina = buscarPaginaEnListaDePaginas(proceso->PID, i);
+		if (pagina->bit_pres == 1) {
+			t_frame* frame = buscarFrame(pagina->nroFrame);
+			contenidoFrame = obtenerContenido(frame->nroFrame, 0,tamanioDeMarcos);
+			//hexdump(contenidoFrame, tamanioDeMarcos, archivoDump);
+		}
+		i++;
+	}
+
+	printf("\nDUMP DE MEMORIA PRINCIPAL PARA EL PROCESO %d REALIZADO\n",
+			proceso->PID);
+	fprintf(archivoDump,
+			"\n//////////////////MEMORIA PRINCIPAL//////////////////\n");
+}
+
+void dumpProcesoParticular(int pid) {
+
+	t_proceso* proceso = buscarProcesoEnListaProcesosParaDump(pid);
+
+	if (proceso == NULL) {
+		printf("No existe ese proceso\n");
+
+	} else {
+
+		char nombreArchivoDump[30] = "dumpProceso";
+		int pidLinux = process_getpid();
+		strcat(nombreArchivoDump, "_");
+		strcat(nombreArchivoDump, string_itoa(pid));
+		strcat(nombreArchivoDump, "_");
+		strcat(nombreArchivoDump, string_itoa(pidLinux));
+		strcat(nombreArchivoDump, ".txt");
+		FILE* archivoDump = fopen(nombreArchivoDump, "w+");
+
+		fprintf(archivoDump,
+				"\n//////////////ESTRUCTURA DE MEMORIA PROCESO %d//////////////\n",
+				proceso->PID);
+		printf(
+				"\n//////////////ESTRUCTURA DE MEMORIA PROCESO %d//////////////\n",
+				proceso->PID);
+		fprintf(archivoDump, "\nCantidad de frames asignados: %d\n",
+				proceso->cantFramesAsignados);
+		printf("\nCantidad de frames asignados: %d\n",
+				proceso->cantFramesAsignados);
+		fprintf(archivoDump, "\nCantidad de paginas: %d\n",
+				proceso->cantPaginas);
+		printf("\nCantidad de paginas: %d\n", proceso->cantPaginas);
+
+		dumpTablaDePaginasDeProceso(proceso, archivoDump);
+		dumpContenidoMemoriaProceso(proceso, archivoDump);
+
+		fclose(archivoDump);
+	}
+
+
+}
+
+void flushMemoria() {
+
+	int i = 0;
+
+	while (i < cantidadDeMarcos) {
+
+		t_frame* frame = list_get(listaFrames, i);
+
+		if (frame->pid != 0) {
+
+			frame->bit_modif = 1;
+		}
+
+		i++;
+	}
+}
+
+
+t_proceso* buscarProcesoEnListaProcesosParaDump(uint32_t pid) {
+
+	int _soy_el_pid_buscado(t_proceso* proceso) {
+		return (proceso->PID == pid);
+	}
+
+	return list_find(listaProcesos, (void*) _soy_el_pid_buscado);
+}
+
+void mostrarContenidoTodosLosProcesos(){
+
+}
+
+void mostrarContenidoDeUnProceso(uint32_t pid){
+
+	t_proceso* proceso = buscarProcesoEnListaProcesoParaDump(pid);
+
+
 }

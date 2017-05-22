@@ -54,6 +54,12 @@ int main(int argc, char* argv[]) {
 	listaProcesos = list_create();
 	inicializarFrames();
 
+	//Verifico si la Cache esta habilitada
+	if (Cache_Activada()) {
+		Cache = crearCache();
+		log_info(log_memoria, "La Cache esta Habilitada\n");
+	}
+
 	//Defino señales
 	signal (SIGINT, terminarProceso);
 
@@ -65,6 +71,10 @@ int main(int argc, char* argv[]) {
 	pthread_attr_init(&atributo);
 	pthread_attr_setdetachstate(&atributo, PTHREAD_CREATE_DETACHED);
 
+	//Creo hilo de la consola
+	pthread_t hiloConsola;
+
+	pthread_create(&hiloConsola, &atributo, (void *) ejecutarComandos,NULL);
 
 	//-------------CREAR UN SOCKET DE ESCUCHA PARA LAS CPU's Y EL NUCLEO-------------------------
 	int socketMemoria = crearSocketDeEscucha(string_itoa(puertoMemoria), log_memoria);

@@ -36,6 +36,11 @@ AnSISOP_funciones functions = {
 };
 
 
+int _inicioOffsetStack(){
+	return pcb->cantPagsCodigo * TAMANIO_PAGINAS;
+}
+
+
 t_puntero definirVariable(t_nombre_variable identificador_variable){
 
 	log_trace(logAnsisop, "Definir variable %c", identificador_variable);
@@ -49,7 +54,7 @@ t_puntero definirVariable(t_nombre_variable identificador_variable){
 	t_Stack* stackActual = list_get(pcb->indiceStack, list_size(pcb->indiceStack)-1 );
 	list_add(stackActual->vars, metadata);
 
-	return 0;	//todo: calcular offset retorno
+	return puntero.pagina * TAMANIO_PAGINAS + puntero.offset - _inicioOffsetStack() ;
 }
 
 t_valor_variable dereferenciar(t_puntero direccion_variable){
@@ -59,31 +64,24 @@ t_valor_variable dereferenciar(t_puntero direccion_variable){
 
 
 t_puntero obtenerPosicionVariable(t_nombre_variable identificador_variable){
-	int i, offset = 0;
+	int i;
 
-	for(i = 0; i < list_size(pcb->indiceStack)-1; i++){
-		t_Stack* stackAux = list_get(pcb->indiceStack, i );
-		offset += sizeof(t_num)*6;
-		offset += tamanioArgVar(stackAux->args);
-		offset += tamanioArgVar(stackAux->vars);
-	}
+	log_trace(logAnsisop, "Obtener posicion variable %c", identificador_variable);
 
 	t_Stack* stackActual = list_get(pcb->indiceStack, list_size(pcb->indiceStack)-1 );
 
 	for(i = 0; i < list_size(stackActual->vars); i++){
 		t_StackMetadata* aux = list_get(stackActual->vars, i);
 		if(aux->id == identificador_variable){
-			return offset;
+			return aux->posicionMemoria.pagina * TAMANIO_PAGINAS + aux->posicionMemoria.offset - _inicioOffsetStack() ;
 		}
-		offset += sizeof(char) + sizeof(t_num)*3;
 	}
 
 	for(i = 0; i < list_size(stackActual->args); i++){
 		t_StackMetadata* aux = list_get(stackActual->args, i);
 		if(aux->id == identificador_variable){
-			return offset;
+			return aux->posicionMemoria.pagina * TAMANIO_PAGINAS + aux->posicionMemoria.offset - _inicioOffsetStack() ;
 		}
-		offset += sizeof(char) + sizeof(t_num)*3;
 	}
 
 	return -1;

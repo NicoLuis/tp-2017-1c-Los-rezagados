@@ -34,9 +34,10 @@ void ejecutar(){
 }
 
 
-t_puntero asignarMemoria(void* buffer, int size){
+t_posicion asignarMemoria(void* buffer, int size){
 
-	t_puntero puntero;
+	t_posicion puntero;
+	int offset = 0, tmpsize;
 
 	msg_enviar_separado(ASIGNACION_MEMORIA, size, buffer, socket_memoria);
 	send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
@@ -46,8 +47,12 @@ t_puntero asignarMemoria(void* buffer, int size){
 
 	switch(msgRecibido->tipoMensaje){
 	case ASIGNACION_MEMORIA:
-		puntero = (t_puntero) msgRecibido->data;
-		log_error(logCPU, "Recibi %d", puntero);
+		memcpy(&puntero.pagina, msgRecibido->data + offset, tmpsize = sizeof(t_num8));
+		offset += tmpsize;
+		memcpy(&puntero.offset, msgRecibido->data + offset, tmpsize = sizeof(t_num8));
+		offset += tmpsize;
+		memcpy(&puntero.size, msgRecibido->data + offset, tmpsize = sizeof(t_num8));
+		log_trace(logCPU, "Recibi %d %d %d", puntero.pagina, puntero.offset, puntero.size);
 		break;
 	case 0:
 		log_error(logCPU, "Se desconecto Memoria");

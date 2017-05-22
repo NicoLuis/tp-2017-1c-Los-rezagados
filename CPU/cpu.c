@@ -19,8 +19,10 @@ int main(int argc, char* argv[]) {
 	}
 
 	//Creo archivo log
+	logAnsisop = log_create("Ansisop.log", "KERNEL", false, LOG_LEVEL_TRACE);
 	logCPU = log_create("kernel.log", "KERNEL", false, LOG_LEVEL_TRACE);
 	log_trace(logCPU, "  -----------  INICIO KERNEL  -----------  ");
+
 
 	signal (SIGINT, terminar);
 	signal (SIGUSR1, ultimaEjec);

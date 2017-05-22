@@ -33,13 +33,14 @@ char* ipMemoria;
 int puertoMemoria;
 
 t_log* logCPU;
+t_log* logAnsisop;
 
 void mostrarArchivoConfig();
 void terminar();
 void ultimaEjec();
 void ejecutar();
 
-t_puntero asignarMemoria(void* buffer, int size);
+t_posicion asignarMemoria(void* buffer, int size);
 
 int socket_kernel;
 int socket_memoria;

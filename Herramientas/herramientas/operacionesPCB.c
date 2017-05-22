@@ -9,7 +9,7 @@
 
 
 int tamanioArgVar(t_list* lista){
-	return (sizeof(t_num) + sizeof(char)) * list_size(lista);
+	return (sizeof(t_num8)*3 + sizeof(char)) * list_size(lista);
 }
 
 void *_serializarArgVar(t_list* lista, int tamanio){
@@ -20,7 +20,11 @@ void *_serializarArgVar(t_list* lista, int tamanio){
 		t_StackMetadata *aux = list_get(lista, i);
 		memcpy(buffer + offset, &aux->id, tmpsize = sizeof(char));
 		offset += tmpsize;
-		memcpy(buffer + offset, &aux->posicionMemoria, tmpsize = sizeof(t_num));
+		memcpy(buffer + offset, &aux->posicionMemoria.pagina, tmpsize = sizeof(t_num8));
+		offset += tmpsize;
+		memcpy(buffer + offset, &aux->posicionMemoria.offset, tmpsize = sizeof(t_num8));
+		offset += tmpsize;
+		memcpy(buffer + offset, &aux->posicionMemoria.size, tmpsize = sizeof(t_num8));
 		offset += tmpsize;
 	}
 
@@ -47,11 +51,11 @@ void *_serializarIndiceStack(t_list* indiceStack, int tamanio){
 		t_Stack *aux = list_get(indiceStack, i);
 		memcpy(buffer + offset, &aux->retPos, tmpsize = sizeof(t_num));
 		offset += tmpsize;
-		memcpy(buffer + offset, &aux->retVar[0], tmpsize = sizeof(t_num8));
+		memcpy(buffer + offset, &aux->retVar.pagina, tmpsize = sizeof(t_num8));
 		offset += tmpsize;
-		memcpy(buffer + offset, &aux->retVar[1], tmpsize = sizeof(t_num8));
+		memcpy(buffer + offset, &aux->retVar.offset, tmpsize = sizeof(t_num8));
 		offset += tmpsize;
-		memcpy(buffer + offset, &aux->retVar[2], tmpsize = sizeof(t_num8));
+		memcpy(buffer + offset, &aux->retVar.size, tmpsize = sizeof(t_num8));
 		offset += tmpsize;
 
 		tmpsize = tamanioArgVar(aux->args);
@@ -128,7 +132,11 @@ void _desserializarArgVar(void* buffer, int tamanio, t_list* lista){
 		t_StackMetadata *aux = malloc(sizeof(t_StackMetadata));
 		memcpy(&aux->id, buffer + offset, tmpsize = sizeof(char));
 		offset += tmpsize;
-		memcpy(&aux->posicionMemoria, buffer + offset, tmpsize = sizeof(t_num));
+		memcpy(&aux->posicionMemoria.pagina, buffer + offset, tmpsize = sizeof(t_num8));
+		offset += tmpsize;
+		memcpy(&aux->posicionMemoria.offset, buffer + offset, tmpsize = sizeof(t_num8));
+		offset += tmpsize;
+		memcpy(&aux->posicionMemoria.size, buffer + offset, tmpsize = sizeof(t_num8));
 		offset += tmpsize;
 		list_add(lista, aux);
 	}
@@ -145,11 +153,11 @@ void _desserializarIndiceStack(void* buffer, t_num size, t_list* indiceStack){
 
 		memcpy(&aux->retPos, buffer + offset, tmpsize = sizeof(t_num));
 		offset += tmpsize;
-		memcpy(&aux->retVar[0], buffer + offset, tmpsize = sizeof(t_num8));
+		memcpy(&aux->retVar.pagina, buffer + offset, tmpsize = sizeof(t_num8));
 		offset += tmpsize;
-		memcpy(&aux->retVar[1], buffer + offset, tmpsize = sizeof(t_num8));
+		memcpy(&aux->retVar.offset, buffer + offset, tmpsize = sizeof(t_num8));
 		offset += tmpsize;
-		memcpy(&aux->retVar[2], buffer + offset, tmpsize = sizeof(t_num8));
+		memcpy(&aux->retVar.size, buffer + offset, tmpsize = sizeof(t_num8));
 		offset += tmpsize;
 
 		memcpy(&tmpsize, buffer + offset, sizeof(t_num));

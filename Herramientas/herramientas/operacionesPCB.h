@@ -15,6 +15,12 @@ typedef struct {
 	void* bloqueSerializado;
 }t_indice;
 
+typedef struct{
+	t_num8 pagina;
+	t_num8 offset;
+	t_num8 size;
+}t_posicion;
+
 typedef struct {
 	t_num8 pid;
 	t_num pc;				//Program Counter
@@ -29,12 +35,12 @@ typedef struct {
 	t_list* args; 	//lista de t_StackMetadata
 	t_list* vars; 	//lista de t_StackMetadata
 	t_num retPos;
-	t_num8 retVar[3];
+	t_posicion retVar;
 }t_Stack;
 
 typedef struct {
 	char id;
-	t_num posicionMemoria;
+	t_posicion posicionMemoria;
 }t_StackMetadata;
 
 int tamanioArgVar(t_list* lista);

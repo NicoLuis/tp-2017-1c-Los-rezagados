@@ -1,6 +1,5 @@
 #include <herramientas/sockets.c>
 #include "libreriaCPU.h"
-#include "operacionesPCB.h"
 
 
 

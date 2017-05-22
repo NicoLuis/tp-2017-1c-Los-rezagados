@@ -20,6 +20,8 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <commons/log.h>
+#include <commons/collections/list.h>
+#include <commons/collections/queue.h>
 
 #include <sys/types.h>
 #include <sys/ioctl.h>

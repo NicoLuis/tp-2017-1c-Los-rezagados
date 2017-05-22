@@ -1,6 +1,5 @@
 
 #include "libreriaCPU.h"
-#include "operacionesPCB.h"
 
 void mostrarArchivoConfig() {
 
@@ -41,6 +40,7 @@ t_puntero asignarMemoria(void* buffer, int size){
 
 	msg_enviar_separado(ASIGNACION_MEMORIA, size, buffer, socket_memoria);
 	send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
+
 	t_msg* msgRecibido = msg_recibir(socket_memoria);
 	msg_recibir_data(socket_memoria, msgRecibido);
 

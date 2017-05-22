@@ -1050,33 +1050,41 @@ void ejecutarComandos() {
 			}
 
 		} else if(!strcmp(buffer,"size")) {
-			printf("Ingrese memoria o pid");
+			printf("Ingrese memoria o pid\n\n");
 			scanf("%s",buffer);
 			if(!strcmp(buffer,"memoria")){
-				printf("La cantidad de frames en memoria es de : %d\n",cantidadDeMarcos);
+				printf("La cantidad de frames en memoria es de : %d\n\n",cantidadDeMarcos);
 
 				int cantidadDeFrames = list_size(listaFrames);
-				printf("La cantidad de frames segun lista de frames es de : %d\n",cantidadDeFrames);
+				printf("La cantidad de frames segun lista de frames es de : %d\n\n",cantidadDeFrames);
 
 				int frameUsado(t_frame* frame) {
 						return (frame->bit_modif != 0);
 					}
 
 				int cantidadDeFramesLlenos = list_size(list_filter(listaFrames,(void*) frameUsado));
-				printf("La cantidad de frames usados es de : %d\n",cantidadDeFramesLlenos);
+				printf("La cantidad de frames usados es de : %d\n\n",cantidadDeFramesLlenos);
 
 				int cantidadDeFramesVacios = cantidadDeFrames - cantidadDeFramesLlenos;
-				printf("La cantidad de frames vacios es de %d",cantidadDeFramesVacios);
+				printf("La cantidad de frames vacios es de %d\n\n",cantidadDeFramesVacios);
 
 			}
 			else if(!strcmp(buffer,"pid")){
 
 				int pid;
-				printf("Ingrese el numero de PID:\n");
+				printf("Ingrese el numero de PID:\n\n");
 				scanf("%d",&pid);
-				t_proceso* proceso = buscarProcesoEnListaProcesos(pid);
-				printf("El tamaño es de %d paginas\n",proceso->cantPaginas);
-				printf("El tamaño es de %d frames\n",proceso->cantFramesAsignados);
+
+				t_proceso* proceso = buscarProcesoEnListaProcesosParaDump(pid);
+
+				if (proceso == NULL) {
+					printf("No existe ese proceso\n");
+
+				}
+				else{
+					printf("El tamaño es de %d paginas\n\n",proceso->cantPaginas);
+					printf("El tamaño es de %d frames\n\n",proceso->cantFramesAsignados);
+				}
 			}
 			else{
 				printf("Comando Incorrecto\n");

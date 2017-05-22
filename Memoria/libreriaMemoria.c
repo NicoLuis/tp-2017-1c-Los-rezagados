@@ -455,48 +455,6 @@ void crearProcesoYAgregarAListaDeProcesos(uint32_t pid,	uint32_t cantidadDePagin
 
 }
 
-/*
-void escribirPaginaEnFS(uint32_t pid, uint8_t nroPag, void* contenido_pagina) {
-
-	void* bufferFS = malloc(100 + tamanioDeMarcos);
-	uint32_t tamanioValidoBufferFS = 0;
-
-	uint32_t header = MEMORIA;
-	memcpy(bufferFS, &header, sizeof(uint32_t));
-	tamanioValidoBufferFS += sizeof(uint32_t);
-
-	header = ESCRITURA_PAGINA;
-	memcpy(bufferFS + tamanioValidoBufferFS, &header, sizeof(uint32_t));
-	tamanioValidoBufferFS += sizeof(uint32_t);
-
-	memcpy(bufferFS + tamanioValidoBufferFS, &pid, sizeof(uint32_t));
-	tamanioValidoBufferFS += sizeof(uint32_t);
-
-//Numero de pagina
-	memcpy(bufferFS + tamanioValidoBufferFS, &nroPag, sizeof(uint8_t));
-	tamanioValidoBufferFS += sizeof(uint8_t);
-
-	memcpy(bufferFS + tamanioValidoBufferFS, contenido_pagina,tamanioDeMarcos);
-	tamanioValidoBufferFS += tamanioDeMarcos;
-
-	pthread_mutex_lock(&mutexFS);
-
-	int bytesEnviados = send(socket_fs, bufferFS, tamanioValidoBufferFS,0);
-
-	if (bytesEnviados <= 0) {
-		log_error(log_memoria,"Error escritura en FS");
-		pthread_mutex_unlock(&mutexFS);
-		pthread_exit(NULL);
-	}
-
-	log_info(log_memoria,"Escribi en FS pagina %d del proceso %d\n", nroPag, pid);
-
-	pthread_mutex_unlock(&mutexFS);
-
-	free(bufferFS);
-}
-*/
-
 void liberarFramesDeProceso(uint32_t unPid) {
 
 	int _soy_el_frame_buscado(t_frame* frame) {
@@ -690,99 +648,6 @@ int hayFramesLibres() {
 		return 0;
 	}
 }
-
-/*
-void* pedirPaginaAFS(uint32_t pid, uint8_t numero_pagina) {
-
-	int bytesRecibidos;
-
-	void* bufferFS = malloc(20);
-	uint32_t tamanioValidoBufferFS = 0;
-
-	uint32_t header = MEMORIA;
-	memcpy(bufferFS, &header, sizeof(uint32_t));
-	tamanioValidoBufferFS += sizeof(uint32_t);
-
-	header = LECTURA_PAGINA;
-	memcpy(bufferFS + tamanioValidoBufferFS, &header, sizeof(uint32_t));
-	tamanioValidoBufferFS += sizeof(uint32_t);
-
-	memcpy(bufferFS + tamanioValidoBufferFS, &pid, sizeof(uint32_t));
-	tamanioValidoBufferFS += sizeof(uint32_t);
-
-	memcpy(bufferFS + tamanioValidoBufferFS, &numero_pagina,
-			sizeof(uint8_t));
-	tamanioValidoBufferFS += sizeof(uint8_t);
-
-	pthread_mutex_lock(&mutexFS);
-
-	log_info(log_memoria,"Pido a FS pagina %d del proceso %d", numero_pagina,pid);
-
-	int bytesEnviados = send(socket_fs, bufferFS, tamanioValidoBufferFS,0);
-	if (bytesEnviados <= 0) {
-		log_error(log_memoria,"Error send FS");
-		pthread_mutex_unlock(&mutexFS);
-		pthread_exit(NULL);
-	}
-
-	free(bufferFS);
-
-	bytesRecibidos = recv(socket_fs, &header, sizeof(uint32_t), 0);
-	if (bytesRecibidos <= 0) {
-		log_info(log_memoria,"El FS se ha desconectado");
-		pthread_mutex_unlock(&mutexFS);
-		pthread_exit(NULL);
-	}
-
-	if (header != FS) {
-		log_info(log_memoria,"El FS se desconecto\n");
-		pthread_mutex_unlock(&mutexFS);
-		pthread_exit(NULL);
-	}
-
-	bytesRecibidos = recv(socket_fs, &header, sizeof(uint32_t), 0);
-	if (bytesRecibidos <= 0) {
-		log_info(log_memoria, "El FS se ha desconectado");
-		pthread_mutex_unlock(&mutexFS);
-		pthread_exit(NULL);
-	}
-
-	if (header != ENVIO_PAGINA) {
-		log_info(log_memoria, "Error en recv accion fs");
-		pthread_mutex_unlock(&mutexFS);
-		pthread_exit(NULL);
-	}
-
-	void* paginaLeida = calloc(1, tamanioDeMarcos);
-
-	bytesRecibidos = recv(socket_fs, &pid, sizeof(uint32_t), 0);
-	if (bytesRecibidos <= 0) {
-		log_info(log_memoria,"El FS se ha desconectado");
-		pthread_mutex_unlock(&mutexFS);
-		pthread_exit(NULL);
-	}
-
-	bytesRecibidos = recv(socket_fs, &numero_pagina, sizeof(uint8_t), 0);
-	if (bytesRecibidos <= 0) {
-		log_info(log_memoria,"El FS se ha desconectado");
-		pthread_mutex_unlock(&mutexFS);
-		pthread_exit(NULL);
-	}
-
-	bytesRecibidos = recv(socket_fs, paginaLeida, tamanioDeMarcos, 0);
-	if (bytesRecibidos <= 0) {
-		log_info(log_memoria,"El FS se ha desconectado");
-		pthread_mutex_unlock(&mutexFS);
-		pthread_exit(NULL);
-	}
-
-	log_info(log_memoria,"Recibi de FS pagina %d del proceso %d\n", numero_pagina,pid);
-
-	pthread_mutex_unlock(&mutexFS);
-
-	return paginaLeida;
-}
-*/
 
 void cargarPaginaAMemoria(uint32_t pid, uint8_t numero_pagina,void* paginaLeida, int accion) {
 
@@ -1139,52 +1004,27 @@ void ejecutarComandos() {
 
 			log_info(log_memoria, "Retardo modificado correctamente a %d ms\n\n",retardoMemoria);
 
-		} else if (!strcmp(buffer, "dump")) {
+		}
+	else if (!strcmp(buffer, "dump")) {
 
-				printf("Ingrese cache, estructura_memoria o contenido_memoria para el reporte que prefiera");
-				scanf("%d",buffer);
-				if (!strcmp(buffer,"estructura_memoria")){
-					int pid;
+			int pid;
 
-					printf("Ingrese 0 si quiere un reporte de todos los procesos o ingrese el pid del proceso para un reporte particular\n");
-					scanf("%d", &pid);
+			printf("Ingrese 0 si quiere un reporte de todos los procesos o ingrese el pid del proceso para un reporte particular\n");
+			scanf("%d", &pid);
 
-					lockFramesYProcesos();
+			lockFramesYProcesos();
 
-					if (pid == 0) {
-						dumpTodosLosProcesos();
+			if (pid == 0) {
+				dumpTodosLosProcesos();
 
-					} else {
-						dumpProcesoParticular(pid);
-					}
+			} else {
+				dumpProcesoParticular(pid);
+			}
 
-					unlockFramesYProcesos();
-				}
-				else if (!strcmp(buffer,"cache")){
+			unlockFramesYProcesos();
 
-				}
-				else if(strcmp(buffer,"contenido_memoria")){
-					int pid;
-
-					printf("Ingrese 0 si quiere un reporte de todos los procesos o ingrese el pid del proceso para un reporte particular\n");
-					scanf("%d", &pid);
-
-					lockFramesYProcesos();
-
-					if (pid == 0) {
-						mostrarContenidoTodosLosProcesos();
-					}
-					else {
-						mostrarContenidoDeUnProceso(pid);
-					}
-
-					unlockFramesYProcesos();
-				}
-				else{
-					printf("Comando Incorrecto\n");
-				}
-
-		} else if (!strcmp(buffer, "flush")) {
+			}
+	else if (!strcmp(buffer, "flush")) {
 
 			printf("Escriba cache o memory\n");
 			scanf("%s", buffer);
@@ -1210,13 +1050,33 @@ void ejecutarComandos() {
 			}
 
 		} else if(!strcmp(buffer,"size")) {
-			printf("Ingrese memory o pid");
+			printf("Ingrese memoria o pid");
 			scanf("%s",buffer);
-			if(!strcmp(buffer,"memory")){
+			if(!strcmp(buffer,"memoria")){
+				printf("La cantidad de frames en memoria es de : %d\n",cantidadDeMarcos);
+
+				int cantidadDeFrames = list_size(listaFrames);
+				printf("La cantidad de frames segun lista de frames es de : %d\n",cantidadDeFrames);
+
+				int frameUsado(t_frame* frame) {
+						return (frame->bit_modif != 0);
+					}
+
+				int cantidadDeFramesLlenos = list_size(list_filter(listaFrames,(void*) frameUsado));
+				printf("La cantidad de frames usados es de : %d\n",cantidadDeFramesLlenos);
+
+				int cantidadDeFramesVacios = cantidadDeFrames - cantidadDeFramesLlenos;
+				printf("La cantidad de frames vacios es de %d",cantidadDeFramesVacios);
 
 			}
 			else if(!strcmp(buffer,"pid")){
 
+				int pid;
+				printf("Ingrese el numero de PID:\n");
+				scanf("%d",&pid);
+				t_proceso* proceso = buscarProcesoEnListaProcesos(pid);
+				printf("El tamaño es de %d paginas\n",proceso->cantPaginas);
+				printf("El tamaño es de %d frames\n",proceso->cantFramesAsignados);
 			}
 			else{
 				printf("Comando Incorrecto\n");

@@ -25,7 +25,7 @@ int main(int argc, char* argv[]) {
 	log_trace(logCPU, "  -----------  INICIO KERNEL  -----------  ");
 
 
-	signal (SIGINT, terminar);
+	signal (SIGINT, finalizarCPU);
 	signal (SIGUSR1, ultimaEjec);
 	ultimaEjecucion = true;
 
@@ -126,13 +126,11 @@ int main(int argc, char* argv[]) {
 			break;
 		case EJECUTAR_INSTRUCCION:
 			log_trace(logCPU, "Recibi EJECUTAR_INSTRUCCION");
-
-			ejecutar();
-
+			ejecutarInstruccion();
 			break;
 		case 0:
 			fprintf(stderr, "El Kernel %d se ha desconectado \n", socket_kernel);
-			terminar();
+			finalizarCPU();
 			break;
 		}
 	}

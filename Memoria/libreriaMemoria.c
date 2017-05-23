@@ -131,7 +131,7 @@ void escucharCPU(void* socket_cpu) {
 	int offset = 0, tmpsize;
 
 	//uint32_t pidAnterior;
-	t_proceso* proceso;
+	t_proceso* proceso;	//fixme: q es este proceso?
 	//list_add(listaCPUs, socketCPU);
 
 	log_info(log_memoria,"Se conecto un CPU\n");
@@ -145,24 +145,6 @@ void escucharCPU(void* socket_cpu) {
 	uint32_t header;
 	int bytesRecibidos;
 	while (1) {
-/*
-			bytesRecibidos = recv(socketCPU, &header, sizeof(uint32_t), 0);
-			if (bytesRecibidos <= 0) {
-				log_error(log_memoria,"Error recv CPU");
-				pthread_exit(NULL);
-			}
-
-			if (header != CPU) {
-				log_info(log_memoria,"La CPU se ha desconectado o etc");
-				pthread_exit(NULL);
-			}
-
-			bytesRecibidos = recv(socketCPU, &header, sizeof(uint32_t), 0);
-			if (bytesRecibidos <= 0) {
-				log_error(log_memoria,"Error recv CPU");
-				pthread_exit(NULL);
-			}
-*/
 			t_msg* msg = msg_recibir(socketCPU);
 			msg_recibir_data(socketCPU, msg);
 
@@ -181,56 +163,40 @@ void escucharCPU(void* socket_cpu) {
 				cantAccesosMemoria++;
 				pthread_mutex_unlock(&mutexCantAccesosMemoria);
 
-				uint8_t numero_pagina;
-				uint32_t offset;
-				uint32_t tamanio_leer;
+				offset = 0;
 
-				bytesRecibidos = recv(socketCPU, &numero_pagina, sizeof(uint8_t),0);
-				if (bytesRecibidos <= 0) {
-					log_error(log_memoria,"Error recv CPU");
-					pthread_exit(NULL);
-				}
+				// desserializacion
+				memcpy(&pidPeticion, msg->data + offset, tmpsize = sizeof(t_num8));
+				offset += tmpsize;
+				memcpy(&puntero.pagina, msg->data + offset, tmpsize = sizeof(t_num8));
+				offset += tmpsize;
+				memcpy(&puntero.offset, msg->data + offset, tmpsize = sizeof(t_num8));
+				offset += tmpsize;
+				memcpy(&puntero.size, msg->data + offset, tmpsize = sizeof(t_num8));
+				offset += tmpsize;
 
-				bytesRecibidos = recv(socketCPU, &offset, sizeof(uint32_t), 0);
-				if (bytesRecibidos <= 0) {
-					log_error(log_memoria,"Error recv CPU");
-					pthread_exit(NULL);
-				}
-
-				bytesRecibidos = recv(socketCPU, &tamanio_leer, sizeof(uint32_t),0);
-				if (bytesRecibidos <= 0) {
-					log_error(log_memoria,"Error recv CPU");
-					pthread_exit(NULL);
-				}
-
-				log_info(log_memoria,"Solicitud de lectura. Pag:%d Offset:%d Size:%d",numero_pagina, offset, tamanio_leer);
+				log_info(log_memoria,"Solicitud de lectura. Pag:%d Offset:%d Size:%d",puntero.pagina, puntero.offset, puntero.size);
 
 				lockProcesos();
-				ponerBitUsoEn1(pidPeticion, numero_pagina);
+				ponerBitUsoEn1(pidPeticion, puntero.pagina);
 				unlockProcesos();
 
-				if (paginaInvalida(pidPeticion, numero_pagina)) {
+				if (paginaInvalida(pidPeticion, puntero.pagina)) {
 
 					log_error(log_memoria, "Stack Overflow proceso %d\n", pidPeticion);
 
 					//AVISO FINALIZACION PROGRAMA A LA CPU
-					header = FINALIZAR_PROGRAMA;
+					msg_enviar_separado(STACKOVERFLOW, 1, 0, socketCPU);
 
-					bytesEnviados = send(socketCPU, &header, sizeof(uint32_t), 0);
-					if (bytesEnviados <= 0) {
-						log_error(log_memoria, "Error send CPU");
-						pthread_exit(NULL);
-					}
+				} else if ((Cache_Activada()) && (estaEnCache(pidPeticion, puntero.pagina))) {
 
-				} else if ((Cache_Activada()) && (estaEnCache(pidPeticion, numero_pagina))) {
+					void* contenido_leido = obtenerContenidoSegunCache(pidPeticion,puntero.pagina, offset, puntero.size);
+					msg_enviar_separado(LECTURA_PAGINA, puntero.size, contenido_leido, socketCPU);
+					free(contenido_leido);
 
-					void* contenido_leido = obtenerContenidoSegunCache(pidPeticion,numero_pagina, offset, tamanio_leer);
+				} else if (estaEnMemoriaReal(pidPeticion, puntero.pagina)) {
 
-					enviarContenidoCPU(contenido_leido, tamanio_leer, socketCPU);
-
-				} else if (estaEnMemoriaReal(pidPeticion, numero_pagina)) {
-
-					log_info(log_memoria, "La pagina %d esta en Memoria Real\n",numero_pagina);
+					log_info(log_memoria, "La pagina %d esta en Memoria Real\n",puntero.pagina);
 
 					//-----Retardo
 					pthread_mutex_lock(&mutexRetardo);
@@ -239,15 +205,15 @@ void escucharCPU(void* socket_cpu) {
 					//------------
 
 					lockProcesos();
-					t_pag* pagina = buscarPaginaEnListaDePaginas(pidPeticion,numero_pagina);
+					t_pag* pagina = buscarPaginaEnListaDePaginas(pidPeticion,puntero.pagina);
 					unlockProcesos();
 
-					void* contenido_leido = obtenerContenido(pagina->nroFrame,offset, tamanio_leer);
-
-					enviarContenidoCPU(contenido_leido, tamanio_leer, socketCPU);
+					void* contenido_leido = obtenerContenido(pagina->nroFrame,offset, puntero.size);
+					msg_enviar_separado(LECTURA_PAGINA, puntero.size, contenido_leido, socketCPU);
+					free(contenido_leido);
 
 					if (Cache_Activada()) {
-						agregarEntradaCache(pidPeticion, numero_pagina, pagina->nroFrame);
+						agregarEntradaCache(pidPeticion, puntero.pagina, pagina->nroFrame);
 					}
 
 				} else {
@@ -261,20 +227,13 @@ void escucharCPU(void* socket_cpu) {
 						log_info(log_memoria,"Finalizando programa: %d. No hay frames disponibles\n",pidPeticion);
 
 						//AVISO FINALIZACION PROGRAMA A LA CPU
-						header = FINALIZAR_PROGRAMA;
-
-						bytesEnviados = send(socketCPU, &header, sizeof(uint32_t),
-								0);
-						if (bytesEnviados <= 0) {
-							log_error(log_memoria, "Error send CPU");
-							pthread_exit(NULL);
-						}
+						msg_enviar_separado(MARCOS_INSUFICIENTES, 0, 1, socketCPU);
 
 					}
 				}
 
 			}
-				break;
+			break;
 
 
 			case ESCRITURA_PAGINA: {

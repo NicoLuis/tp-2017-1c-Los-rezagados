@@ -30,15 +30,17 @@ char* ipKernel;
 int puertoKernel;
 char* ipMemoria;
 int puertoMemoria;
+int tamanioPagina;
 
 t_log* logCPU;
 t_log* logAnsisop;
 
 void mostrarArchivoConfig();
-void terminar();
+void finalizarCPU();
 void ultimaEjec();
-void ejecutar();
+void ejecutarInstruccion();
 
+char* proximaInstruccion();
 t_posicion asignarMemoria(void* buffer, int size);
 t_posicion escribirMemoria(t_posicion puntero, t_valor_variable valor);
 

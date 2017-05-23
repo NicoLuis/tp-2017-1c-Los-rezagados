@@ -141,9 +141,9 @@ void escucharCPU(void* socket_cpu) {
 		log_error(log_memoria,"Error send CPU");
 		pthread_exit(NULL);
 	}
+	send(socketCPU, &tamanioDeMarcos, sizeof(t_num), 0);
 
 	uint32_t header;
-	int bytesRecibidos;
 	while (1) {
 			t_msg* msg = msg_recibir(socketCPU);
 			msg_recibir_data(socketCPU, msg);
@@ -227,7 +227,7 @@ void escucharCPU(void* socket_cpu) {
 						log_info(log_memoria,"Finalizando programa: %d. No hay frames disponibles\n",pidPeticion);
 
 						//AVISO FINALIZACION PROGRAMA A LA CPU
-						msg_enviar_separado(MARCOS_INSUFICIENTES, 0, 1, socketCPU);
+						msg_enviar_separado(MARCOS_INSUFICIENTES, 1, 0, socketCPU);
 
 					}
 				}

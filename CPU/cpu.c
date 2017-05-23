@@ -20,9 +20,8 @@ int main(int argc, char* argv[]) {
 	}
 
 	//Creo archivo log
-	logAnsisop = log_create("Ansisop.log", "KERNEL", false, LOG_LEVEL_TRACE);
-	logCPU = log_create("kernel.log", "KERNEL", false, LOG_LEVEL_TRACE);
-	log_trace(logCPU, "  -----------  INICIO KERNEL  -----------  ");
+	logCPU = log_create("cpu.log", "CPU", false, LOG_LEVEL_TRACE);
+	log_trace(logCPU, "  -----------  INICIO CPU  -----------  ");
 
 
 	signal (SIGINT, finalizarCPU);
@@ -43,7 +42,7 @@ int main(int argc, char* argv[]) {
 
 	//-------------------------------CONEXION AL KERNEL-------------------------------------
 
-	printf("Me conecto al Kernel\n");
+	log_info(logCPU, "Me conecto al Kernel");
 
 	socket_kernel = conectarAServidor(ipKernel, puertoKernel);
 
@@ -51,64 +50,55 @@ int main(int argc, char* argv[]) {
 
 	int bytesRecibidos = recv(socket_kernel, bufferKernel, 50, 0);
 	if (bytesRecibidos <= 0) {
-		printf("El Kernel se ha desconectado\n");
+		log_info(logCPU, "El Kernel se ha desconectado");
 	}
 
 	bufferKernel[bytesRecibidos] = '\0';
 
-	printf("Recibi %d bytes con el siguiente mensaje: %s\n",bytesRecibidos, bufferKernel);
+	log_info(logCPU, "Recibi %d bytes con el siguiente mensaje: %s",bytesRecibidos, bufferKernel);
 
 	send(socket_kernel, "Hola soy la CPU", 16, 0);
 
 	bytesRecibidos = recv(socket_kernel, bufferKernel, 50, 0);
 
 	if (bytesRecibidos <= 0) {
-		printf("El Kernel se ha desconectado\n");
+		log_info(logCPU, "El Kernel se ha desconectado");
 	}
 
 	bufferKernel[bytesRecibidos] = '\0';
-
-	printf("Respuesta: %s\n", bufferKernel);
-
 	if (strcmp("Conexion aceptada", bufferKernel) == 0) {
-		printf("Me conecte correctamente al Kernel\n");
+		log_trace(logCPU, "Me conecte correctamente al Kernel");
 	}
 
 	free(bufferKernel);
 
 	//-------------------------------CONEXION AL LA MEMORIA-------------------------------------
 
-	printf("Me conecto a la Memoria\n");
+	log_trace(logCPU, "Me conecto a la Memoria");
 
 	socket_memoria = conectarAServidor(ipMemoria, puertoMemoria);
-
 	char* bufferMemoria = malloc(200);
 
 	bytesRecibidos = recv(socket_memoria, bufferMemoria, 50, 0);
-	if (bytesRecibidos <= 0) {
-		printf("La Memoria se ha desconectado\n");
-	}
-
+	if (bytesRecibidos <= 0)
+		log_info(logCPU, "La Memoria se ha desconectado");
 	bufferMemoria[bytesRecibidos] = '\0';
 
-	printf("Recibi %d bytes con el siguiente mensaje: %s\n",bytesRecibidos, bufferMemoria);
+	log_info(logCPU, "Recibi %d bytes con el siguiente mensaje: %s",bytesRecibidos, bufferMemoria);
 
 	send(socket_memoria, "Hola soy la CPU", 16, 0);
 
 	bytesRecibidos = recv(socket_memoria, bufferMemoria, 50, 0);
-
-	if (bytesRecibidos <= 0) {
-		printf("La Memoria se ha desconectado\n");
-	}
-
+	if (bytesRecibidos <= 0)
+		log_info(logCPU, "La Memoria se ha desconectado");
 	bufferMemoria[bytesRecibidos] = '\0';
 
-	printf("Respuesta: %s\n", bufferMemoria);
+	if (!strcmp("Conexion aceptada", bufferMemoria))
+		log_trace(logCPU, "Me conecte correctamente a la Memoria");
 
-	if (strcmp("Conexion aceptada", bufferMemoria) == 0) {
-		printf("Me conecte correctamente a la Memoria\n");
-	}
-
+	if(recv(socket_memoria, &tamanioPagina, sizeof(t_num), 0) <= 0)
+		log_info(logCPU, "La Memoria se ha desconectado");
+	log_info(logCPU, "tamanio de pagina %d", tamanioPagina);
 	free(bufferMemoria);
 
 

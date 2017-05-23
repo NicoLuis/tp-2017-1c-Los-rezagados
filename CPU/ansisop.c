@@ -36,9 +36,7 @@ AnSISOP_funciones functions = {
 };
 
 
-int _inicioOffsetStack(){
-	return pcb->cantPagsCodigo * TAMANIO_PAGINAS;
-}
+#define INICIOSTACK pcb->cantPagsCodigo * TAMANIO_PAGINAS
 
 
 t_puntero definirVariable(t_nombre_variable identificador_variable){
@@ -54,7 +52,7 @@ t_puntero definirVariable(t_nombre_variable identificador_variable){
 	t_Stack* stackActual = list_get(pcb->indiceStack, list_size(pcb->indiceStack)-1 );
 	list_add(stackActual->vars, metadata);
 
-	return puntero.pagina * TAMANIO_PAGINAS + puntero.offset - _inicioOffsetStack() ;
+	return puntero.pagina * TAMANIO_PAGINAS + puntero.offset - INICIOSTACK ;
 }
 
 t_valor_variable dereferenciar(t_puntero direccion_variable){
@@ -73,14 +71,14 @@ t_puntero obtenerPosicionVariable(t_nombre_variable identificador_variable){
 	for(i = 0; i < list_size(stackActual->vars); i++){
 		t_StackMetadata* aux = list_get(stackActual->vars, i);
 		if(aux->id == identificador_variable){
-			return aux->posicionMemoria.pagina * TAMANIO_PAGINAS + aux->posicionMemoria.offset - _inicioOffsetStack() ;
+			return aux->posicionMemoria.pagina * TAMANIO_PAGINAS + aux->posicionMemoria.offset - INICIOSTACK ;
 		}
 	}
 
 	for(i = 0; i < list_size(stackActual->args); i++){
 		t_StackMetadata* aux = list_get(stackActual->args, i);
 		if(aux->id == identificador_variable){
-			return aux->posicionMemoria.pagina * TAMANIO_PAGINAS + aux->posicionMemoria.offset - _inicioOffsetStack() ;
+			return aux->posicionMemoria.pagina * TAMANIO_PAGINAS + aux->posicionMemoria.offset - INICIOSTACK ;
 		}
 	}
 
@@ -89,6 +87,15 @@ t_puntero obtenerPosicionVariable(t_nombre_variable identificador_variable){
 
 void asignar(t_puntero direccion_variable, t_valor_variable valor){
 
+	log_trace(logAnsisop, "Asigno valor %d en direccion variable %d", valor, direccion_variable);
+
+	int offsetTotal = INICIOSTACK + direccion_variable;
+	t_posicion puntero;
+	puntero.pagina = offsetTotal / TAMANIO_PAGINAS;
+	puntero.offset = offsetTotal % TAMANIO_PAGINAS;
+	puntero.size = sizeof(t_valor_variable);
+
+	escribirMemoria(puntero, valor);
 }
 
 void irAlLabel(t_nombre_etiqueta t_nombre_etiqueta){

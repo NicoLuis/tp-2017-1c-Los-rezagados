@@ -58,7 +58,48 @@ t_posicion asignarMemoria(void* buffer, int size){
 		log_error(logCPU, "Se desconecto Memoria");
 		break;
 	}
+	msg_destruir(msgRecibido);
+	return puntero;
+}
 
+
+void* _serializarEscribirValorMemoria(t_posicion puntero, t_valor_variable valor){
+	int offset = 0, tmpsize;
+	void* buffer = malloc(sizeof(t_num8)*4 + sizeof(t_valor_variable));
+
+	memcpy(buffer + offset, &pcb->pid, tmpsize = sizeof(t_num8));
+	offset += tmpsize;
+	memcpy(buffer + offset, &puntero.pagina, tmpsize = sizeof(t_num8));
+	offset += tmpsize;
+	memcpy(buffer + offset, &puntero.offset, tmpsize = sizeof(t_num8));
+	offset += tmpsize;
+	memcpy(buffer + offset, &puntero.size, tmpsize = sizeof(t_num8));
+	offset += tmpsize;
+	memcpy(buffer + offset, &valor, tmpsize = sizeof(t_valor_variable));
+	offset += tmpsize;
+
+	return buffer;
+}
+
+t_posicion escribirMemoria(t_posicion puntero, t_valor_variable valor){
+
+	void* buffer = _serializarEscribirValorMemoria(puntero, valor);
+	msg_enviar_separado(ASIGNAR_VALOR, sizeof(t_num8)*4 + sizeof(t_valor_variable), buffer, socket_memoria);
+	free(buffer);
+
+	t_msg* msgRecibido = msg_recibir(socket_memoria);
+	msg_recibir_data(socket_memoria, msgRecibido);
+
+	switch(msgRecibido->tipoMensaje){
+	case ASIGNAR_VALOR:
+		log_trace(logCPU, "Asigno correctamente");
+		break;
+	case 0:
+		log_error(logCPU, "Se desconecto Memoria");
+		break;
+	}
+
+	msg_destruir(msgRecibido);
 	return puntero;
 }
 

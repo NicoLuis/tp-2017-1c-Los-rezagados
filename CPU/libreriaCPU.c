@@ -63,7 +63,7 @@ t_posicion asignarMemoria(void* buffer, int size){
 }
 
 
-void* _serializarEscribirValorMemoria(t_posicion puntero, t_valor_variable valor){
+void* _serializarEscribirValorMemoria(t_posicion puntero, t_num valor){
 	int offset = 0, tmpsize;
 	void* buffer = malloc(sizeof(t_num8)*4 + sizeof(t_valor_variable));
 
@@ -75,7 +75,7 @@ void* _serializarEscribirValorMemoria(t_posicion puntero, t_valor_variable valor
 	offset += tmpsize;
 	memcpy(buffer + offset, &puntero.size, tmpsize = sizeof(t_num8));
 	offset += tmpsize;
-	memcpy(buffer + offset, &valor, tmpsize = sizeof(t_valor_variable));
+	memcpy(buffer + offset, &valor, tmpsize = sizeof(t_num));
 	offset += tmpsize;
 
 	return buffer;
@@ -84,22 +84,24 @@ void* _serializarEscribirValorMemoria(t_posicion puntero, t_valor_variable valor
 t_posicion escribirMemoria(t_posicion puntero, t_valor_variable valor){
 
 	void* buffer = _serializarEscribirValorMemoria(puntero, valor);
-	msg_enviar_separado(ASIGNAR_VALOR, sizeof(t_num8)*4 + sizeof(t_valor_variable), buffer, socket_memoria);
+	msg_enviar_separado(ESCRITURA_PAGINA, sizeof(t_num8)*4 + sizeof(t_valor_variable), buffer, socket_memoria);
 	free(buffer);
 
-	t_msg* msgRecibido = msg_recibir(socket_memoria);
-	msg_recibir_data(socket_memoria, msgRecibido);
+	t_num header;
+	recv(socket_memoria, &header, sizeof(t_num), 0);
 
-	switch(msgRecibido->tipoMensaje){
-	case ASIGNAR_VALOR:
+	switch(header){
+	case ESCRITURA_PAGINA:
 		log_trace(logCPU, "Asigno correctamente");
 		break;
 	case 0:
 		log_error(logCPU, "Se desconecto Memoria");
 		break;
+	case FINALIZAR_PROGRAMA:
+		log_error(logCPU, "Stack Overflow?");
+		break;
 	}
 
-	msg_destruir(msgRecibido);
 	return puntero;
 }
 

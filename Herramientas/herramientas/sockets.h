@@ -45,6 +45,13 @@ typedef struct {
 }__attribute__  ((packed)) t_msg;
 
 
+typedef struct{
+	t_num8 pagina;
+	t_num8 offset;
+	t_num8 size;
+}t_posicion;
+
+
 int conectarAServidor(char* ipServidor, int puertoServidor);
 
 int crearSocketDeEscucha(char* puerto, t_log* conectar_select_log);

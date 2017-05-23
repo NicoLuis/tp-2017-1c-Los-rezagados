@@ -5,8 +5,8 @@
  *      Author: utnso
  */
 
-#ifndef OPERACIONESPCB_H_
-#define OPERACIONESPCB_H_
+#ifndef OPERACIONESPCBKERNEL_H_
+#define OPERACIONESPCBKERNEL_H_
 
 #include "libreriaKernel.h"
 
@@ -15,4 +15,4 @@ void llenarIndicesPCB(int, char*);
 void setearExitCode(int, int);
 bool _sacarDeCola(int pid, t_queue* cola);
 
-#endif /* OPERACIONESPCB_H_ */
+#endif /* OPERACIONESPCBKERNEL_H_ */

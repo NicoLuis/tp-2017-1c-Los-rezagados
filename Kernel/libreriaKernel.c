@@ -7,7 +7,8 @@
 
 
 #include "libreriaKernel.h"
-#include "operacionesPCB.h"
+
+#include "operacionesPCBKernel.h"
 
 void mostrarArchivoConfig() {
 

@@ -7,7 +7,8 @@
 
 
 #include "planificacion.h"
-#include "operacionesPCB.h"
+
+#include "operacionesPCBKernel.h"
 
 void planificar(){
 

@@ -7,7 +7,7 @@
 
 #include "libreriaKernel.h"
 #include <herramientas/operacionesPCB.h>
-#include "operacionesPCB.h"
+#include "operacionesPCBKernel.h"
 
 int crearPCB(int socketConsola){
 	t_PCB* pcb = malloc(sizeof(t_PCB));

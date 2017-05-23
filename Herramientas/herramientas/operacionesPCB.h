@@ -15,12 +15,6 @@ typedef struct {
 	void* bloqueSerializado;
 }t_indice;
 
-typedef struct{
-	t_num8 pagina;
-	t_num8 offset;
-	t_num8 size;
-}t_posicion;
-
 typedef struct {
 	t_num8 pid;
 	t_num pc;				//Program Counter

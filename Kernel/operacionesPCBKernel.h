@@ -9,6 +9,7 @@
 #define OPERACIONESPCBKERNEL_H_
 
 #include "libreriaKernel.h"
+#include "pcb.h"
 
 int crearPCB(int);
 void llenarIndicesPCB(int, char*);

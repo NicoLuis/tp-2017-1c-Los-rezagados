@@ -5,8 +5,6 @@
  *      Author: utnso
  */
 
-#include "libreriaKernel.h"
-#include <herramientas/operacionesPCB.h>
 #include "operacionesPCBKernel.h"
 
 int crearPCB(int socketConsola){

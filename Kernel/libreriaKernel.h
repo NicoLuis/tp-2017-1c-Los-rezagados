@@ -33,7 +33,6 @@
 #include <commons/process.h>
 #include <herramientas/sockets.h>
 #include <herramientas/enum.h>
-#include <herramientas/operacionesPCB.h>
 #include <parser/metadata_program.h>
 
 

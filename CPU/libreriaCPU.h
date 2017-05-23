@@ -23,7 +23,6 @@
 #include <commons/process.h>
 #include <herramientas/sockets.h>
 #include <herramientas/enum.h>
-#include <herramientas/operacionesPCB.h>
 #include <signal.h>
 
 //Archivo de Configuracion
@@ -47,7 +46,5 @@ int socket_kernel;
 int socket_memoria;
 
 bool ultimaEjecucion;
-
-t_PCB* pcb;
 
 #endif

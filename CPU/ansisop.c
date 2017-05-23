@@ -6,6 +6,7 @@
  */
 
 #include "libreriaCPU.h"
+#include "pcb.h"
 #include <parser/parser.h>
 #include <parser/metadata_program.h>
 

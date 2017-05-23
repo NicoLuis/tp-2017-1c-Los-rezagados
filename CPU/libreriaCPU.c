@@ -1,5 +1,6 @@
 
 #include "libreriaCPU.h"
+#include "pcb.h"
 
 void mostrarArchivoConfig() {
 

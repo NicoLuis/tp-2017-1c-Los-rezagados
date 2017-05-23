@@ -6,6 +6,7 @@
  */
 
 #include "pcb.h"
+#include "libreriaKernel.h"
 
 
 int tamanioArgVar(t_list* lista){
@@ -92,7 +93,7 @@ int tamanioTotalPCB(t_PCB* pcb){
 void *serializarPCB(t_PCB* pcb){
 	int offset = 0;
 	t_num tmpsize;
-	void *buffer = malloc(sizeof(t_PCB)), *tmpBuffer;
+	void *buffer = malloc(sizeof(tamanioTotalPCB)), *tmpBuffer;
 
 	memcpy(buffer + offset, &pcb->pid, tmpsize = sizeof(t_num8));
 		offset += tmpsize;
@@ -102,7 +103,6 @@ void *serializarPCB(t_PCB* pcb){
 		offset += tmpsize;
 	memcpy(buffer + offset, &pcb->ec, tmpsize = sizeof(t_num));
 		offset += tmpsize;
-
 	memcpy(buffer + offset, &pcb->indiceCodigo.size, tmpsize = sizeof(t_size));
 		offset += tmpsize;
 	memcpy(buffer + offset, &pcb->indiceCodigo.bloqueSerializado, tmpsize = pcb->indiceCodigo.size * sizeof(t_intructions));

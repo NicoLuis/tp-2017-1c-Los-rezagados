@@ -87,7 +87,8 @@ void planificar_FIFO(){
 	sem_post(&sem_cantColaReady);		//una vez q entre xq wait me resto 1 sin cambiar el tamaniodeCola
 
 	log_trace(logKernel, "Inicio FIFO");
-	int pidPCB = (int) queue_peek(cola_Ready);
+	int pidPCB;
+	memcpy(&pidPCB, queue_peek(cola_Ready), sizeof(int));
 	int _es_PCB(t_PCB* p){
 		return p->pid == pidPCB;
 	}
@@ -96,26 +97,32 @@ void planificar_FIFO(){
 	if(pcb == NULL)
 		log_error(logKernel, "no existe el proceso con pid %d", pidPCB);
 
-	int cpuUsada = (int) list_take_and_remove(lista_cpus, 1);
+	int cpuUsada;
+	memcpy(&cpuUsada,  list_remove(lista_cpus, 0), sizeof(int));
+	log_trace(logKernel, "cpuUsada %d", cpuUsada);
+
 	sigoFIFO = 1;
 	t_infosocket* info = malloc(sizeof(t_infosocket));
 	info->pid = pcb->pid; info->socket = cpuUsada;
 	list_add(lista_PCB_cpu, info);
+
 	bool _esCpu(t_infosocket* a){
 		return a->socket == cpuUsada;
 	}
 	void _lib(t_infosocket* a){
+		log_trace(logKernel, "FREE 7");
 		free(a);
 	}
 
 	uint32_t size = tamanioTotalPCB(pcb);
 	void* pcbSerializado = serializarPCB(pcb);
+	log_trace(logKernel, "good 7");
 	msg_enviar_separado(ENVIO_PCB, size, pcbSerializado, cpuUsada);
-	free(pcbSerializado);
-
-	log_trace(logKernel, "Planifico proceso %d", pcb->pid);
+	log_trace(logKernel, "good 7");
 
 	while(sigoFIFO){
+
+		log_trace(logKernel, "Planifico proceso %d", pcb->pid);
 
 		msg_enviar_separado(EJECUTAR_INSTRUCCION, 1, 0, cpuUsada);
 
@@ -123,9 +130,11 @@ void planificar_FIFO(){
 
 		switch(msgRecibido->tipoMensaje){
 		case OK:
+			log_trace(logKernel, "Recibi OK");
 			break;
 
 		case ENVIO_PCB:		// si me devuelve el PCB es porque fue la ultima instruccion
+			log_trace(logKernel, "Recibi PCB");
 			msg_recibir_data(cpuUsada, msgRecibido);
 			pcb = desserealizarPCB(msgRecibido);
 			list_add(lista_cpus, &cpuUsada);
@@ -146,6 +155,7 @@ void planificar_FIFO(){
 
 	}
 
+	free(pcbSerializado);
 	log_trace(logKernel, "Fin FIFO");
 
 }

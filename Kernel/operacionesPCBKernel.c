@@ -26,11 +26,13 @@ void llenarIndicesPCB(int pidPCB, char* codigo){
 
 	pcb->pc = metadata->instruccion_inicio;
 
-	pcb->indiceEtiquetas.size = metadata->etiquetas_size;
-	pcb->indiceEtiquetas.bloqueSerializado = metadata->etiquetas;
+	pcb->indiceEtiquetas.bloqueSerializado = malloc(metadata->etiquetas_size);
+	memcpy(&pcb->indiceEtiquetas.size, &metadata->etiquetas_size, sizeof(t_size));
+	memcpy(pcb->indiceEtiquetas.bloqueSerializado, metadata->etiquetas, metadata->etiquetas_size);
 
-	pcb->indiceCodigo.size = metadata->instrucciones_size;
-	pcb->indiceCodigo.bloqueSerializado = metadata->instrucciones_serializado;
+	pcb->indiceCodigo.bloqueSerializado = malloc(metadata->instrucciones_size * sizeof(t_intructions));
+	memcpy(&pcb->indiceCodigo.size, &metadata->instrucciones_size, sizeof(t_size));
+	memcpy(pcb->indiceCodigo.bloqueSerializado, metadata->instrucciones_serializado, metadata->instrucciones_size);
 
 	t_Stack* entradaStack = malloc(sizeof(t_Stack));
 	entradaStack->args = list_create();

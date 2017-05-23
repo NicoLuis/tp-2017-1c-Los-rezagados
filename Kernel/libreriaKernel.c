@@ -169,9 +169,9 @@ void enviarScriptAMemoria(_t_hiloEspera* aux){
 	send(socket_memoria, &stackSize, sizeof(t_num8), 0);
 	t_num8 respuesta;
 	recv(socket_memoria, &respuesta, sizeof(t_num8), 0);
-	log_trace(logKernel, "Recibi de memoria %d", respuesta);
 	switch(respuesta){
 	case OK:
+		log_trace(logKernel, "Recibi OK de memoria");
 		pcb->cantPagsCodigo = (string_length(aux->script) / tamanioPag);
 		pcb->cantPagsCodigo = (string_length(aux->script) % tamanioPag) == 0? pcb->cantPagsCodigo: pcb->cantPagsCodigo + 1;
 		send(socketConsola, &respuesta, sizeof(t_num8), 0);

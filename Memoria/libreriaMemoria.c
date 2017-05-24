@@ -341,6 +341,12 @@ void escucharCPU(void* socket_cpu) {
 				}
 
 			break;
+
+			case 0:
+				log_trace(log_memoria, "Se desconecto cpu %d", socketCPU);
+				pthread_exit(NULL);
+				break;
+
 			default:
 				log_error(log_memoria,"Error");
 			}

@@ -162,7 +162,7 @@ char* proximaInstruccion() {
 
 	int pagina = instruction->start / tamanioPagina;
 	t_posicion puntero = {
-			.pagina = pagina + pcb->cantPagsCodigo,
+			.pagina = pagina,
 			.size = instruction->offset,									//offset -> es el size
 			.offset = instruction->start - (tamanioPagina * pagina) 		//start dentro de la pagina
 	};

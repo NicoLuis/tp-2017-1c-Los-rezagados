@@ -168,11 +168,11 @@ void escucharCPU(void* socket_cpu) {
 				// desserializacion
 				memcpy(&pidPeticion, msg->data + offset, tmpsize = sizeof(t_num8));
 				offset += tmpsize;
-				memcpy(&puntero.pagina, msg->data + offset, tmpsize = sizeof(t_num8));
+				memcpy(&puntero.pagina, msg->data + offset, tmpsize = sizeof(t_num));
 				offset += tmpsize;
-				memcpy(&puntero.offset, msg->data + offset, tmpsize = sizeof(t_num8));
+				memcpy(&puntero.offset, msg->data + offset, tmpsize = sizeof(t_num));
 				offset += tmpsize;
-				memcpy(&puntero.size, msg->data + offset, tmpsize = sizeof(t_num8));
+				memcpy(&puntero.size, msg->data + offset, tmpsize = sizeof(t_num));
 				offset += tmpsize;
 
 				log_info(log_memoria,"Solicitud de lectura. Pag:%d Offset:%d Size:%d",puntero.pagina, puntero.offset, puntero.size);
@@ -247,11 +247,11 @@ void escucharCPU(void* socket_cpu) {
 				// desserializacion
 				memcpy(&pidPeticion, msg->data + offset, tmpsize = sizeof(t_num8));
 				offset += tmpsize;
-				memcpy(&puntero.pagina, msg->data + offset, tmpsize = sizeof(t_num8));
+				memcpy(&puntero.pagina, msg->data + offset, tmpsize = sizeof(t_num));
 				offset += tmpsize;
-				memcpy(&puntero.offset, msg->data + offset, tmpsize = sizeof(t_num8));
+				memcpy(&puntero.offset, msg->data + offset, tmpsize = sizeof(t_num));
 				offset += tmpsize;
-				memcpy(&puntero.size, msg->data + offset, tmpsize = sizeof(t_num8));
+				memcpy(&puntero.size, msg->data + offset, tmpsize = sizeof(t_num));
 				offset += tmpsize;
 
 				void* contenido_escribir = calloc(1, puntero.size);

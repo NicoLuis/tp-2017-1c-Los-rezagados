@@ -6,7 +6,7 @@
  */
 
 #include "pcb.h"
-
+#include "libreriaCPU.h"
 
 int tamanioArgVar(t_list* lista){
 	return (sizeof(t_num8)*3 + sizeof(char)) * list_size(lista);
@@ -85,14 +85,14 @@ int tamanioTotalPCB(t_PCB* pcb){
 	int tamanioIndiceEtiquetas =
 			sizeof(t_size) + pcb->indiceEtiquetas.size;
 
-	return sizeof(t_num8) + sizeof(t_num) * 3 +
+	return sizeof(t_num8) + sizeof(t_num) * 4 +
 		tamanioIndiceCodigo + tamanioIndiceEtiquetas + tamanioIndiceStack(pcb->indiceStack);
 }
 
 void *serializarPCB(t_PCB* pcb){
 	int offset = 0;
 	t_num tmpsize;
-	void *buffer = malloc(sizeof(t_PCB)), *tmpBuffer;
+	void *buffer = malloc(tamanioTotalPCB(pcb)), *tmpBuffer;
 
 	memcpy(buffer + offset, &pcb->pid, tmpsize = sizeof(t_num8));
 		offset += tmpsize;
@@ -100,17 +100,16 @@ void *serializarPCB(t_PCB* pcb){
 		offset += tmpsize;
 	memcpy(buffer + offset, &pcb->cantPagsCodigo, tmpsize = sizeof(t_num));
 		offset += tmpsize;
-	memcpy(buffer + offset, &pcb->ec, tmpsize = sizeof(t_num));
+	memcpy(buffer + offset, &pcb->exitCode, tmpsize = sizeof(t_num));
 		offset += tmpsize;
 
 	memcpy(buffer + offset, &pcb->indiceCodigo.size, tmpsize = sizeof(t_size));
 		offset += tmpsize;
-	memcpy(buffer + offset, &pcb->indiceCodigo.bloqueSerializado, tmpsize = pcb->indiceCodigo.size * sizeof(t_intructions));
+	memcpy(buffer + offset, pcb->indiceCodigo.bloqueSerializado, tmpsize = pcb->indiceCodigo.size * sizeof(t_intructions));
 		offset += tmpsize;
-
 	memcpy(buffer + offset, &pcb->indiceEtiquetas.size, tmpsize = sizeof(t_size));
 		offset += tmpsize;
-	memcpy(buffer + offset, &pcb->indiceEtiquetas.bloqueSerializado, tmpsize = pcb->indiceEtiquetas.size);
+	memcpy(buffer + offset, pcb->indiceEtiquetas.bloqueSerializado, tmpsize = pcb->indiceEtiquetas.size);
 		offset += tmpsize;
 
 	tmpsize = tamanioIndiceStack(pcb->indiceStack);
@@ -190,23 +189,25 @@ t_PCB *desserealizarPCB(void* buffer){
 	t_num tmpsize;
 	void *tmpBuffer;
 
-	memcpy(&pcb->pid, buffer + offset, tmpsize = sizeof(t_num));
+	memcpy(&pcb->pid, buffer + offset, tmpsize = sizeof(t_num8));
 		offset += tmpsize;
 	memcpy(&pcb->pc, buffer + offset, tmpsize = sizeof(t_num));
 		offset += tmpsize;
 	memcpy(&pcb->cantPagsCodigo, buffer + offset, tmpsize = sizeof(t_num));
 		offset += tmpsize;
-	memcpy(&pcb->ec, buffer + offset, tmpsize = sizeof(t_num));
+	memcpy(&pcb->exitCode, buffer + offset, tmpsize = sizeof(t_num));
 		offset += tmpsize;
 
 	memcpy(&pcb->indiceCodigo.size, buffer + offset, tmpsize = sizeof(t_size));
 		offset += tmpsize;
-	memcpy(&pcb->indiceCodigo.bloqueSerializado, buffer + offset, tmpsize = pcb->indiceCodigo.size * sizeof(t_intructions));
+	pcb->indiceCodigo.bloqueSerializado = malloc(pcb->indiceCodigo.size * sizeof(t_intructions));
+	memcpy(pcb->indiceCodigo.bloqueSerializado, buffer + offset, tmpsize = pcb->indiceCodigo.size * sizeof(t_intructions));
 		offset += tmpsize;
 
 	memcpy(&pcb->indiceEtiquetas.size, buffer + offset, tmpsize = sizeof(t_size));
 		offset += tmpsize;
-	memcpy(&pcb->indiceEtiquetas.bloqueSerializado, buffer + offset, tmpsize = pcb->indiceEtiquetas.size * sizeof(t_intructions));
+	pcb->indiceEtiquetas.bloqueSerializado = malloc(pcb->indiceEtiquetas.size);
+	memcpy(pcb->indiceEtiquetas.bloqueSerializado, buffer + offset, tmpsize = pcb->indiceEtiquetas.size);
 		offset += tmpsize;
 
 	memcpy(&tmpsize, buffer + offset, sizeof(t_num));

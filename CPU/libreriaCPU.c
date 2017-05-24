@@ -65,7 +65,7 @@ void ejecutarInstruccion(){
 	char* instruccion = proximaInstruccion();
 
 	if (instruccion != NULL) {
-		log_debug(logCPU, "Instruccion recibida: %s", instruccion);
+		log_trace(logCPU, "Instruccion recibida: %s", instruccion);
 		analizadorLinea(instruccion, &functions, &kernel_functions);
 		pcb->pc++;
 	} else {
@@ -117,11 +117,11 @@ void* _serializarPuntero(t_posicion puntero){
 
 	memcpy(buffer + offset, &pcb->pid, tmpsize = sizeof(t_num8));
 	offset += tmpsize;
-	memcpy(buffer + offset, &puntero.pagina, tmpsize = sizeof(t_num8));
+	memcpy(buffer + offset, &puntero.pagina, tmpsize = sizeof(t_num));
 	offset += tmpsize;
-	memcpy(buffer + offset, &puntero.offset, tmpsize = sizeof(t_num8));
+	memcpy(buffer + offset, &puntero.offset, tmpsize = sizeof(t_num));
 	offset += tmpsize;
-	memcpy(buffer + offset, &puntero.size, tmpsize = sizeof(t_num8));
+	memcpy(buffer + offset, &puntero.size, tmpsize = sizeof(t_num));
 	offset += tmpsize;
 
 	return buffer;
@@ -130,9 +130,9 @@ void* _serializarPuntero(t_posicion puntero){
 t_posicion escribirMemoria(t_posicion puntero, t_valor_variable valor){
 
 	void* buffer = _serializarPuntero(puntero);
-	buffer = realloc(buffer, sizeof(t_num8)*4 + sizeof(t_valor_variable));
-	memcpy(buffer + sizeof(t_num8)*4, &valor, sizeof(t_num));
-	msg_enviar_separado(ESCRITURA_PAGINA, sizeof(t_num8)*4 + sizeof(t_valor_variable), buffer, socket_memoria);
+	buffer = realloc(buffer, sizeof(t_num)*3 + sizeof(t_num8) + sizeof(t_valor_variable));
+	memcpy(buffer + sizeof(t_num)*3 + sizeof(t_num8), &valor, sizeof(t_num));
+	msg_enviar_separado(ESCRITURA_PAGINA, sizeof(t_num)*3 + sizeof(t_num8) + sizeof(t_valor_variable), buffer, socket_memoria);
 	free(buffer);
 
 	t_num header;
@@ -158,20 +158,19 @@ char* proximaInstruccion() {
 
 	char* proxInstruccion = NULL;
 	t_intructions* instruction = malloc(sizeof(t_intructions));
-	void* bloque = pcb->indiceCodigo.bloqueSerializado;
-	memcpy(instruction, bloque + pcb->pc * sizeof(t_intructions), sizeof(t_intructions));
+	memcpy(instruction, pcb->indiceCodigo.bloqueSerializado + (pcb->pc * sizeof(t_intructions)), sizeof(t_intructions));
 
 	int pagina = instruction->start / tamanioPagina;
 	t_posicion puntero = {
-			.pagina = pagina,
-			.size = instruction->offset - instruction->start,				//offset -> donde termina
+			.pagina = pagina + pcb->cantPagsCodigo,
+			.size = instruction->offset,									//offset -> es el size
 			.offset = instruction->start - (tamanioPagina * pagina) 		//start dentro de la pagina
 	};
 
 	log_info(logCPU, "pagina %d start %d size %d", puntero.pagina, puntero.offset, puntero.size);
 
 	void* buffer = _serializarPuntero(puntero);
-	msg_enviar_separado(LECTURA_PAGINA, sizeof(t_num8)*4, buffer, socket_memoria);
+	msg_enviar_separado(LECTURA_PAGINA, sizeof(t_num)*3 + sizeof(t_num8), buffer, socket_memoria);
 	free(buffer);
 	free(instruction);
 

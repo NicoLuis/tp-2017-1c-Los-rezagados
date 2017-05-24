@@ -110,21 +110,18 @@ void planificar_FIFO(){
 		return a->socket == cpuUsada;
 	}
 	void _lib(t_infosocket* a){
-		log_trace(logKernel, "FREE 7");
 		free(a);
 	}
 
 	uint32_t size = tamanioTotalPCB(pcb);
 	void* pcbSerializado = serializarPCB(pcb);
-	log_trace(logKernel, "good 7");
 	msg_enviar_separado(ENVIO_PCB, size, pcbSerializado, cpuUsada);
-	log_trace(logKernel, "good 7");
 
 	while(sigoFIFO){
 
 		log_trace(logKernel, "Planifico proceso %d", pcb->pid);
 
-		msg_enviar_separado(EJECUTAR_INSTRUCCION, 1, 0, cpuUsada);
+		msg_enviar_separado(EJECUTAR_INSTRUCCION, 0, 0, cpuUsada);
 
 		t_msg* msgRecibido = msg_recibir(cpuUsada);
 

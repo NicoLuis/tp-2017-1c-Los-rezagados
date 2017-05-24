@@ -20,6 +20,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	//Creo archivo log
+	logAnsisop = log_create("ansisop.log", "Ansisop", false, LOG_LEVEL_TRACE);
 	logCPU = log_create("cpu.log", "CPU", false, LOG_LEVEL_TRACE);
 	log_trace(logCPU, "  -----------  INICIO CPU  -----------  ");
 
@@ -105,13 +106,21 @@ int main(int argc, char* argv[]) {
 	while(1){
 
 		t_msg* msgRecibido = msg_recibir(socket_kernel);
-		msg_recibir_data(socket_kernel, msgRecibido);
+		if(msgRecibido->longitud != 0)
+			msg_recibir_data(socket_kernel, msgRecibido);
 
 		switch(msgRecibido->tipoMensaje){
 		case ENVIO_PCB:
 
 			log_trace(logCPU, "Recibi ENVIO_PCB");
 			pcb = desserealizarPCB(msgRecibido->data);
+
+			log_trace(logCPU, "pcb->pid %d", pcb->pid);
+			log_trace(logCPU, "pcb->pc %d", pcb->pc);
+			log_trace(logCPU, "pcb->cantPagsCodigo %d", pcb->cantPagsCodigo);
+			log_trace(logCPU, "pcb->exitCode %d", pcb->exitCode);
+			log_trace(logCPU, "pcb->indiceCodigo.size %d", pcb->indiceCodigo.size);
+			log_trace(logCPU, "pcb->indiceEtiquetas.size %d", pcb->indiceEtiquetas.size);
 
 			break;
 		case EJECUTAR_INSTRUCCION:
@@ -122,7 +131,10 @@ int main(int argc, char* argv[]) {
 			fprintf(stderr, "El Kernel %d se ha desconectado \n", socket_kernel);
 			finalizarCPU();
 			break;
+		default:
+			log_trace(logCPU, "Recibi verdura %d", msgRecibido->tipoMensaje);
 		}
+
 	}
 
 	return 0;

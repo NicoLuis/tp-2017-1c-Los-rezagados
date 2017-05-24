@@ -22,7 +22,7 @@ typedef struct {
 	t_indice indiceCodigo;
 	t_indice indiceEtiquetas;
 	t_list* indiceStack;		//Lista de t_Stack
-	t_num ec; 				//Exit Code
+	t_num exitCode;
 }t_PCB;
 
 typedef struct {

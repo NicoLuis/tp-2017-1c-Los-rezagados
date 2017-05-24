@@ -10,6 +10,7 @@
 int crearPCB(int socketConsola){
 	t_PCB* pcb = malloc(sizeof(t_PCB));
 	pcb->pid = pid;
+	pcb->exitCode = 22;
 	pcb->indiceStack = list_create();
 	list_add(lista_PCBs, pcb);
 	return pcb->pid;
@@ -32,7 +33,9 @@ void llenarIndicesPCB(int pidPCB, char* codigo){
 
 	pcb->indiceCodigo.bloqueSerializado = malloc(metadata->instrucciones_size * sizeof(t_intructions));
 	memcpy(&pcb->indiceCodigo.size, &metadata->instrucciones_size, sizeof(t_size));
-	memcpy(pcb->indiceCodigo.bloqueSerializado, metadata->instrucciones_serializado, metadata->instrucciones_size);
+	memcpy(pcb->indiceCodigo.bloqueSerializado, metadata->instrucciones_serializado, metadata->instrucciones_size * sizeof(t_intructions));
+
+	log_trace(logKernel, "metadata->instrucciones_size %d", metadata->instrucciones_size);
 
 	t_Stack* entradaStack = malloc(sizeof(t_Stack));
 	entradaStack->args = list_create();
@@ -74,6 +77,6 @@ void setearExitCode(int pidPCB, int exitCode){
 	}
 
 	t_PCB* pcb = list_find(lista_PCBs, (void*) _buscarPCB);
-	pcb->ec = exitCode;
+	pcb->exitCode = exitCode;
 	queue_push(cola_Exit, &pcb->pid);
 }

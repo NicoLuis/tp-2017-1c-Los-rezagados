@@ -39,9 +39,9 @@ void mostrarArchivoConfig();
 void finalizarCPU();
 void ultimaEjec();
 void ejecutarInstruccion();
+t_posicion traducirSP();
 
 char* proximaInstruccion();
-t_posicion asignarMemoria(void* buffer, int size);
 t_posicion escribirMemoria(t_posicion puntero, t_valor_variable valor);
 
 int socket_kernel;

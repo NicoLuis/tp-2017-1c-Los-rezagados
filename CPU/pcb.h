@@ -23,6 +23,7 @@ typedef struct {
 	t_indice indiceEtiquetas;
 	t_list* indiceStack;		//Lista de t_Stack
 	t_num exitCode;
+	t_num sp;	//Posición del Stack
 }t_PCB;
 
 typedef struct {
@@ -49,7 +50,7 @@ int tamanioTotalPCB(t_PCB* pcb);
 void *serializarPCB(t_PCB* pcb);
 t_PCB *desserealizarPCB(void*);
 void liberarPCB(t_PCB* pcb);
-void desserializarArgVar(void* buffer, int tamanio, t_list* lista);
-void desserializarIndiceStack(void* buffer, t_num size, t_list* indiceStack);
+t_list* desserializarArgVar(void* buffer, int tamanio);
+t_list* desserializarIndiceStack(void* buffer, t_num size);
 
 #endif /* OPERACIONESPCB_H_ */

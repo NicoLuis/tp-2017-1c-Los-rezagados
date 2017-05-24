@@ -74,42 +74,13 @@ void ejecutarInstruccion(){
 	}
 
 	if(ultimaEjecucion){
+		log_trace(logCPU, "Ultima Instruccion");
 		uint32_t size = tamanioTotalPCB(pcb);
 		void* pcbSerializado = serializarPCB(pcb);
 		msg_enviar_separado(ENVIO_PCB, size, pcbSerializado, socket_kernel);
 		free(pcbSerializado);
 	}
 }
-
-
-t_posicion asignarMemoria(void* buffer, int size){
-
-	t_posicion puntero;
-	int offset = 0, tmpsize;
-
-	msg_enviar_separado(ASIGNACION_MEMORIA, size, buffer, socket_memoria);
-	send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
-
-	t_msg* msgRecibido = msg_recibir(socket_memoria);
-	msg_recibir_data(socket_memoria, msgRecibido);
-
-	switch(msgRecibido->tipoMensaje){
-	case ASIGNACION_MEMORIA:
-		memcpy(&puntero.pagina, msgRecibido->data + offset, tmpsize = sizeof(t_num8));
-		offset += tmpsize;
-		memcpy(&puntero.offset, msgRecibido->data + offset, tmpsize = sizeof(t_num8));
-		offset += tmpsize;
-		memcpy(&puntero.size, msgRecibido->data + offset, tmpsize = sizeof(t_num8));
-		log_trace(logCPU, "Recibi %d %d %d", puntero.pagina, puntero.offset, puntero.size);
-		break;
-	case 0:
-		log_error(logCPU, "Se desconecto Memoria");
-		break;
-	}
-	msg_destruir(msgRecibido);
-	return puntero;
-}
-
 
 void* _serializarPuntero(t_posicion puntero){
 	int offset = 0, tmpsize;
@@ -153,6 +124,13 @@ t_posicion escribirMemoria(t_posicion puntero, t_valor_variable valor){
 	return puntero;
 }
 
+t_posicion traducirSP(){
+	t_posicion posicion;
+	posicion.pagina = pcb->sp / tamanioPagina;
+	posicion.offset = pcb->sp % tamanioPagina;
+	return posicion;
+}
+
 
 char* proximaInstruccion() {
 
@@ -182,7 +160,6 @@ char* proximaInstruccion() {
 		log_info(logCPU, "Recibo contenido");
 		proxInstruccion = malloc(msgRecibido->longitud);
 		memcpy(proxInstruccion, msgRecibido->data, msgRecibido->longitud);
-		log_info(logCPU, "Contenido %s", proxInstruccion);
 		return proxInstruccion;
 		break;
 	case STACKOVERFLOW:

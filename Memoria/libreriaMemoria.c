@@ -208,7 +208,6 @@ void escucharCPU(void* socket_cpu) {
 					unlockProcesos();
 
 					char* contenido_leido = obtenerContenido(pagina->nroFrame, puntero.offset, puntero.size);
-/* fixme: no retorna el contenido */
 					log_info(log_memoria, "contenido_leido %s", contenido_leido);
 					msg_enviar_separado(LECTURA_PAGINA, puntero.size, contenido_leido, socketCPU);
 					free(contenido_leido);

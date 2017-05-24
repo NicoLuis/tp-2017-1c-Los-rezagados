@@ -23,6 +23,7 @@ typedef struct {
 	t_indice indiceEtiquetas;
 	t_list* indiceStack;		//Lista de t_Stack
 	t_num exitCode;
+	t_num sp;	//Posición del Stack
 }t_PCB;
 
 typedef struct {

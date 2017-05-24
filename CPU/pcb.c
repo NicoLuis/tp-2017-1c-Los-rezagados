@@ -1,15 +1,9 @@
-/*
- * operacionesPCB.c
- *
- *  Created on: 15/5/2017
- *      Author: utnso
- */
 
 #include "pcb.h"
 #include "libreriaCPU.h"
 
 int tamanioArgVar(t_list* lista){
-	return (sizeof(t_num8)*3 + sizeof(char)) * list_size(lista);
+	return (sizeof(t_num)*3 + sizeof(char)) * list_size(lista);
 }
 
 void *serializarArgVar(t_list* lista, int tamanio){
@@ -20,11 +14,11 @@ void *serializarArgVar(t_list* lista, int tamanio){
 		t_StackMetadata *aux = list_get(lista, i);
 		memcpy(buffer + offset, &aux->id, tmpsize = sizeof(char));
 		offset += tmpsize;
-		memcpy(buffer + offset, &aux->posicionMemoria.pagina, tmpsize = sizeof(t_num8));
+		memcpy(buffer + offset, &aux->posicionMemoria.pagina, tmpsize = sizeof(t_num));
 		offset += tmpsize;
-		memcpy(buffer + offset, &aux->posicionMemoria.offset, tmpsize = sizeof(t_num8));
+		memcpy(buffer + offset, &aux->posicionMemoria.offset, tmpsize = sizeof(t_num));
 		offset += tmpsize;
-		memcpy(buffer + offset, &aux->posicionMemoria.size, tmpsize = sizeof(t_num8));
+		memcpy(buffer + offset, &aux->posicionMemoria.size, tmpsize = sizeof(t_num));
 		offset += tmpsize;
 	}
 
@@ -35,8 +29,7 @@ int tamanioIndiceStack(t_list* indiceStack){
 	int i = 0, sizeTotal = 0;
 	for(; i < list_size(indiceStack) ; i++){
 		t_Stack *aux = list_get(indiceStack, i);
-		sizeTotal += sizeof(t_num8)*3;
-		sizeTotal += sizeof(t_num)*3;
+		sizeTotal += sizeof(t_num)*6;
 		sizeTotal += tamanioArgVar(aux->args);
 		sizeTotal += tamanioArgVar(aux->vars);
 	}
@@ -51,11 +44,11 @@ void *serializarIndiceStack(t_list* indiceStack, int tamanio){
 		t_Stack *aux = list_get(indiceStack, i);
 		memcpy(buffer + offset, &aux->retPos, tmpsize = sizeof(t_num));
 		offset += tmpsize;
-		memcpy(buffer + offset, &aux->retVar.pagina, tmpsize = sizeof(t_num8));
+		memcpy(buffer + offset, &aux->retVar.pagina, tmpsize = sizeof(t_num));
 		offset += tmpsize;
-		memcpy(buffer + offset, &aux->retVar.offset, tmpsize = sizeof(t_num8));
+		memcpy(buffer + offset, &aux->retVar.offset, tmpsize = sizeof(t_num));
 		offset += tmpsize;
-		memcpy(buffer + offset, &aux->retVar.size, tmpsize = sizeof(t_num8));
+		memcpy(buffer + offset, &aux->retVar.size, tmpsize = sizeof(t_num));
 		offset += tmpsize;
 
 		tmpsize = tamanioArgVar(aux->args);
@@ -85,7 +78,7 @@ int tamanioTotalPCB(t_PCB* pcb){
 	int tamanioIndiceEtiquetas =
 			sizeof(t_size) + pcb->indiceEtiquetas.size;
 
-	return sizeof(t_num8) + sizeof(t_num) * 4 +
+	return sizeof(t_num8) + sizeof(t_num) * 5 +
 		tamanioIndiceCodigo + tamanioIndiceEtiquetas + tamanioIndiceStack(pcb->indiceStack);
 }
 
@@ -101,6 +94,8 @@ void *serializarPCB(t_PCB* pcb){
 	memcpy(buffer + offset, &pcb->cantPagsCodigo, tmpsize = sizeof(t_num));
 		offset += tmpsize;
 	memcpy(buffer + offset, &pcb->exitCode, tmpsize = sizeof(t_num));
+		offset += tmpsize;
+	memcpy(buffer + offset, &pcb->sp, tmpsize = sizeof(t_num));
 		offset += tmpsize;
 
 	memcpy(buffer + offset, &pcb->indiceCodigo.size, tmpsize = sizeof(t_size));
@@ -123,26 +118,27 @@ void *serializarPCB(t_PCB* pcb){
 	return buffer;
 }
 
-void desserializarArgVar(void* buffer, int tamanio, t_list* lista){
-	lista = list_create();
+t_list* desserializarArgVar(void* buffer, int tamanio){
+	t_list* lista = list_create();
 	int offset = 0, tmpsize;
 
 	while(offset < tamanio){
 		t_StackMetadata *aux = malloc(sizeof(t_StackMetadata));
 		memcpy(&aux->id, buffer + offset, tmpsize = sizeof(char));
 		offset += tmpsize;
-		memcpy(&aux->posicionMemoria.pagina, buffer + offset, tmpsize = sizeof(t_num8));
+		memcpy(&aux->posicionMemoria.pagina, buffer + offset, tmpsize = sizeof(t_num));
 		offset += tmpsize;
-		memcpy(&aux->posicionMemoria.offset, buffer + offset, tmpsize = sizeof(t_num8));
+		memcpy(&aux->posicionMemoria.offset, buffer + offset, tmpsize = sizeof(t_num));
 		offset += tmpsize;
-		memcpy(&aux->posicionMemoria.size, buffer + offset, tmpsize = sizeof(t_num8));
+		memcpy(&aux->posicionMemoria.size, buffer + offset, tmpsize = sizeof(t_num));
 		offset += tmpsize;
 		list_add(lista, aux);
 	}
+	return lista;
 }
 
-void desserializarIndiceStack(void* buffer, t_num size, t_list* indiceStack){
-	indiceStack = list_create();
+t_list* desserializarIndiceStack(void* buffer, t_num size){
+	t_list* indiceStack = list_create();
 	int offset = 0, tmpsize;
 	void *tmpBuffer;
 
@@ -152,11 +148,11 @@ void desserializarIndiceStack(void* buffer, t_num size, t_list* indiceStack){
 
 		memcpy(&aux->retPos, buffer + offset, tmpsize = sizeof(t_num));
 		offset += tmpsize;
-		memcpy(&aux->retVar.pagina, buffer + offset, tmpsize = sizeof(t_num8));
+		memcpy(&aux->retVar.pagina, buffer + offset, tmpsize = sizeof(t_num));
 		offset += tmpsize;
-		memcpy(&aux->retVar.offset, buffer + offset, tmpsize = sizeof(t_num8));
+		memcpy(&aux->retVar.offset, buffer + offset, tmpsize = sizeof(t_num));
 		offset += tmpsize;
-		memcpy(&aux->retVar.size, buffer + offset, tmpsize = sizeof(t_num8));
+		memcpy(&aux->retVar.size, buffer + offset, tmpsize = sizeof(t_num));
 		offset += tmpsize;
 
 		memcpy(&tmpsize, buffer + offset, sizeof(t_num));
@@ -164,7 +160,7 @@ void desserializarIndiceStack(void* buffer, t_num size, t_list* indiceStack){
 		tmpBuffer = malloc(tmpsize);
 		memcpy(tmpBuffer, buffer + offset, tmpsize);
 		offset += tmpsize;
-		desserializarArgVar(tmpBuffer, tmpsize, aux->args);
+		aux->args = desserializarArgVar(tmpBuffer, tmpsize);
 		free(tmpBuffer);
 
 		memcpy(&tmpsize, buffer + offset, sizeof(t_num));
@@ -172,12 +168,12 @@ void desserializarIndiceStack(void* buffer, t_num size, t_list* indiceStack){
 		tmpBuffer = malloc(tmpsize);
 		memcpy(tmpBuffer, buffer + offset, tmpsize);
 		offset += tmpsize;
-		desserializarArgVar(tmpBuffer, tmpsize, aux->vars);
+		aux->vars = desserializarArgVar(tmpBuffer, tmpsize);
 		free(tmpBuffer);
 
 		list_add(indiceStack, aux);
 	}
-
+	return indiceStack;
 }
 
 
@@ -197,6 +193,8 @@ t_PCB *desserealizarPCB(void* buffer){
 		offset += tmpsize;
 	memcpy(&pcb->exitCode, buffer + offset, tmpsize = sizeof(t_num));
 		offset += tmpsize;
+	memcpy(&pcb->sp, buffer + offset, tmpsize = sizeof(t_num));
+		offset += tmpsize;
 
 	memcpy(&pcb->indiceCodigo.size, buffer + offset, tmpsize = sizeof(t_size));
 		offset += tmpsize;
@@ -214,7 +212,7 @@ t_PCB *desserealizarPCB(void* buffer){
 	offset += sizeof(t_num);
 	tmpBuffer = malloc(tmpsize);
 	memcpy(tmpBuffer, buffer + offset, tmpsize);
-	desserializarIndiceStack(tmpBuffer, tmpsize, pcb->indiceStack);
+	pcb->indiceStack = desserializarIndiceStack(tmpBuffer, tmpsize);
 	offset += tmpsize;
 	free(tmpBuffer);
 

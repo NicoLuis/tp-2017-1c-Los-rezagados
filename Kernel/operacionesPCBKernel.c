@@ -10,7 +10,7 @@
 int crearPCB(int socketConsola){
 	t_PCB* pcb = malloc(sizeof(t_PCB));
 	pcb->pid = pid;
-	pcb->exitCode = 22;
+	pcb->exitCode = -20;
 	pcb->indiceStack = list_create();
 	list_add(lista_PCBs, pcb);
 	return pcb->pid;
@@ -41,6 +41,7 @@ void llenarIndicesPCB(int pidPCB, char* codigo){
 	entradaStack->args = list_create();
 	entradaStack->vars = list_create();
 	list_add(pcb->indiceStack, entradaStack);
+	pcb->sp = pcb->cantPagsCodigo;
 
 	metadata_destruir(metadata);
 }

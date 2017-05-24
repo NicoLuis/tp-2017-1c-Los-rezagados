@@ -1,15 +1,9 @@
-/*
- * operacionesPCB.c
- *
- *  Created on: 15/5/2017
- *      Author: utnso
- */
 
 #include "pcb.h"
 #include "libreriaKernel.h"
 
 int tamanioArgVar(t_list* lista){
-	return (sizeof(t_num8)*3 + sizeof(char)) * list_size(lista);
+	return (sizeof(t_num)*3 + sizeof(char)) * list_size(lista);
 }
 
 void *serializarArgVar(t_list* lista, int tamanio){
@@ -20,11 +14,11 @@ void *serializarArgVar(t_list* lista, int tamanio){
 		t_StackMetadata *aux = list_get(lista, i);
 		memcpy(buffer + offset, &aux->id, tmpsize = sizeof(char));
 		offset += tmpsize;
-		memcpy(buffer + offset, &aux->posicionMemoria.pagina, tmpsize = sizeof(t_num8));
+		memcpy(buffer + offset, &aux->posicionMemoria.pagina, tmpsize = sizeof(t_num));
 		offset += tmpsize;
-		memcpy(buffer + offset, &aux->posicionMemoria.offset, tmpsize = sizeof(t_num8));
+		memcpy(buffer + offset, &aux->posicionMemoria.offset, tmpsize = sizeof(t_num));
 		offset += tmpsize;
-		memcpy(buffer + offset, &aux->posicionMemoria.size, tmpsize = sizeof(t_num8));
+		memcpy(buffer + offset, &aux->posicionMemoria.size, tmpsize = sizeof(t_num));
 		offset += tmpsize;
 	}
 
@@ -35,8 +29,7 @@ int tamanioIndiceStack(t_list* indiceStack){
 	int i = 0, sizeTotal = 0;
 	for(; i < list_size(indiceStack) ; i++){
 		t_Stack *aux = list_get(indiceStack, i);
-		sizeTotal += sizeof(t_num8)*3;
-		sizeTotal += sizeof(t_num)*3;
+		sizeTotal += sizeof(t_num)*6;
 		sizeTotal += tamanioArgVar(aux->args);
 		sizeTotal += tamanioArgVar(aux->vars);
 	}
@@ -51,11 +44,11 @@ void *serializarIndiceStack(t_list* indiceStack, int tamanio){
 		t_Stack *aux = list_get(indiceStack, i);
 		memcpy(buffer + offset, &aux->retPos, tmpsize = sizeof(t_num));
 		offset += tmpsize;
-		memcpy(buffer + offset, &aux->retVar.pagina, tmpsize = sizeof(t_num8));
+		memcpy(buffer + offset, &aux->retVar.pagina, tmpsize = sizeof(t_num));
 		offset += tmpsize;
-		memcpy(buffer + offset, &aux->retVar.offset, tmpsize = sizeof(t_num8));
+		memcpy(buffer + offset, &aux->retVar.offset, tmpsize = sizeof(t_num));
 		offset += tmpsize;
-		memcpy(buffer + offset, &aux->retVar.size, tmpsize = sizeof(t_num8));
+		memcpy(buffer + offset, &aux->retVar.size, tmpsize = sizeof(t_num));
 		offset += tmpsize;
 
 		tmpsize = tamanioArgVar(aux->args);
@@ -85,7 +78,7 @@ int tamanioTotalPCB(t_PCB* pcb){
 	int tamanioIndiceEtiquetas =
 			sizeof(t_size) + pcb->indiceEtiquetas.size;
 
-	return sizeof(t_num8) + sizeof(t_num) * 4 +
+	return sizeof(t_num8) + sizeof(t_num) * 5 +
 		tamanioIndiceCodigo + tamanioIndiceEtiquetas + tamanioIndiceStack(pcb->indiceStack);
 }
 
@@ -101,6 +94,8 @@ void *serializarPCB(t_PCB* pcb){
 	memcpy(buffer + offset, &pcb->cantPagsCodigo, tmpsize = sizeof(t_num));
 		offset += tmpsize;
 	memcpy(buffer + offset, &pcb->exitCode, tmpsize = sizeof(t_num));
+		offset += tmpsize;
+	memcpy(buffer + offset, &pcb->sp, tmpsize = sizeof(t_num));
 		offset += tmpsize;
 
 	memcpy(buffer + offset, &pcb->indiceCodigo.size, tmpsize = sizeof(t_size));
@@ -131,11 +126,11 @@ void desserializarArgVar(void* buffer, int tamanio, t_list* lista){
 		t_StackMetadata *aux = malloc(sizeof(t_StackMetadata));
 		memcpy(&aux->id, buffer + offset, tmpsize = sizeof(char));
 		offset += tmpsize;
-		memcpy(&aux->posicionMemoria.pagina, buffer + offset, tmpsize = sizeof(t_num8));
+		memcpy(&aux->posicionMemoria.pagina, buffer + offset, tmpsize = sizeof(t_num));
 		offset += tmpsize;
-		memcpy(&aux->posicionMemoria.offset, buffer + offset, tmpsize = sizeof(t_num8));
+		memcpy(&aux->posicionMemoria.offset, buffer + offset, tmpsize = sizeof(t_num));
 		offset += tmpsize;
-		memcpy(&aux->posicionMemoria.size, buffer + offset, tmpsize = sizeof(t_num8));
+		memcpy(&aux->posicionMemoria.size, buffer + offset, tmpsize = sizeof(t_num));
 		offset += tmpsize;
 		list_add(lista, aux);
 	}
@@ -152,11 +147,11 @@ void desserializarIndiceStack(void* buffer, t_num size, t_list* indiceStack){
 
 		memcpy(&aux->retPos, buffer + offset, tmpsize = sizeof(t_num));
 		offset += tmpsize;
-		memcpy(&aux->retVar.pagina, buffer + offset, tmpsize = sizeof(t_num8));
+		memcpy(&aux->retVar.pagina, buffer + offset, tmpsize = sizeof(t_num));
 		offset += tmpsize;
-		memcpy(&aux->retVar.offset, buffer + offset, tmpsize = sizeof(t_num8));
+		memcpy(&aux->retVar.offset, buffer + offset, tmpsize = sizeof(t_num));
 		offset += tmpsize;
-		memcpy(&aux->retVar.size, buffer + offset, tmpsize = sizeof(t_num8));
+		memcpy(&aux->retVar.size, buffer + offset, tmpsize = sizeof(t_num));
 		offset += tmpsize;
 
 		memcpy(&tmpsize, buffer + offset, sizeof(t_num));
@@ -196,6 +191,8 @@ t_PCB *desserealizarPCB(void* buffer){
 	memcpy(&pcb->cantPagsCodigo, buffer + offset, tmpsize = sizeof(t_num));
 		offset += tmpsize;
 	memcpy(&pcb->exitCode, buffer + offset, tmpsize = sizeof(t_num));
+		offset += tmpsize;
+	memcpy(&pcb->sp, buffer + offset, tmpsize = sizeof(t_num));
 		offset += tmpsize;
 
 	memcpy(&pcb->indiceCodigo.size, buffer + offset, tmpsize = sizeof(t_size));

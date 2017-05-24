@@ -200,7 +200,8 @@ void atender_consola(int socket_consola){
 
 	case ENVIO_CODIGO:
 		pid++;
-		script = (char*)msgRecibido->data;
+		script = malloc(msgRecibido->longitud);
+		memcpy(script, msgRecibido->data, msgRecibido->longitud);
 		log_info(logKernel, script);
 		int pidActual = crearPCB(socket_consola);
 		llenarIndicesPCB(pidActual, script);
@@ -215,7 +216,8 @@ void atender_consola(int socket_consola){
 		_t_hiloEspera* aux = malloc(sizeof(_t_hiloEspera));
 
 		aux->pid = pidActual;
-		aux->script = script;
+		aux->script = malloc(string_length(script));
+		memcpy(aux->script, script, string_length(script));
 
 		pthread_attr_t atributo;
 		pthread_attr_init(&atributo);
@@ -224,6 +226,7 @@ void atender_consola(int socket_consola){
 		pthread_create(&hiloEspera, &atributo,(void*) enviarScriptAMemoria, aux);
 		pthread_attr_destroy(&atributo);
 
+		free(script);
 		break;
 
 	case 0:

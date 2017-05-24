@@ -36,7 +36,7 @@
 int puertoMemoria;
 int cantidadDeMarcos;
 uint32_t tamanioDeMarcos;
-int cantidadaEntradasCache;
+//int cantidadaEntradasCache;	//fixme: cantidadaEntradasCache??
 int cantidadEntradasCache;
 int cachePorProceso;
 char* algoritmoReemplazo;

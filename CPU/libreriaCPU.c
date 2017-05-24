@@ -113,7 +113,7 @@ t_posicion asignarMemoria(void* buffer, int size){
 
 void* _serializarPuntero(t_posicion puntero){
 	int offset = 0, tmpsize;
-	void* buffer = malloc(sizeof(t_num8)*4);
+	void* buffer = malloc(sizeof(t_num)*3 + sizeof(t_num8));
 
 	memcpy(buffer + offset, &pcb->pid, tmpsize = sizeof(t_num8));
 	offset += tmpsize;
@@ -179,13 +179,18 @@ char* proximaInstruccion() {
 
 	switch(msgRecibido->tipoMensaje){
 	case LECTURA_PAGINA:
+		log_info(logCPU, "Recibo contenido");
+		proxInstruccion = malloc(msgRecibido->longitud);
 		memcpy(proxInstruccion, msgRecibido->data, msgRecibido->longitud);
+		log_info(logCPU, "Contenido %s", proxInstruccion);
 		return proxInstruccion;
 		break;
 	case STACKOVERFLOW:
 		log_error(logCPU, "Pagina invalida"); break;
 	case 0:
-		log_error(logCPU, "memoria se desconecto");
+		log_error(logCPU, "memoria se desconecto"); break;
+	default:
+		log_error(logCPU, "cualquiera");
 	}
 
 	return NULL;

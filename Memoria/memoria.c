@@ -37,7 +37,7 @@ int main(int argc, char* argv[]) {
 	puertoMemoria = config_get_int_value(configuracion, "PUERTO");
 	cantidadDeMarcos = config_get_int_value(configuracion, "MARCOS");
 	tamanioDeMarcos = config_get_int_value(configuracion, "MARCO_SIZE");
-	cantidadaEntradasCache = config_get_int_value(configuracion, "ENTRADAS_CACHE");
+	cantidadEntradasCache = config_get_int_value(configuracion, "ENTRADAS_CACHE");
 	cachePorProceso = config_get_int_value(configuracion, "CACHE_X_PROC");
 	algoritmoReemplazo = config_get_string_value(configuracion, "REEMPLAZO_CACHE");
 	retardoMemoria = config_get_int_value(configuracion, "RETARDO_MEMORIA");

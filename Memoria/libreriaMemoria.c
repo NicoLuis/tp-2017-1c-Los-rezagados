@@ -15,8 +15,8 @@ void mostrarArchivoConfig() {
 	log_info(log_memoria,"La cantidad de Marcos es: %d", cantidadDeMarcos);
 	printf("El tamaño de las Marcos es: %d\n", tamanioDeMarcos);
 	log_info(log_memoria,"El tamaño de las Marcos es: %d", tamanioDeMarcos);
-	printf("La cantidad de entradas de Cache habilitadas son: %d\n", cantidadaEntradasCache);
-	log_info(log_memoria,"La cantidad de entradas de Cache habilitadas son: %d", cantidadaEntradasCache);
+	printf("La cantidad de entradas de Cache habilitadas son: %d\n", cantidadEntradasCache);
+	log_info(log_memoria,"La cantidad de entradas de Cache habilitadas son: %d", cantidadEntradasCache);
 	printf("La cantidad maxima de entradas a la cache por proceso son: %d\n", cachePorProceso);
 	log_info(log_memoria,"La cantidad maxima de entradas a la cache por proceso son: %d", cachePorProceso);
 	printf("El algoritmo de reemplaco de la Cache es: %s\n", algoritmoReemplazo);
@@ -76,22 +76,21 @@ void escucharKERNEL(void* socket_kernel) {
 
 			//guardo codigo en memoria
 
+			log_info(log_memoria, "Solicitud %s", msg->data);
+
 			if(hayFramesLibres(cantidadDePaginas)){
 				int i = 0;
-				t_frame* marcoLibre;
 				for(; i < cantidadDePaginas; i++){
-					marcoLibre = buscarFrameLibre(pid);
 					tmpBuffer = malloc(tamanioDeMarcos);
 					memcpy(tmpBuffer, msg->data + i*tamanioDeMarcos, tamanioDeMarcos);
-					escribirContenido(marcoLibre->nroFrame, 0, tamanioDeMarcos, tmpBuffer);
+					cargarPaginaAMemoria(pid, i, tmpBuffer, ESCRITURA_PAGINA);
 				}
-				free(marcoLibre);
 				log_info(log_memoria, "Asigne correctamente");
-		 		header = 29;//OK
+		 		header = OK;
 				send(socketKernel, &header, sizeof(uint8_t), 0);
 			}else{
 				log_warning(log_memoria, "No hay frames libres");
-				header = 30;//MARCOS_INSUFICIENTES
+				header = MARCOS_INSUFICIENTES;
 				send(socketKernel, &header, sizeof(uint8_t), 0);
 			}
 			break;
@@ -103,7 +102,7 @@ void escucharKERNEL(void* socket_kernel) {
 				pthread_exit(NULL);
 			}
 
-			log_info(log_memoria,"Finalizando proceso %d\n", pid);
+			log_info(log_memoria,"Finalizando proceso %d", pid);
 
 			lockFramesYProcesos();
 
@@ -134,7 +133,7 @@ void escucharCPU(void* socket_cpu) {
 	t_proceso* proceso;	//fixme: q es este proceso?
 	//list_add(listaCPUs, socketCPU);
 
-	log_info(log_memoria,"Se conecto un CPU\n");
+	log_info(log_memoria,"Se conecto un CPU");
 
 	int bytesEnviados = send(socketCPU, "Conexion Aceptada", 18, 0);
 	if (bytesEnviados <= 0) {
@@ -154,7 +153,7 @@ void escucharCPU(void* socket_cpu) {
 
 			case FIN_CPU: {
 				//MATO ES HILO
-				log_info(log_memoria,"La CPU %d ha finalizado\n", socketCPU);
+				log_info(log_memoria,"La CPU %d ha finalizado", socketCPU);
 				pthread_exit(NULL);
 			}
 			break;
@@ -183,20 +182,20 @@ void escucharCPU(void* socket_cpu) {
 
 				if (paginaInvalida(pidPeticion, puntero.pagina)) {
 
-					log_error(log_memoria, "Stack Overflow proceso %d\n", pidPeticion);
+					log_error(log_memoria, "Stack Overflow proceso %d", pidPeticion);
 
 					//AVISO FINALIZACION PROGRAMA A LA CPU
 					msg_enviar_separado(STACKOVERFLOW, 1, 0, socketCPU);
 
 				} else if ((Cache_Activada()) && (estaEnCache(pidPeticion, puntero.pagina))) {
 
-					void* contenido_leido = obtenerContenidoSegunCache(pidPeticion,puntero.pagina, offset, puntero.size);
+					void* contenido_leido = obtenerContenidoSegunCache(pidPeticion,puntero.pagina, puntero.offset, puntero.size);
 					msg_enviar_separado(LECTURA_PAGINA, puntero.size, contenido_leido, socketCPU);
 					free(contenido_leido);
 
 				} else if (estaEnMemoriaReal(pidPeticion, puntero.pagina)) {
 
-					log_info(log_memoria, "La pagina %d esta en Memoria Real\n",puntero.pagina);
+					log_info(log_memoria, "La pagina %d esta en Memoria Real", puntero.pagina);
 
 					//-----Retardo
 					pthread_mutex_lock(&mutexRetardo);
@@ -208,7 +207,9 @@ void escucharCPU(void* socket_cpu) {
 					t_pag* pagina = buscarPaginaEnListaDePaginas(pidPeticion,puntero.pagina);
 					unlockProcesos();
 
-					void* contenido_leido = obtenerContenido(pagina->nroFrame,offset, puntero.size);
+					char* contenido_leido = obtenerContenido(pagina->nroFrame, puntero.offset, puntero.size);
+/* fixme: no retorna el contenido */
+					log_info(log_memoria, "contenido_leido %s", contenido_leido);
 					msg_enviar_separado(LECTURA_PAGINA, puntero.size, contenido_leido, socketCPU);
 					free(contenido_leido);
 
@@ -216,21 +217,8 @@ void escucharCPU(void* socket_cpu) {
 						agregarEntradaCache(pidPeticion, puntero.pagina, pagina->nroFrame);
 					}
 
-				} else {
-
-					lockFrames();
-					int hayFrameLibre = hayFramesLibres();
-					unlockFrames();
-
-					if ((!hayFrameLibre) && (proceso->cantFramesAsignados == 0)) {
-
-						log_info(log_memoria,"Finalizando programa: %d. No hay frames disponibles\n",pidPeticion);
-
-						//AVISO FINALIZACION PROGRAMA A LA CPU
-						msg_enviar_separado(MARCOS_INSUFICIENTES, 1, 0, socketCPU);
-
-					}
-				}
+				} else
+					log_error(log_memoria, "No esta en cache ni memoria real");
 
 			}
 			break;
@@ -272,7 +260,7 @@ void escucharCPU(void* socket_cpu) {
 
 				if (paginaInvalida(pidPeticion, puntero.pagina)) {
 
-					log_error(log_memoria, "Stack Overflow proceso %d\n", pidPeticion);
+					log_error(log_memoria, "Stack Overflow proceso %d", pidPeticion);
 					free(contenido_escribir);
 
 					//AVISO FINALIZACION PROGRAMA A LA CPU
@@ -287,7 +275,7 @@ void escucharCPU(void* socket_cpu) {
 
 				} else if (estaEnMemoriaReal(pidPeticion, puntero.pagina)) {
 
-						log_info(log_memoria, "La pagina %d esta en Memoria Real\n",puntero.pagina);
+						log_info(log_memoria, "La pagina %d esta en Memoria Real",puntero.pagina);
 
 						//-----Retardo
 						pthread_mutex_lock(&mutexRetardo);
@@ -357,7 +345,7 @@ void escucharCPU(void* socket_cpu) {
 void* reservarMemoria(int cantidadMarcos, int capacidadMarco) {
 	// La creo con calloc para que me la llene de \0
 	void * memoria = calloc(cantidadMarcos, capacidadMarco);
-	log_info(log_memoria,"Memoria reservada\n");
+	log_info(log_memoria,"Memoria reservada");
 	return memoria;
 }
 
@@ -523,7 +511,7 @@ void* obtenerContenido(int frame, int offset, int tamanio_leer) {
 	usleep(retardoMemoria * 1000);
 	pthread_mutex_unlock(&mutexRetardo);
 	//------------
-	void* contenido = calloc(1, tamanio_leer);
+	void* contenido = malloc(tamanio_leer);
 	int desplazamiento = (frame * tamanioDeMarcos) + offset;
 
 	pthread_mutex_lock(&mutexMemoriaReal);
@@ -628,7 +616,7 @@ void cargarPaginaAMemoria(uint32_t pid, uint8_t numero_pagina,void* paginaLeida,
 
 		escribirContenido(frame->nroFrame, 0, tamanioDeMarcos, paginaLeida);
 
-		log_info(log_memoria,"Pagina %d del proceso %d cargada en frame %d\n",numero_pagina, pid, frame->nroFrame);
+		log_info(log_memoria,"Pagina %d del proceso %d cargada en frame %d",numero_pagina, pid, frame->nroFrame);
 
 	}
 
@@ -772,10 +760,10 @@ int estaEnCache(uint32_t pid, uint8_t numero_pagina) {
 	t_cache* entradaCache = buscarEntradaCache(pid, numero_pagina);
 
 	if (entradaCache != NULL) {
-		log_info(log_memoria, "La pagina %d esta en la Cache\n", numero_pagina);
+		log_info(log_memoria, "La pagina %d esta en la Cache", numero_pagina);
 		return 1;
 	} else {
-		log_info(log_memoria, "Cache Miss\n");
+		log_info(log_memoria, "Cache Miss");
 		pthread_mutex_unlock(&mutexCache);
 		return 0;
 	}
@@ -820,7 +808,7 @@ void agregarEntradaCache(uint32_t pid, uint8_t numero_pagina, int nroFrame) {
 		list_add(Cache, nuevaEntradaCache);
 	}
 
-	log_info(log_memoria, "Pagina %d del proceso %d agregada a Cache\n", numero_pagina,pid);
+	log_info(log_memoria, "Pagina %d del proceso %d agregada a Cache", numero_pagina,pid);
 
 	pthread_mutex_unlock(&mutexCache);
 }
@@ -866,11 +854,11 @@ void vaciarCache() {
 		pthread_mutex_unlock(&mutexCache);
 
 		printf("Flush Cache realizado\n");
-		log_info(log_memoria, "Flush Cache realizado\n");
+		log_info(log_memoria, "Flush Cache realizado");
 
 	} else
 		printf("Se intento hacer flush cache pero no esta activada\n");
-		log_error(log_memoria, "Se intento hacer flush cache pero no esta activada\n");
+		log_error(log_memoria, "Se intento hacer flush cache pero no esta activada");
 
 }
 
@@ -915,7 +903,7 @@ void borrarEntradaCacheSegunFrame(int nroFrame) {
 
 int Cache_Activada() {
 
-	return (cantidadaEntradasCache > 0);
+	return (cantidadEntradasCache > 0);
 
 }
 
@@ -957,7 +945,7 @@ void ejecutarComandos() {
 
 			printf("Retardo modificado correctamente a %d ms\n\n", retardoMemoria);
 
-			log_info(log_memoria, "Retardo modificado correctamente a %d ms\n\n",retardoMemoria);
+			log_info(log_memoria, "Retardo modificado correctamente a %d ms",retardoMemoria);
 
 		}
 	else if (!strcmp(buffer, "dump")) {
@@ -998,7 +986,7 @@ void ejecutarComandos() {
 
 				printf("Flush memory realizado\n\n");
 
-				log_info(log_memoria, "Flush memory realizado\n\n");
+				log_info(log_memoria, "Flush memory realizado");
 
 			} else {
 				printf("Comando Incorrecto\n");

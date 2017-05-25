@@ -48,5 +48,6 @@ int socket_kernel;
 int socket_memoria;
 
 bool ultimaEjecucion;
+bool finalizado;
 
 #endif

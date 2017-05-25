@@ -79,4 +79,5 @@ void setearExitCode(int pidPCB, int exitCode){
 	t_PCB* pcb = list_find(lista_PCBs, (void*) _buscarPCB);
 	pcb->exitCode = exitCode;
 	queue_push(cola_Exit, &pcb->pid);
+	liberarPCB(pcb, true);
 }

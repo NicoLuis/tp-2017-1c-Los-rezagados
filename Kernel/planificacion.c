@@ -36,10 +36,12 @@ void planificar_RR(){
 	quantumRestante = quantum;
 
 	log_trace(logKernel, "Inicio rafaga RR con quantum: %d", quantum);
-	int pidPCB = (int) queue_pop(cola_Ready);
+	int pidPCB;
+	memcpy(&pidPCB, queue_pop(cola_Ready), sizeof(int));
 	int _es_PCB(t_PCB* p){
 		return p->pid == pidPCB;
 	}
+	list_add(cola_Exec, &pidPCB);
 
 	t_PCB* pcb = list_find(lista_PCBs, (void*) _es_PCB);
 	if(pcb == NULL)
@@ -81,10 +83,11 @@ void planificar_FIFO(){
 
 	log_trace(logKernel, "Inicio FIFO");
 	int pidPCB;
-	memcpy(&pidPCB, queue_peek(cola_Ready), sizeof(int));
+	memcpy(&pidPCB, queue_pop(cola_Ready), sizeof(int));
 	int _es_PCB(t_PCB* p){
 		return p->pid == pidPCB;
 	}
+	list_add(cola_Exec, &pidPCB);
 
 	t_PCB* pcb = list_find(lista_PCBs, (void*) _es_PCB);
 	if(pcb == NULL)

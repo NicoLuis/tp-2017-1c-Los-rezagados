@@ -49,7 +49,7 @@ int tamanioArgVar(t_list* lista);
 int tamanioTotalPCB(t_PCB* pcb);
 void *serializarPCB(t_PCB* pcb);
 t_PCB *desserealizarPCB(void*);
-void liberarPCB(t_PCB* pcb);
+void liberarPCB(t_PCB* pcb, bool soloStructs);
 t_list* desserializarArgVar(void* buffer, int tamanio);
 t_list* desserializarIndiceStack(void* buffer, t_num size);
 

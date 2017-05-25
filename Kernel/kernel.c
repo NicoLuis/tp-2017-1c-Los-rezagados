@@ -36,7 +36,7 @@ int main(int argc, char* argv[]) {
 	pid = 0;
 	cola_New = queue_create();
 	cola_Ready = queue_create();
-	cola_Exec = queue_create();
+	cola_Exec = list_create();
 	cola_Block = queue_create();
 	cola_Exit = queue_create();
 

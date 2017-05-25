@@ -98,7 +98,7 @@ t_num8 stackSize;
 
 t_queue* cola_New;
 t_queue* cola_Ready;
-t_queue* cola_Exec;
+t_list* cola_Exec;
 t_queue* cola_Block;
 t_queue* cola_Exit;
 

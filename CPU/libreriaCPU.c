@@ -50,7 +50,7 @@ void finalizarCPU(){
 		close(socket_memoria);
 	}
 
-	liberarPCB(pcb);
+	liberarPCB(pcb, false);
 	exit(1);
 }
 
@@ -68,7 +68,6 @@ void ejecutarInstruccion(){
 		log_trace(logCPU, "Instruccion recibida: %s", instruccion);
 		analizadorLinea(instruccion, &functions, &kernel_functions);
 		pcb->pc++;
-		msg_enviar_separado(OK, 0, 0, socket_kernel);
 	} else {
 		log_error(logCPU, "No se pudo recibir la instruccion");
 		return;
@@ -78,9 +77,13 @@ void ejecutarInstruccion(){
 		log_trace(logCPU, "Ultima Instruccion");
 		uint32_t size = tamanioTotalPCB(pcb);
 		void* pcbSerializado = serializarPCB(pcb);
-		msg_enviar_separado(ENVIO_PCB, size, pcbSerializado, socket_kernel);
+		if(finalizado)
+			msg_enviar_separado(FINALIZAR_PROGRAMA, size, pcbSerializado, socket_kernel);
+		else
+			msg_enviar_separado(ENVIO_PCB, size, pcbSerializado, socket_kernel);
 		free(pcbSerializado);
-	}
+	}else
+		msg_enviar_separado(OK, 0, 0, socket_kernel);
 }
 
 void* _serializarPuntero(t_posicion puntero){

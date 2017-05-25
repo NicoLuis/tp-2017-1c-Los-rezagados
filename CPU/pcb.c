@@ -220,7 +220,7 @@ t_PCB *desserealizarPCB(void* buffer){
 }
 
 
-void liberarPCB(t_PCB* pcb){
+void liberarPCB(t_PCB* pcb, bool soloStructs){
 	void _destruirStackMetadata(t_StackMetadata* stack){
 		free(stack);
 	}
@@ -232,6 +232,7 @@ void liberarPCB(t_PCB* pcb){
 	free(pcb->indiceCodigo.bloqueSerializado);
 	free(pcb->indiceEtiquetas.bloqueSerializado);
 	list_destroy_and_destroy_elements(pcb->indiceStack, (void*) _destruirIndiceStack);
-	free(pcb);
+	if(!soloStructs)
+		free(pcb);
 
 }

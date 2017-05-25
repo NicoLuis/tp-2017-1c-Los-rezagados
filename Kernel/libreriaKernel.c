@@ -117,7 +117,14 @@ void* _buscarPCB(int socket, t_list* lista){
 }
 
 
-
+void _sacarPidRustico(t_list* lista, int numBuscado){
+	int i = 0, num;
+	for(; i < list_size(lista); i++){
+		memcpy(&num, list_get(lista, i), sizeof(int));
+		if(num == numBuscado)
+			list_remove(lista, i);
+	}
+}
 
 void escucharCPU(int socket_cpu) {
 
@@ -131,6 +138,7 @@ void escucharCPU(int socket_cpu) {
 		free(a);
 	}
 	t_cpu* cpuUsada = list_find(lista_cpus, (void*) _esCPU);
+	bool finalizado = false;
 
 	while(1){
 
@@ -145,17 +153,21 @@ void escucharCPU(int socket_cpu) {
 			log_trace(logKernel, "Recibi OK");
 			quantumRestante--;
 			break;
-
+		case FINALIZAR_PROGRAMA:
+			log_trace(logKernel, "Finalizo programa");
+			finalizado = true;
+			//no break
 		case ENVIO_PCB:		// si me devuelve el PCB es porque fue la ultima instruccion
 			log_trace(logKernel, "Recibi PCB");
 			msg_recibir_data(socket_cpu, msgRecibido);
-			pcb = desserealizarPCB(msgRecibido);
+			pcb = desserealizarPCB(msgRecibido->data);
 			list_add(lista_cpus, cpuUsada);
 			list_remove_and_destroy_by_condition(lista_PCB_cpu, (void*) _esCPU2, (void*) _liberar);
-			queue_pop(cola_Ready);
+			_sacarPidRustico(cola_Exec, pcb->pid);
 			sigoFIFO = 0;
-			setearExitCode(pcb->pid, 0);
 			quantumRestante = 0;
+			if(finalizado)
+				setearExitCode(pcb->pid, 0);
 			break;
 		case 0: case FIN_CPU:
 			fprintf(stderr, "La cpu %d se ha desconectado \n", socket_cpu);
@@ -164,8 +176,9 @@ void escucharCPU(int socket_cpu) {
 			list_remove_by_condition(lista_cpus, (void*) _esCPU);
 			list_remove_and_destroy_by_condition(lista_PCB_cpu, (void*) _esCPU2, (void*) _liberar);
 			setearExitCode(pcb->pid, -20);
-			queue_pop(cola_Ready);
+			_sacarPidRustico(cola_Exec, pcb->pid);
 			sigoFIFO = 0;
+			quantumRestante = 0;
 			pthread_mutex_unlock(&mut_planificacion);
 			pthread_exit(NULL);
 			break;
@@ -388,10 +401,21 @@ void consolaKernel(){
 }
 void terminarKernel(){			//aca libero todos
 
-	list_destroy(lista_cpus);
 	list_destroy(lista_consolas);
+	void _freeCPUs(t_cpu* cpu){ free(cpu); }
+	list_destroy_and_destroy_elements(lista_cpus, (void*) _freeCPUs);
+	void _freePCB_2(t_infosocket* info){ free(info); }
+	list_destroy_and_destroy_elements(lista_PCB_consola, (void*) _freePCB_2);
+	list_destroy_and_destroy_elements(lista_PCB_cpu, (void*) _freePCB_2);
 
-	list_destroy_and_destroy_elements(lista_PCBs, (void*) liberarPCB);
+	void _freePCBs(t_PCB* pcb){ liberarPCB(pcb, false); }
+	list_destroy_and_destroy_elements(lista_PCBs, (void*) _freePCBs);
+
+	queue_destroy(cola_New);
+	queue_destroy(cola_Ready);
+	list_destroy(cola_Exec);
+	queue_destroy(cola_Block);
+	queue_destroy(cola_Exit);
 
 	void _destruirVariablesCompartidas(t_VariableCompartida* variable){
 		free(variable);
@@ -409,11 +433,4 @@ void terminarKernel(){			//aca libero todos
 	log_destroy(logKernel);
 	exit(1);
 }
-
-
-
-
-
-
-
 

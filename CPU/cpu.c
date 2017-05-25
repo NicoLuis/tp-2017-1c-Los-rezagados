@@ -28,6 +28,7 @@ int main(int argc, char* argv[]) {
 	signal (SIGINT, finalizarCPU);
 	signal (SIGUSR1, ultimaEjec);
 	ultimaEjecucion = false;
+	finalizado = false;
 
 	//Cargo archivo de configuracion
 

@@ -41,7 +41,6 @@ void llenarIndicesPCB(int pidPCB, char* codigo){
 	entradaStack->args = list_create();
 	entradaStack->vars = list_create();
 	list_add(pcb->indiceStack, entradaStack);
-	pcb->sp = pcb->cantPagsCodigo;
 
 	metadata_destruir(metadata);
 }

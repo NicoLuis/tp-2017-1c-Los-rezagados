@@ -118,8 +118,8 @@ void *serializarPCB(t_PCB* pcb){
 	return buffer;
 }
 
-void desserializarArgVar(void* buffer, int tamanio, t_list* lista){
-	lista = list_create();
+t_list* desserializarArgVar(void* buffer, int tamanio){
+	t_list* lista = list_create();
 	int offset = 0, tmpsize;
 
 	while(offset < tamanio){
@@ -134,10 +134,11 @@ void desserializarArgVar(void* buffer, int tamanio, t_list* lista){
 		offset += tmpsize;
 		list_add(lista, aux);
 	}
+	return lista;
 }
 
-void desserializarIndiceStack(void* buffer, t_num size, t_list* indiceStack){
-	indiceStack = list_create();
+t_list* desserializarIndiceStack(void* buffer, t_num size){
+	t_list* indiceStack = list_create();
 	int offset = 0, tmpsize;
 	void *tmpBuffer;
 
@@ -159,7 +160,7 @@ void desserializarIndiceStack(void* buffer, t_num size, t_list* indiceStack){
 		tmpBuffer = malloc(tmpsize);
 		memcpy(tmpBuffer, buffer + offset, tmpsize);
 		offset += tmpsize;
-		desserializarArgVar(tmpBuffer, tmpsize, aux->args);
+		aux->args = desserializarArgVar(tmpBuffer, tmpsize);
 		free(tmpBuffer);
 
 		memcpy(&tmpsize, buffer + offset, sizeof(t_num));
@@ -167,12 +168,12 @@ void desserializarIndiceStack(void* buffer, t_num size, t_list* indiceStack){
 		tmpBuffer = malloc(tmpsize);
 		memcpy(tmpBuffer, buffer + offset, tmpsize);
 		offset += tmpsize;
-		desserializarArgVar(tmpBuffer, tmpsize, aux->vars);
+		aux->vars = desserializarArgVar(tmpBuffer, tmpsize);
 		free(tmpBuffer);
 
 		list_add(indiceStack, aux);
 	}
-
+	return indiceStack;
 }
 
 
@@ -211,7 +212,7 @@ t_PCB *desserealizarPCB(void* buffer){
 	offset += sizeof(t_num);
 	tmpBuffer = malloc(tmpsize);
 	memcpy(tmpBuffer, buffer + offset, tmpsize);
-	desserializarIndiceStack(tmpBuffer, tmpsize, pcb->indiceStack);
+	pcb->indiceStack = desserializarIndiceStack(tmpBuffer, tmpsize);
 	offset += tmpsize;
 	free(tmpBuffer);
 

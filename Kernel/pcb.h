@@ -39,6 +39,8 @@ typedef struct {
 }t_StackMetadata;
 
 
+t_PCB* pcb;
+
 
 void *serializarArgVar(t_list* lista, int tamanio);
 int tamanioIndiceStack(t_list* indiceStack);
@@ -48,7 +50,7 @@ int tamanioTotalPCB(t_PCB* pcb);
 void *serializarPCB(t_PCB* pcb);
 t_PCB *desserealizarPCB(void*);
 void liberarPCB(t_PCB* pcb);
-void desserializarArgVar(void* buffer, int tamanio, t_list* lista);
-void desserializarIndiceStack(void* buffer, t_num size, t_list* indiceStack);
+t_list* desserializarArgVar(void* buffer, int tamanio);
+t_list* desserializarIndiceStack(void* buffer, t_num size);
 
 #endif /* OPERACIONESPCB_H_ */

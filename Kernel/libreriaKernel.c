@@ -174,6 +174,7 @@ void enviarScriptAMemoria(_t_hiloEspera* aux){
 		log_trace(logKernel, "Recibi OK de memoria");
 		pcb->cantPagsCodigo = (string_length(aux->script) / tamanioPag);
 		pcb->cantPagsCodigo = (string_length(aux->script) % tamanioPag) == 0? pcb->cantPagsCodigo: pcb->cantPagsCodigo + 1;
+		pcb->sp = pcb->cantPagsCodigo * tamanioPag;
 		send(socketConsola, &respuesta, sizeof(t_num8), 0);
 		send(socketConsola, &pcb->pid, sizeof(t_num), 0);
 		queue_push(cola_Ready, &aux->pid);

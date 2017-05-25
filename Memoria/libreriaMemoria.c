@@ -241,15 +241,15 @@ void escucharCPU(void* socket_cpu) {
 				memcpy(&puntero.size, msg->data + offset, tmpsize = sizeof(t_num));
 				offset += tmpsize;
 
-				void* contenido_escribir = calloc(1, puntero.size);
-				memcpy(&contenido_escribir, msg->data + offset, tmpsize = sizeof(t_num));
+				void* contenido_escribir = malloc(puntero.size);
+				memcpy(contenido_escribir, msg->data + offset, tmpsize = puntero.size);
 				offset += tmpsize;
 
 				log_info(log_memoria, "Solicitud de escritura. Pag:%d Offset:%d Size:%d", puntero.pagina, puntero.offset, puntero.size);
 
-				if (puntero.size == sizeof(t_num)) {
+				if (puntero.size == sizeof(t_valor_variable)) {
 					int contenido;
-					memcpy(&contenido, contenido_escribir, sizeof(t_num));
+					memcpy(&contenido, contenido_escribir, sizeof(t_valor_variable));
 					log_info(log_memoria, "Contenido: %d", contenido);
 				}
 
@@ -287,7 +287,6 @@ void escucharCPU(void* socket_cpu) {
 						unlockProcesos();
 
 						escribirContenido(pag->nroFrame, puntero.offset, puntero.size, contenido_escribir);
-						free(contenido_escribir);
 
 						lockFrames();
 						ponerBitModificadoEn1(pag->nroFrame);
@@ -301,6 +300,8 @@ void escucharCPU(void* socket_cpu) {
 							log_error(log_memoria, "Error send CPU");
 							pthread_exit(NULL);
 						}
+
+						log_info(log_memoria, "Escribi correctamente");
 
 						/*	fixme: necesario? La cant de pags en stack es fija
 						//MODIFICAR
@@ -709,7 +710,6 @@ void ponerBitModificadoEn1(int nroFrame) {
 	t_frame* frame = buscarFrame(nroFrame);
 
 	frame->bit_modif = 1;
-
 }
 
 t_frame* buscarFrame(int numeroFrame) {

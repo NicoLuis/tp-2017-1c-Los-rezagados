@@ -30,9 +30,10 @@ void planificar(){
 
 void planificar_RR(){
 
+	pthread_mutex_lock(&mut_planificacion);
 	usleep(quantumSleep * 1000);
 	sem_post(&sem_cantColaReady);		//una vez q entre xq wait me resto 1 sin cambiar el tamaniodeCola
-	int quantumRestante = quantum, cpuUsada;
+	quantumRestante = quantum;
 
 	log_trace(logKernel, "Inicio rafaga RR con quantum: %d", quantum);
 	int pidPCB = (int) queue_pop(cola_Ready);
@@ -44,39 +45,30 @@ void planificar_RR(){
 	if(pcb == NULL)
 		log_error(logKernel, "no existe el proceso con pid %d", pidPCB);
 
-	cpuUsada = (int) list_take_and_remove(lista_cpus, 1);
+	t_cpu* cpuUsada = list_remove(lista_cpus, 0);
+	log_trace(logKernel, "cpuUsada %d", cpuUsada->socket);
 
 	uint32_t size = tamanioTotalPCB(pcb);
 	void* pcbSerializado = serializarPCB(pcb);
-	msg_enviar_separado(ENVIO_PCB, size, pcbSerializado, cpuUsada);
+	msg_enviar_separado(ENVIO_PCB, size, pcbSerializado, cpuUsada->socket);
 	free(pcbSerializado);
 
 	log_trace(logKernel, "Planifico proceso %d", pcb->pid);
 	while(quantumRestante > 0){
 
 		if(quantumRestante > 1)
-			msg_enviar_separado(EJECUTAR_INSTRUCCION, 1, 0, cpuUsada);
+			msg_enviar_separado(EJECUTAR_INSTRUCCION, 1, 0, cpuUsada->socket);
 		if(quantumRestante == 1)
-			msg_enviar_separado(EJECUTAR_ULTIMA_INSTRUCCION, 1, 0, cpuUsada);
-		t_msg* msgRecibido = msg_recibir(cpuUsada);
-		switch(msgRecibido->tipoMensaje){
-		case OK:
-			quantumRestante--;
-			break;
+			msg_enviar_separado(EJECUTAR_ULTIMA_INSTRUCCION, 1, 0, cpuUsada->socket);
 
-		case ENVIO_PCB:
-			msg_recibir_data(cpuUsada, msgRecibido);
-			pcb = desserealizarPCB(msgRecibido);
-			list_add(lista_cpus, &cpuUsada);
-			break;
-		case 0:
-			log_trace(logKernel, "Se desconecto cpu %d", cpuUsada);
-			setearExitCode(pcb->pid, -20);
-			quantumRestante = 0;
-		}
+		sem_wait(&cpuUsada->sem);
+		pthread_mutex_lock(&mut_planificacion);
+
+		log_trace(logKernel, "Planifico correctamente");
 	}
 
 	log_trace(logKernel, "Fin rafaga RR");
+	list_add(lista_cpus, cpuUsada);
 }
 
 
@@ -85,6 +77,7 @@ void planificar_RR(){
 void planificar_FIFO(){
 
 	sem_post(&sem_cantColaReady);		//una vez q entre xq wait me resto 1 sin cambiar el tamaniodeCola
+	pthread_mutex_lock(&mut_planificacion);
 
 	log_trace(logKernel, "Inicio FIFO");
 	int pidPCB;
@@ -97,59 +90,36 @@ void planificar_FIFO(){
 	if(pcb == NULL)
 		log_error(logKernel, "no existe el proceso con pid %d", pidPCB);
 
-	int cpuUsada;
-	memcpy(&cpuUsada,  list_remove(lista_cpus, 0), sizeof(int));
-	log_trace(logKernel, "cpuUsada %d", cpuUsada);
+	t_cpu* cpuUsada = list_remove(lista_cpus, 0);
+	log_trace(logKernel, "cpuUsada %d", cpuUsada->socket);
 
 	sigoFIFO = 1;
 	t_infosocket* info = malloc(sizeof(t_infosocket));
-	info->pid = pcb->pid; info->socket = cpuUsada;
+	info->pid = pcb->pid;
+	info->socket = cpuUsada->socket;
 	list_add(lista_PCB_cpu, info);
 
 	bool _esCpu(t_infosocket* a){
-		return a->socket == cpuUsada;
+		return a->socket == cpuUsada->socket;
 	}
-	void _lib(t_infosocket* a){
+	void _liberar(t_infosocket* a){
 		free(a);
 	}
 
 	uint32_t size = tamanioTotalPCB(pcb);
 	void* pcbSerializado = serializarPCB(pcb);
-	msg_enviar_separado(ENVIO_PCB, size, pcbSerializado, cpuUsada);
+	msg_enviar_separado(ENVIO_PCB, size, pcbSerializado, cpuUsada->socket);
 
 	while(sigoFIFO){
 
-		log_trace(logKernel, "Planifico proceso %d", pcb->pid);
+		log_trace(logKernel, "Planifico proceso %d en cpu %d", pcb->pid, cpuUsada->socket);
 
-		msg_enviar_separado(EJECUTAR_INSTRUCCION, 0, 0, cpuUsada);
+		msg_enviar_separado(EJECUTAR_INSTRUCCION, 0, 0, cpuUsada->socket);
 
-		t_msg* msgRecibido = msg_recibir(cpuUsada);
+		sem_post(&cpuUsada->sem);
+		pthread_mutex_lock(&mut_planificacion);
 
-		switch(msgRecibido->tipoMensaje){
-		case OK:
-			log_trace(logKernel, "Recibi OK");
-			break;
-
-		case ENVIO_PCB:		// si me devuelve el PCB es porque fue la ultima instruccion
-			log_trace(logKernel, "Recibi PCB");
-			msg_recibir_data(cpuUsada, msgRecibido);
-			pcb = desserealizarPCB(msgRecibido);
-			list_add(lista_cpus, &cpuUsada);
-			list_remove_and_destroy_by_condition(lista_PCB_cpu, (void*) _esCpu, (void*) _lib);
-			queue_pop(cola_Ready);
-			sigoFIFO = 0;
-			setearExitCode(pcb->pid, 0);
-
-			break;
-		case 0:
-			log_trace(logKernel, "Se desconecto cpu %d", cpuUsada);
-			list_remove_and_destroy_by_condition(lista_PCB_cpu, (void*) _esCpu, (void*) _lib);
-			setearExitCode(pcb->pid, -20);
-			queue_pop(cola_Ready);
-			sigoFIFO = 0;
-			break;
-		}
-
+		log_trace(logKernel, "Planifico correctamente");
 	}
 
 	free(pcbSerializado);

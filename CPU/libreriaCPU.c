@@ -68,6 +68,7 @@ void ejecutarInstruccion(){
 		log_trace(logCPU, "Instruccion recibida: %s", instruccion);
 		analizadorLinea(instruccion, &functions, &kernel_functions);
 		pcb->pc++;
+		msg_enviar_separado(OK, 0, 0, socket_kernel);
 	} else {
 		log_error(logCPU, "No se pudo recibir la instruccion");
 		return;
@@ -120,6 +121,7 @@ t_posicion escribirMemoria(t_posicion puntero, t_valor_variable valor){
 		log_error(logCPU, "Stack Overflow?");
 		break;
 	}
+	log_trace(logCPU, "sali %d", header);
 
 	return puntero;
 }

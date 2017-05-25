@@ -9,6 +9,7 @@
 #include "libreriaKernel.h"
 
 #include "operacionesPCBKernel.h"
+#include "planificacion.h"
 
 void mostrarArchivoConfig() {
 
@@ -115,28 +116,64 @@ void* _buscarPCB(int socket, t_list* lista){
 	return list_find(lista_PCBs, (void*) _es_PCB);
 }
 
+
+
+
 void escucharCPU(int socket_cpu) {
 
+	bool _esCPU(t_cpu* aux){
+		return aux->socket == socket_cpu;
+	}
+	bool _esCPU2(t_infosocket* aux){
+		return aux->socket == socket_cpu;
+	}
+	void _liberar(t_infosocket* a){
+		free(a);
+	}
+	t_cpu* cpuUsada = list_find(lista_cpus, (void*) _esCPU);
+
 	while(1){
+
+		sem_wait(&cpuUsada->sem);
 
 		t_msg* msgRecibido = msg_recibir(socket_cpu);
 
 		t_PCB* pcb = _buscarPCB(socket_cpu, lista_PCB_cpu);
 
 		switch(msgRecibido->tipoMensaje){
+		case OK:
+			log_trace(logKernel, "Recibi OK");
+			quantumRestante--;
+			break;
 
+		case ENVIO_PCB:		// si me devuelve el PCB es porque fue la ultima instruccion
+			log_trace(logKernel, "Recibi PCB");
+			msg_recibir_data(socket_cpu, msgRecibido);
+			pcb = desserealizarPCB(msgRecibido);
+			list_add(lista_cpus, cpuUsada);
+			list_remove_and_destroy_by_condition(lista_PCB_cpu, (void*) _esCPU2, (void*) _liberar);
+			queue_pop(cola_Ready);
+			sigoFIFO = 0;
+			setearExitCode(pcb->pid, 0);
+			quantumRestante = 0;
+			break;
 		case 0: case FIN_CPU:
 			fprintf(stderr, "La cpu %d se ha desconectado \n", socket_cpu);
+			log_trace(logKernel, "La desconecto la cpu %d", socket_cpu);
 			//si la cpu se desconecto la saco de la lista
-			bool _esCpu(int socketC){ return socketC == socket_cpu; }
-			list_remove_by_condition(lista_cpus, (void*) _esCpu);
+			list_remove_by_condition(lista_cpus, (void*) _esCPU);
+			list_remove_and_destroy_by_condition(lista_PCB_cpu, (void*) _esCPU2, (void*) _liberar);
+			setearExitCode(pcb->pid, -20);
+			queue_pop(cola_Ready);
+			sigoFIFO = 0;
+			pthread_mutex_unlock(&mut_planificacion);
 			pthread_exit(NULL);
 			break;
 		}
 
 		msg_destruir(msgRecibido);
+		pthread_mutex_unlock(&mut_planificacion);
 	}
-
 }
 
 

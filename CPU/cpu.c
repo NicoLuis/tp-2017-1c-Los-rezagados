@@ -27,7 +27,7 @@ int main(int argc, char* argv[]) {
 
 	signal (SIGINT, finalizarCPU);
 	signal (SIGUSR1, ultimaEjec);
-	ultimaEjecucion = true;
+	ultimaEjecucion = false;
 
 	//Cargo archivo de configuracion
 
@@ -125,6 +125,11 @@ int main(int argc, char* argv[]) {
 			break;
 		case EJECUTAR_INSTRUCCION:
 			log_trace(logCPU, "Recibi EJECUTAR_INSTRUCCION");
+			ejecutarInstruccion();
+			break;
+		case EJECUTAR_ULTIMA_INSTRUCCION:
+			log_trace(logCPU, "Recibi EJECUTAR_ULTIMA_INSTRUCCION");
+			ultimaEjec();
 			ejecutarInstruccion();
 			break;
 		case 0:

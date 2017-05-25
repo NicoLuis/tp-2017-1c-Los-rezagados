@@ -66,7 +66,10 @@ typedef struct {
 	int pid;
 }t_infosocket;
 
-
+typedef struct {
+	int socket;
+	sem_t sem;
+}t_cpu;
 
 t_list* lista_cpus;
 t_list* lista_consolas;

@@ -147,6 +147,7 @@ int conectar_select(char* puerto_escucha) {
 	pthread_attr_t atributo;
 	pthread_attr_init(&atributo);
 	pthread_attr_setdetachstate(&atributo, PTHREAD_CREATE_DETACHED);
+	t_cpu* cpuNueva;
 
 	while (1) {
 		descriptoresLectura = fdsMaestro;
@@ -180,17 +181,22 @@ int conectar_select(char* puerto_escucha) {
 // Aca entro cuando entro una nueva consola		-----------------------------------------------------------------
 								FD_SET(socket_cliente_aceptado, &fdsMaestro);
 								list_add(lista_consolas, &socket_cliente_aceptado);
+								log_trace(conectar_select_log, "Nueva Consola");
 
 								break;
 							case 2:
 // Aca entro cuando entro una nueva cpu			-----------------------------------------------------------------
 
+								cpuNueva = malloc(sizeof(t_cpu));
+								cpuNueva->socket = socket_cliente_aceptado;
+								sem_init(&cpuNueva->sem, 0, 0);
+								list_add(lista_cpus, cpuNueva);
+
 								if (pthread_create(&hilo_conexionCPU, &atributo,(void*) escucharCPU, (void*) socket_cliente_aceptado) < 0) {
 									log_error(conectar_select_log, "Error Hilo Escucha Consola");
 									abort();
 								}
-
-								list_add(lista_cpus, &socket_cliente_aceptado);
+								log_trace(conectar_select_log, "Nueva CPU");
 
 								break;
 							case -1:

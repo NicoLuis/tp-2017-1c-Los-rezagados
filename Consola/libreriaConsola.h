@@ -28,9 +28,17 @@
 #include <commons/collections/queue.h>
 #include <commons/log.h>
 #include <commons/process.h>
+#include <commons/temporal.h>
 #include <herramientas/sockets.h>
 #include <herramientas/enum.h>
 
+typedef struct {
+	t_num8 pid;
+	char* horaInicio;
+	char* horaFin;
+	int cantImpresionesPantalla;
+}t_programa;
+t_list* lista_programas;
 
 //Archivo de Configuracion
 char* ipKernel;
@@ -40,9 +48,11 @@ void mostrarArchivoConfig();
 
 int socket_kernel;
 
-void finalizarPrograma(void*);
+t_log* logConsola;
+
 void leerComando(char* comando);
-void iniciarPrograma(char* pathAIniciar);
+void escucharKernel();
 char* cargarScript(void* pathScript);
+void finalizarPrograma(t_programa* prog);
 
 #endif /* LIBRERIACONSOLA_H_ */

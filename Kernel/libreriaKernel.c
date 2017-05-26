@@ -166,8 +166,14 @@ void escucharCPU(int socket_cpu) {
 			_sacarPidRustico(cola_Exec, pcb->pid);
 			sigoFIFO = 0;
 			quantumRestante = 0;
-			if(finalizado)
+			if(finalizado){
 				setearExitCode(pcb->pid, 0);
+				bool _esPid(t_infosocket* a){ return a->pid == pcb->pid; }
+				t_infosocket* info = list_find(lista_PCB_consola, (void*) _esPid);
+				if(info == NULL)
+					log_trace(logKernel, "No se ecuentra consola asociada a pid %d", pcb->pid);
+				msg_enviar_separado(FINALIZAR_PROGRAMA, sizeof(t_num8), &info->pid, info->socket);
+			}
 			break;
 		case 0: case FIN_CPU:
 			fprintf(stderr, "La cpu %d se ha desconectado \n", socket_cpu);
@@ -225,14 +231,13 @@ void enviarScriptAMemoria(_t_hiloEspera* aux){
 		pcb->cantPagsCodigo = (string_length(aux->script) / tamanioPag);
 		pcb->cantPagsCodigo = (string_length(aux->script) % tamanioPag) == 0? pcb->cantPagsCodigo: pcb->cantPagsCodigo + 1;
 		pcb->sp = pcb->cantPagsCodigo * tamanioPag;
-		send(socketConsola, &respuesta, sizeof(t_num8), 0);
-		send(socketConsola, &pcb->pid, sizeof(t_num), 0);
+		msg_enviar_separado(respuesta, sizeof(t_num8), &pcb->pid, socketConsola);
 		queue_push(cola_Ready, &aux->pid);
 		sem_post(&sem_cantColaReady);
 		break;
 	case MARCOS_INSUFICIENTES:
 		log_trace(logKernel, "MARCOS INSUFICIENTES");
-		send(socketConsola, &respuesta, sizeof(t_num8), 0);
+		msg_enviar_separado(MARCOS_INSUFICIENTES, 0, 0, socketConsola);
 		setearExitCode(pcb->pid, -1);
 		break;
 	}
@@ -257,7 +262,7 @@ void atender_consola(int socket_consola){
 		int pidActual = crearPCB(socket_consola);
 		llenarIndicesPCB(pidActual, script);
 
-		t_infosocket* info = malloc(sizeof(info));
+		t_infosocket* info = malloc(sizeof(t_infosocket));
 		info->pid = pidActual;
 		info->socket = socket_consola;
 		list_add(lista_PCB_consola, info);

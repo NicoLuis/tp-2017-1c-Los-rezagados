@@ -124,7 +124,6 @@ t_posicion escribirMemoria(t_posicion puntero, t_valor_variable valor){
 		log_error(logCPU, "Stack Overflow?");
 		break;
 	}
-	log_trace(logCPU, "sali %d", header);
 
 	return puntero;
 }

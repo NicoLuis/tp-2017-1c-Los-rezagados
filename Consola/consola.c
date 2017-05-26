@@ -18,20 +18,25 @@ int main(int argc, char* argv[]) {
 		return -2;
 	}
 
+	//Creo archivo log
+	logConsola = log_create("consola.log", "CONSOLA", false, LOG_LEVEL_TRACE);
+	log_trace(logConsola, "  -----------  INICIO CONSOLA  -----------  ");
+
 	//Cargo archivo de configuracion
 
 	t_config* configuracion = config_create(argv[1]);
 	ipKernel = config_get_string_value(configuracion, "IP_KERNEL");
 	puertoKernel = config_get_int_value(configuracion, "PUERTO_KERNEL");
 
+	lista_programas = list_create();
 
 	//Muestro archivo de configuracion
 
 	mostrarArchivoConfig();
 
-	//-------------------------------CONEXION AL LA MEMORIA-------------------------------------
+	//-------------------------------CONEXION AL KERNEL-------------------------------------
 
-	printf("Me conecto al Kernel\n");
+	log_trace(logConsola, "Me conecto al Kernel");
 
 	socket_kernel = conectarAServidor(ipKernel, puertoKernel);
 
@@ -39,43 +44,37 @@ int main(int argc, char* argv[]) {
 
 	int bytesRecibidos = recv(socket_kernel, bufferKernel, 50, 0);
 	if (bytesRecibidos <= 0) {
-		printf("El Kernel se ha desconectado\n");
+		log_trace(logConsola, "El Kernel se ha desconectado");
 	}
 
 	bufferKernel[bytesRecibidos] = '\0';
 
-	printf("Recibi %d bytes con el siguiente mensaje: %s\n",bytesRecibidos, bufferKernel);
+	log_trace(logConsola, "Recibi %d bytes con el siguiente mensaje: %s",bytesRecibidos, bufferKernel);
 
 	send(socket_kernel, "Hola soy la Consola", 20, 0);
 
 	bytesRecibidos = recv(socket_kernel, bufferKernel, 50, 0);
 
 	if (bytesRecibidos <= 0) {
-		printf("El Kernel se ha desconectado\n");
+		log_trace(logConsola, "El Kernel se ha desconectado");
 	}
 
 	bufferKernel[bytesRecibidos] = '\0';
 
-	printf("Respuesta: %s\n", bufferKernel);
+	log_trace(logConsola, "Respuesta: %s", bufferKernel);
 
 	if (strcmp("Conexion aceptada", bufferKernel) == 0) {
-		printf("Me conecte correctamente al Kernel\n");
+		log_trace(logConsola, "Me conecte correctamente al Kernel");
 	}
 
 	free(bufferKernel);
 
-
-	// Creo el hilo que permite que la consola quede a la espera de comandos que se ingresen por linea de comandos
-	// fixme: el hilo hay q crearlo cuando detecte el comando -> sino el main sigue y termina el proceso sin hacer nada
-
-/*
 	pthread_attr_t atributo;
-	pthread_t hiloInterpreteDeComandos;
+	pthread_t hiloKernel;
 	pthread_attr_init(&atributo);
 	pthread_attr_setdetachstate(&atributo, PTHREAD_CREATE_DETACHED);
-	pthread_create(&hiloInterpreteDeComandos, &atributo,(void*) finalizarPrograma, (void *) socket_kernel);
+	pthread_create(&hiloKernel, &atributo,(void*) escucharKernel, NULL);
 	pthread_attr_destroy(&atributo);
-*/
 
 	while(1){
 		void* mensaje = malloc(200);

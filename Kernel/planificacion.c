@@ -62,7 +62,9 @@ void planificar_RR(){
 	t_infoProceso* infoProc = list_find(infoProcs, (void*) _proc);
 
 	log_trace(logKernel, "Planifico proceso %d", pcb->pid);
+	pthread_mutex_lock(&mut_planificacion2);
 	while(quantumRestante > 0){
+		pthread_mutex_unlock(&mut_planificacion2);
 
 		if(quantumRestante > 1)
 			msg_enviar_separado(EJECUTAR_INSTRUCCION, 1, 0, cpuUsada->socket);
@@ -74,6 +76,7 @@ void planificar_RR(){
 		pthread_mutex_lock(&mut_planificacion);
 
 		log_trace(logKernel, "Planifico correctamente");
+		pthread_mutex_lock(&mut_planificacion2);
 	}
 
 	log_trace(logKernel, "Fin rafaga RR");
@@ -132,7 +135,9 @@ void planificar_FIFO(){
 	}
 	t_infoProceso* infoProc = list_find(infoProcs, (void*) _proc);
 
+	pthread_mutex_lock(&mut_planificacion2);
 	while(sigoFIFO){
+		pthread_mutex_unlock(&mut_planificacion2);
 
 		log_trace(logKernel, "Planifico proceso %d en cpu %d", pcb->pid, cpuUsada->socket);
 
@@ -143,7 +148,9 @@ void planificar_FIFO(){
 		pthread_mutex_lock(&mut_planificacion);
 
 		log_trace(logKernel, "Planifico correctamente");
+		pthread_mutex_lock(&mut_planificacion2);
 	}
+	pthread_mutex_unlock(&mut_planificacion2);
 
 	free(pcbSerializado);
 	log_trace(logKernel, "Fin FIFO");

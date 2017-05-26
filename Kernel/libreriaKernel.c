@@ -220,7 +220,7 @@ void escucharCPU(int socket_cpu) {
 
 
 typedef struct {
-	t_num pid;
+	t_num8 pid;
 	char* script;
 }_t_hiloEspera;
 
@@ -243,7 +243,7 @@ void enviarScriptAMemoria(_t_hiloEspera* aux){
 
 	t_PCB* pcb = list_find(lista_PCBs, (void*) _buscarPCB);
 
-	send(socket_memoria, &aux->pid, sizeof(t_num), 0);
+	send(socket_memoria, &aux->pid, sizeof(t_num8), 0);
 	msg_enviar_separado(INICIALIZAR_PROGRAMA, (t_num) string_length(aux->script), aux->script, socket_memoria);
 	send(socket_memoria, &stackSize, sizeof(t_num8), 0);
 	t_num8 respuesta;
@@ -286,7 +286,7 @@ void atender_consola(int socket_consola){
 		script = malloc(msgRecibido->longitud);
 		memcpy(script, msgRecibido->data, msgRecibido->longitud);
 		log_info(logKernel, script);
-		int pidActual = crearPCB(socket_consola);
+		t_num8 pidActual = crearPCB(socket_consola);
 		llenarIndicesPCB(pidActual, script);
 
 		t_infosocket* info = malloc(sizeof(t_infosocket));
@@ -456,7 +456,13 @@ void consolaKernel(){
 
 		}else if(string_equals_ignore_case(comando, "detener")){
 
-			//todo: implementar
+			log_trace(logKernel, "Detengo planificacion");
+			pthread_mutex_lock(&mut_planificacion2);
+
+		}else if(string_equals_ignore_case(comando, "reanudar")){
+
+			log_trace(logKernel, "Reanudo planificacion");
+			pthread_mutex_unlock(&mut_planificacion2);
 
 		}else if(string_equals_ignore_case(comando, "help")){
 			printf("Comandos:\n"
@@ -465,7 +471,8 @@ void consolaKernel(){
 					"● tabla archivos: Obtener informacion de proceso\n"
 					"● grado mp [grado]: Setear grado de multiprogramacion\n"
 					"● kill [pid]: Finalizar proceso\n"
-					"● detener: Detener la planificación\n");
+					"● detener: Detener la planificación\n"
+					"● reanudar: Reanuda la planificación\n");
 
 		}else
 			fprintf(stderr, "El comando '%s' no es valido\n", comando);

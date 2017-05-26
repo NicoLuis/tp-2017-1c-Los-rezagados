@@ -14,6 +14,7 @@ int sigoFIFO;
 int quantumRestante;
 
 pthread_mutex_t mut_planificacion;
+pthread_mutex_t mut_planificacion2;
 
 void planificar();
 void planificar_FIFO();

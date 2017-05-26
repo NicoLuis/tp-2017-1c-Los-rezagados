@@ -11,10 +11,10 @@
 #include "libreriaKernel.h"
 #include "pcb.h"
 
-int crearPCB(int);
+t_num8 crearPCB(int);
 void llenarIndicesPCB(int, char*);
 void setearExitCode(int, int);
-bool _sacarDeCola(int pid, t_queue* cola);
-bool _estaEnCola(int pid, t_queue* cola);
+bool _sacarDeCola(t_num8 pid, t_queue* cola);
+bool _estaEnCola(t_num8 pid, t_queue* cola);
 
 #endif /* OPERACIONESPCBKERNEL_H_ */

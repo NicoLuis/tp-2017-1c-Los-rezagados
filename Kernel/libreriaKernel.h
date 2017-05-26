@@ -63,7 +63,7 @@ typedef struct HeapMetadata {
 
 typedef struct {
 	int socket;
-	int pid;
+	t_num8 pid;
 }t_infosocket;
 
 typedef struct {
@@ -94,7 +94,7 @@ t_list* lista_consolas;
 t_list* lista_PCBs;
 t_list* lista_PCB_consola;
 t_list* lista_PCB_cpu;
-t_num pid;
+t_num8 pid;
 
 //Archivo de Configuracion
 int puertoPrograma;

@@ -48,7 +48,7 @@ void escucharKERNEL(void* socket_kernel) {
 	uint32_t header;
 	while (1) {
 
-		if (recv(socketKernel, &pid, sizeof(uint32_t), 0) <= 0) {
+		if (recv(socketKernel, &pid, sizeof(t_num8), 0) <= 0) {
 			log_info(log_memoria,"El Kernel se ha desconectado");
 			pthread_exit(NULL);
 		}
@@ -97,7 +97,7 @@ void escucharKERNEL(void* socket_kernel) {
 
 
 		case FINALIZAR_PROGRAMA:
-			if (recv(socketKernel, &pid, sizeof(uint32_t), 0) <= 0) {
+			if (recv(socketKernel, &pid, sizeof(t_num8), 0) <= 0) {
 				log_info(log_memoria,"El Kernel se ha desconectado");
 				pthread_exit(NULL);
 			}

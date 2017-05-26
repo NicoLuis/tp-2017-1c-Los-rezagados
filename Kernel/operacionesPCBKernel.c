@@ -7,7 +7,7 @@
 
 #include "operacionesPCBKernel.h"
 
-int crearPCB(int socketConsola){
+t_num8 crearPCB(int socketConsola){
 	t_PCB* pcb = malloc(sizeof(t_PCB));
 	pcb->pid = pid;
 	pcb->exitCode = -20;
@@ -46,12 +46,13 @@ void llenarIndicesPCB(int pidPCB, char* codigo){
 }
 
 
-bool _sacarDeCola(int pid, t_queue* cola){
+bool _sacarDeCola(t_num8 pid, t_queue* cola){
 	// todo: semaforear
-	int i = 0, tmppid;
+	int i = 0;
+	t_num8 tmppid;
 	bool estaba = false;
 	for(; i < queue_size(cola) ; i++){
-		tmppid = (int) queue_pop(cola);
+		memcpy(&tmppid, queue_pop(cola), sizeof(t_num8));
 		if( tmppid != pid )
 			queue_push(cola, &tmppid);
 		else
@@ -60,16 +61,18 @@ bool _sacarDeCola(int pid, t_queue* cola){
 	return estaba;
 }
 
-bool _estaEnCola(int pid, t_queue* cola){
+bool _estaEnCola(t_num8 pid, t_queue* cola){
 	// todo: semaforear
-	int i = 0, tmppid;
+	int i = 0;
+	t_num8 tmppid;
 	bool esta = false;
 	for(; i < queue_size(cola) ; i++){
-		tmppid = (int) queue_pop(cola);
+		memcpy(&tmppid, queue_pop(cola), sizeof(t_num8));
 		if( tmppid == pid )
 			esta = true;
 		queue_push(cola, &tmppid);
 	}
+
 	return esta;
 }
 

@@ -37,6 +37,7 @@ void planificar_RR(){
 
 	log_trace(logKernel, "Inicio rafaga RR con quantum: %d", quantum);
 	int pidPCB;
+	sem_wait(&sem_cantColaReady);
 	memcpy(&pidPCB, queue_pop(cola_Ready), sizeof(int));
 	int _es_PCB(t_PCB* p){
 		return p->pid == pidPCB;
@@ -89,6 +90,7 @@ void planificar_FIFO(){
 
 	log_trace(logKernel, "Inicio FIFO");
 	int pidPCB;
+	sem_wait(&sem_cantColaReady);
 	memcpy(&pidPCB, queue_pop(cola_Ready), sizeof(int));
 	int _es_PCB(t_PCB* p){
 		return p->pid == pidPCB;

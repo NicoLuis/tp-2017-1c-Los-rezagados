@@ -117,6 +117,39 @@ void* _buscarPCB(int socket, t_list* lista){
 }
 
 
+t_PCB* recibir_pcb(int socket_cpu, t_msg* msgRecibido, bool finalizado){
+	bool _esCPU2(t_infosocket* aux){
+		return aux->socket == socket_cpu;
+	}
+	void _liberar(t_infosocket* a){
+		free(a);
+	}
+	log_trace(logKernel, "Recibi PCB");
+	msg_recibir_data(socket_cpu, msgRecibido);
+	pcb = desserealizarPCB(msgRecibido->data);
+	list_remove_and_destroy_by_condition(lista_PCB_cpu, (void*) _esCPU2, (void*) _liberar);
+	_sacarDeCola(pcb->pid, cola_Exec);
+	sigoFIFO = 0;
+	quantumRestante = 0;
+	if(finalizado){
+		setearExitCode(pcb->pid, 0);
+		bool _esPid(t_infosocket* a){ return a->pid == pcb->pid; }
+		t_infosocket* info = list_find(lista_PCB_consola, (void*) _esPid);
+		if(info == NULL)
+			log_trace(logKernel, "No se ecuentra consola asociada a pid %d", pcb->pid);
+		msg_enviar_separado(FINALIZAR_PROGRAMA, sizeof(t_num8), &info->pid, info->socket);
+	}else
+		if(msgRecibido->tipoMensaje > SYSCALLS__1 && msgRecibido->tipoMensaje < SYSCALLS__2)
+			queue_push(cola_Block, &pcb->pid);
+		else{
+			queue_push(cola_Ready, &pcb->pid);
+			sem_wait(&sem_cantColaReady);
+		}
+
+	return pcb;
+}
+
+
 void escucharCPU(int socket_cpu) {
 
 	bool _esCPU(t_cpu* aux){
@@ -149,21 +182,7 @@ void escucharCPU(int socket_cpu) {
 			finalizado = true;
 			//no break
 		case ENVIO_PCB:		// si me devuelve el PCB es porque fue la ultima instruccion
-			log_trace(logKernel, "Recibi PCB");
-			msg_recibir_data(socket_cpu, msgRecibido);
-			pcb = desserealizarPCB(msgRecibido->data);
-			list_remove_and_destroy_by_condition(lista_PCB_cpu, (void*) _esCPU2, (void*) _liberar);
-			_sacarDeCola(pcb->pid, cola_Exec);
-			sigoFIFO = 0;
-			quantumRestante = 0;
-			if(finalizado){
-				setearExitCode(pcb->pid, 0);
-				bool _esPid(t_infosocket* a){ return a->pid == pcb->pid; }
-				t_infosocket* info = list_find(lista_PCB_consola, (void*) _esPid);
-				if(info == NULL)
-					log_trace(logKernel, "No se ecuentra consola asociada a pid %d", pcb->pid);
-				msg_enviar_separado(FINALIZAR_PROGRAMA, sizeof(t_num8), &info->pid, info->socket);
-			}
+			pcb = recibir_pcb(socket_cpu, msgRecibido, finalizado);
 			break;
 		case 0: case FIN_CPU:
 			fprintf(stderr, "La cpu %d se ha desconectado \n", socket_cpu);
@@ -177,6 +196,29 @@ void escucharCPU(int socket_cpu) {
 			quantumRestante = 0;
 			pthread_mutex_unlock(&mut_planificacion);
 			pthread_exit(NULL);
+			break;
+		case ESCRIBIR_FD:
+			log_trace(logKernel, "Recibi ESCRIBIR_FD");
+			msg_recibir_data(socket_cpu, msgRecibido);
+			int size = msgRecibido->longitud - sizeof(t_puntero), fd;
+			void* informacion = malloc(size);
+			memcpy(&fd, msgRecibido->data, sizeof(t_puntero));
+			memcpy(informacion, msgRecibido->data + sizeof(t_puntero), size);
+
+			msgRecibido = msg_recibir(socket_cpu);
+			pcb = recibir_pcb(socket_cpu, msgRecibido, finalizado);
+			if(fd == 1){
+				bool _esPid(t_infosocket* a){ return a->pid == pcb->pid; }
+				t_infosocket* info = list_find(lista_PCB_consola, (void*) _esPid);
+				if(info == NULL)
+					log_trace(logKernel, "No se ecuentra consola asociada a pid %d", pcb->pid);
+				msg_enviar_separado(IMPRIMIR_TEXTO, size, informacion, info->socket);
+			}else{
+				//todo: lo trato como si fuese del FS
+			}
+			_sacarDeCola(pcb->pid, cola_Block);
+			queue_push(cola_Ready, &pcb->pid);
+			sem_post(&sem_cantColaReady);
 			break;
 		}
 

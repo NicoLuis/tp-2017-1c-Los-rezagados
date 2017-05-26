@@ -57,7 +57,7 @@ int main(int argc, char* argv[]) {
 	//Verifico si la Cache esta habilitada
 	if (Cache_Activada()) {
 		Cache = crearCache();
-		log_info(log_memoria, "La Cache esta Habilitada\n");
+		log_info(log_memoria, "La Cache esta Habilitada");
 	}
 
 	//Defino señales

@@ -122,6 +122,13 @@ void escucharKernel(){
 			log_trace(logConsola, "La desconecto el kernel");
 			pthread_exit(NULL);
 			break;
+		case IMPRIMIR_TEXTO:
+			log_trace(logConsola, "Recibi IMPRIMIR_TEXTO");
+			msg_recibir_data(socket_kernel, msgRecibido);
+			char* texto;
+			memcpy(texto, msgRecibido->data, msgRecibido->longitud);
+			fprintf(stderr, texto);
+			break;
 		}
 
 	}

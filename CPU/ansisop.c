@@ -6,6 +6,7 @@
  */
 
 #include "ansisop.h"
+#include "pcb.h"
 
 #define INICIOSTACK (pcb->cantPagsCodigo * tamanioPagina)
 
@@ -83,16 +84,21 @@ void asignar(t_puntero direccion_variable, t_valor_variable valor){
 	escribirMemoria(puntero, valor);
 }
 
-void irAlLabel(t_nombre_etiqueta t_nombre_etiqueta){
+void irAlLabel(t_nombre_etiqueta etiqueta){
+
+	log_trace(logAnsisop, "Voy al label %s", etiqueta);
 
 }
 
 void llamarSinRetorno(t_nombre_etiqueta etiqueta){
 
+	log_trace(logAnsisop, "Llamar sin retorno %s", etiqueta);
+
 }
 
 void llamarConRetorno(t_nombre_etiqueta etiqueta, t_puntero donde_retornar){
 
+	log_trace(logAnsisop, "Llamar con retorno %s", etiqueta);
 }
 
 t_valor_variable asignarValorCompartida(t_nombre_compartida variable, t_valor_variable valor){
@@ -137,9 +143,17 @@ void borrar(t_descriptor_archivo direccion){
 void cerrar(t_descriptor_archivo descriptor_archivo){
 
 }
-void escribir(t_descriptor_archivo descriptor_archivo, void* informacion, t_valor_variable tamanio){
 
+void escribir(t_descriptor_archivo descriptor_archivo, void* informacion, t_valor_variable tamanio){
+	log_trace(logAnsisop, "Escribir en fd %d: %s", descriptor_archivo, informacion);
+	int tmpsize = sizeof(t_descriptor_archivo);
+	void* buf = malloc(tamanio + tmpsize);
+	memcpy(buf, &descriptor_archivo, tmpsize);
+	memcpy(buf + tmpsize, informacion, tamanio);
+	msg_enviar_separado(ESCRIBIR_FD, tamanio + tmpsize, buf, socket_kernel);
+	ultimaEjecucion = true;
 }
+
 void leer(t_descriptor_archivo descriptor_archivo, t_puntero informacion, t_valor_variable tamanio){
 
 }

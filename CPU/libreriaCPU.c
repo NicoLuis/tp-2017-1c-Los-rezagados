@@ -73,8 +73,8 @@ void ejecutarInstruccion(){
 
 	if (instruccion != NULL) {
 		log_trace(logCPU, "Instruccion recibida: %s", instruccion);
-		analizadorLinea(instruccion, &functions, &kernel_functions);
 		pcb->pc++;
+		analizadorLinea(instruccion, &functions, &kernel_functions);
 	} else {
 		log_error(logCPU, "No se pudo recibir la instruccion");
 		return;
@@ -89,6 +89,8 @@ void ejecutarInstruccion(){
 		else
 			msg_enviar_separado(ENVIO_PCB, size, pcbSerializado, socket_kernel);
 		free(pcbSerializado);
+		finalizado = false;
+		ultimaEjecucion = false;
 	}else
 		msg_enviar_separado(OK, 0, 0, socket_kernel);
 }

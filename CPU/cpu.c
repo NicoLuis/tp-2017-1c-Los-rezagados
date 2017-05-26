@@ -123,7 +123,6 @@ int main(int argc, char* argv[]) {
 			log_trace(logCPU, "pcb->pid %d", pcb->pid);
 			log_trace(logCPU, "pcb->pc %d", pcb->pc);
 			log_trace(logCPU, "pcb->cantPagsCodigo %d", pcb->cantPagsCodigo);
-			log_trace(logCPU, "pcb->exitCode %d", pcb->exitCode);
 			log_trace(logCPU, "pcb->indiceCodigo.size %d", pcb->indiceCodigo.size);
 			log_trace(logCPU, "pcb->indiceEtiquetas.size %d", pcb->indiceEtiquetas.size);
 
@@ -134,7 +133,8 @@ int main(int argc, char* argv[]) {
 			break;
 		case EJECUTAR_ULTIMA_INSTRUCCION:
 			log_trace(logCPU, "Recibi EJECUTAR_ULTIMA_INSTRUCCION");
-			ultimaEjec();
+			finalizado = true;
+			ultimaEjecucion = true;
 			ejecutarInstruccion();
 			break;
 		case 0:

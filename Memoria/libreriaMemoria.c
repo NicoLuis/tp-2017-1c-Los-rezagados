@@ -57,18 +57,18 @@ void escucharKERNEL(void* socket_kernel) {
 		void* tmpBuffer;
 
 		header = msg->tipoMensaje;
-		t_num8 aux;
+		t_num8 stackSize;
 
 		switch (header) {
 
 		case INICIALIZAR_PROGRAMA:
 
-			recv(socketKernel, &aux, sizeof(t_num8), 0);
+			recv(socketKernel, &stackSize, sizeof(t_num8), 0);
 
 			cantidadDePaginas = msg->longitud / tamanioDeMarcos;
 			cantidadDePaginas = (msg->longitud % tamanioDeMarcos) == 0? cantidadDePaginas: cantidadDePaginas + 1;
 
-			cantidadDePaginas += aux;
+			cantidadDePaginas += stackSize;
 
 			log_info(log_memoria, "Solicitud de inicializar proceso %d con %d paginas", pid, cantidadDePaginas);
 

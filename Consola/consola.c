@@ -78,7 +78,7 @@ int main(int argc, char* argv[]) {
 
 	while(1){
 		void* mensaje = malloc(200);
-		printf("Ingrese mensaje:\n");
+		//printf("Ingrese mensaje:\n");
 		fgets(mensaje, 200, stdin);
 
 		leerComando(mensaje);

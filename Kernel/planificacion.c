@@ -41,7 +41,7 @@ void planificar_RR(){
 	int _es_PCB(t_PCB* p){
 		return p->pid == pidPCB;
 	}
-	list_add(cola_Exec, &pidPCB);
+	queue_push(cola_Exec, &pidPCB);
 
 	t_PCB* pcb = list_find(lista_PCBs, (void*) _es_PCB);
 	if(pcb == NULL)
@@ -55,6 +55,11 @@ void planificar_RR(){
 	msg_enviar_separado(ENVIO_PCB, size, pcbSerializado, cpuUsada->socket);
 	free(pcbSerializado);
 
+	int _proc(t_infoProceso* a){
+		return a->pid == pcb->pid;
+	}
+	t_infoProceso* infoProc = list_find(infoProcs, (void*) _proc);
+
 	log_trace(logKernel, "Planifico proceso %d", pcb->pid);
 	while(quantumRestante > 0){
 
@@ -63,6 +68,7 @@ void planificar_RR(){
 		if(quantumRestante == 1)
 			msg_enviar_separado(EJECUTAR_ULTIMA_INSTRUCCION, 1, 0, cpuUsada->socket);
 
+		infoProc->cantRafagas++;
 		sem_wait(&cpuUsada->sem);
 		pthread_mutex_lock(&mut_planificacion);
 
@@ -87,13 +93,19 @@ void planificar_FIFO(){
 	int _es_PCB(t_PCB* p){
 		return p->pid == pidPCB;
 	}
-	list_add(cola_Exec, &pidPCB);
+	int _cpuLibre(t_cpu* c){
+		return c->libre;
+	}
+	queue_push(cola_Exec, &pidPCB);
 
 	t_PCB* pcb = list_find(lista_PCBs, (void*) _es_PCB);
 	if(pcb == NULL)
 		log_error(logKernel, "no existe el proceso con pid %d", pidPCB);
 
-	t_cpu* cpuUsada = list_remove(lista_cpus, 0);
+	t_cpu* cpuUsada = list_find(lista_cpus, (void*) _cpuLibre);
+	if(cpuUsada == NULL)
+		log_error(logKernel, "No hay CPUS libres"); //todo: semaforo cnat cpus
+	cpuUsada->libre = false;
 	log_trace(logKernel, "cpuUsada %d", cpuUsada->socket);
 
 	sigoFIFO = 1;
@@ -113,12 +125,18 @@ void planificar_FIFO(){
 	void* pcbSerializado = serializarPCB(pcb);
 	msg_enviar_separado(ENVIO_PCB, size, pcbSerializado, cpuUsada->socket);
 
+	int _proc(t_infoProceso* a){
+		return a->pid == pcb->pid;
+	}
+	t_infoProceso* infoProc = list_find(infoProcs, (void*) _proc);
+
 	while(sigoFIFO){
 
 		log_trace(logKernel, "Planifico proceso %d en cpu %d", pcb->pid, cpuUsada->socket);
 
 		msg_enviar_separado(EJECUTAR_INSTRUCCION, 0, 0, cpuUsada->socket);
 
+		infoProc->cantRafagas++;
 		sem_post(&cpuUsada->sem);
 		pthread_mutex_lock(&mut_planificacion);
 

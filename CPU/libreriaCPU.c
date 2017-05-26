@@ -54,7 +54,14 @@ void finalizarCPU(){
 	exit(1);
 }
 
+void ultimaEjecTotal(){
+	ultimaEjec();
+	ultimaEjecucionTotal = true;
+}
+
 void ultimaEjec(){
+	log_info(logCPU, "Signal ultimaEjecucion");
+	finalizado = true;
 	ultimaEjecucion = true;
 }
 

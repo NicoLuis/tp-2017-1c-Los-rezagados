@@ -117,15 +117,6 @@ void* _buscarPCB(int socket, t_list* lista){
 }
 
 
-void _sacarPidRustico(t_list* lista, int numBuscado){
-	int i = 0, num;
-	for(; i < list_size(lista); i++){
-		memcpy(&num, list_get(lista, i), sizeof(int));
-		if(num == numBuscado)
-			list_remove(lista, i);
-	}
-}
-
 void escucharCPU(int socket_cpu) {
 
 	bool _esCPU(t_cpu* aux){
@@ -161,9 +152,8 @@ void escucharCPU(int socket_cpu) {
 			log_trace(logKernel, "Recibi PCB");
 			msg_recibir_data(socket_cpu, msgRecibido);
 			pcb = desserealizarPCB(msgRecibido->data);
-			list_add(lista_cpus, cpuUsada);
 			list_remove_and_destroy_by_condition(lista_PCB_cpu, (void*) _esCPU2, (void*) _liberar);
-			_sacarPidRustico(cola_Exec, pcb->pid);
+			_sacarDeCola(pcb->pid, cola_Exec);
 			sigoFIFO = 0;
 			quantumRestante = 0;
 			if(finalizado){
@@ -182,7 +172,7 @@ void escucharCPU(int socket_cpu) {
 			list_remove_by_condition(lista_cpus, (void*) _esCPU);
 			list_remove_and_destroy_by_condition(lista_PCB_cpu, (void*) _esCPU2, (void*) _liberar);
 			setearExitCode(pcb->pid, -20);
-			_sacarPidRustico(cola_Exec, pcb->pid);
+			_sacarDeCola(pcb->pid, cola_Exec);
 			sigoFIFO = 0;
 			quantumRestante = 0;
 			pthread_mutex_unlock(&mut_planificacion);
@@ -232,6 +222,10 @@ void enviarScriptAMemoria(_t_hiloEspera* aux){
 		pcb->cantPagsCodigo = (string_length(aux->script) % tamanioPag) == 0? pcb->cantPagsCodigo: pcb->cantPagsCodigo + 1;
 		pcb->sp = pcb->cantPagsCodigo * tamanioPag;
 		msg_enviar_separado(respuesta, sizeof(t_num8), &pcb->pid, socketConsola);
+		t_infoProceso* infP = malloc(sizeof(t_infoProceso));
+		bzero(infP, sizeof(t_infoProceso));
+		infP->pid = aux->pid;
+		list_add(infoProcs, infP);
 		queue_push(cola_Ready, &aux->pid);
 		sem_post(&sem_cantColaReady);
 		break;
@@ -316,21 +310,9 @@ void consolaKernel(){
 
 	/*
 	 * Faltan implementar solo estos:
-	1. Obtener el listado de procesos del sistema, permitiendo mostrar todos o solo los que estén
-		en algún estado (cola).
 	2. Obtener para un proceso dado:
-		a. La cantidad de rafagas ejecutadas.
-		b. La cantidad de operaciones privilegiadas que ejecutó.
 		c. Obtener la tabla de archivos abiertos por el proceso.
-		d. La cantidad de páginas de Heap utilizadas
-		i. Cantidad de acciones alocar realizadas en cantidad de operaciones y en
-		bytes
-		ii. Cantidad de acciones liberar realizadas en cantidad de operaciones y en
-		bytes
-		e. Cantidad de syscalls ejecutadas
 	3. Obtener la tabla global de archivos.
-	5. Finalizar un proceso. En caso de que el proceso esté en ejecución, se deberá esperar a que la
-		CPU devuelva el PCB actualizado para luego finalizarlo.
 	6. Detener la planificación a fin de que no se produzcan cambios de estado de los procesos.
 	*/
 
@@ -344,29 +326,86 @@ void consolaKernel(){
 			printf("Mostrar todos? (s/n) ");
 			fgets(comando, 200, stdin);
 			comando[strlen(comando)-1] = '\0';
+			int i;
 
-			//todo: implementar
-			if(string_equals_ignore_case(comando, "s")){
-				printf("Muestro todos\n");
-			}
-			else if(string_starts_with(comando, "n")){
-				printf("Muestro solo los que estén en algún estado\n");
+			if(string_starts_with(comando, "s") || string_starts_with(comando, "n")){
+				printf("   ----  PID  ----   PC  ---- CantPags ---- ExitCode ----   Cola   ----   \n");
+				for(i = 0; i < list_size(lista_PCBs); i++){
+					t_PCB* pcbA = list_get(lista_PCBs, i);
+					char* cola = " -- ";
+
+					if(_estaEnCola(pcbA->pid, cola_New))
+						cola = "NEW";
+					if(_estaEnCola(pcbA->pid, cola_Ready))
+						cola = "READY";
+					if(_estaEnCola(pcbA->pid, cola_Exec))
+						cola = "EXEC";
+					if(_estaEnCola(pcbA->pid, cola_Block))
+						cola = "BLOCK";
+					if(_estaEnCola(pcbA->pid, cola_Exit))
+						cola = "EXIT";
+
+					if(string_starts_with(comando, "s") || !string_equals_ignore_case(cola, " -- "))
+						printf("   ----   %d   ----   %d   ----    %d     ----     %d    ----  %s  ----   \n",
+							pcbA->pid, pcbA->pc, (pcbA->cantPagsCodigo + stackSize), pcbA->exitCode, cola);
+				}
+
 			}else printf("Flasheaste era s/n \n");
 
 		}else if(string_starts_with(comando, "obtener info ")){
 
-			int pid = atoi(string_substring_from(comando, 13));
+			int pidPCB = atoi(string_substring_from(comando, 13));
 
-			//todo: implementar
-			printf( "Cantidad de rafagas ejecutadas: %d \n"
-					"Cantidad de operaciones privilegiadas que ejecutó: %d \n"
-					//"Obtener la tabla de archivos abiertos por el proceso \n"
-					"Cantidad de páginas de Heap utilizadas: %d \n"
-					"Cantidad de acciones alocar realizadas en cantidad de operaciones y en bytes \n"
-					"Cantidad de acciones liberar realizadas en cantidad de operaciones y en bytes \n"
-					"Cantidad de syscalls ejecutadas \n",
-					pid, pid, pid);		//esto no va pero me da paja
+			int _espid(t_infoProceso* a){ return a->pid == pidPCB; }
+			t_infoProceso* infP = list_find(infoProcs, (void*) _espid);
+			if(infP == NULL)
+				printf( "No existe el pid %d \n", pidPCB);
+			else{
 
+				printf("Elegir opcion: \n"
+						" a - Cantidad de rafagas ejecutadas \n"
+						" b - Cantidad de operaciones privilegiadas que ejecutó \n"
+						" c - Tabla de archivos abiertos por el proceso \n"
+						" d - Cantidad de páginas de Heap utilizadas \n"
+						" e - Cantidad de acciones alocar realizadas [cantidad de operaciones] \n"
+						" f - Cantidad de acciones alocar realizadas [bytes] \n"
+						" g - Cantidad de acciones liberar realizadas [cantidad de operaciones]  \n"
+						" h - Cantidad de acciones liberar realizadas [bytes] \n"
+						" i - Cantidad de syscalls ejecutadas \n");
+
+				switch(getchar()){
+				case 'a':
+					printf( "Cantidad de rafagas ejecutadas: %d \n", infP->cantRafagas);
+					break;
+				case 'b':
+					printf( "Cantidad de operaciones privilegiadas que ejecutó: %d \n", infP->cantOpPriv);
+					break;
+				case 'c':
+					printf( "Tabla de archivos abiertos por el proceso %d \n", infP->tablaArchivos);	//todo
+					break;
+				case 'd':
+					printf( "Cantidad de páginas de Heap utilizadas: %d \n", infP->cantPagsHeap);
+					break;
+				case 'e':
+					printf( "Cantidad de operaciones alocar: %d \n", infP->cantOp_alocar);
+					break;
+				case 'f':
+					printf( "Se alocaron %d bytes \n", infP->canrBytes_alocar);
+					break;
+				case 'g':
+					printf( "Cantidad de operaciones liberar: %d \n", infP->cantOp_liberar);
+					break;
+				case 'h':
+					printf( "Se liberaron %d bytes \n", infP->canrBytes_liberar);
+					break;
+				case 'i':
+					printf( "Cantidad de syscalls ejecutadas: %d \n", infP->cantSyscalls);
+					break;
+				default:
+					printf( "Capo que me tiraste? \n");
+				}
+
+			}
 		}else if(string_equals_ignore_case(comando, "tabla archivos")){
 
 			//todo: implementar
@@ -378,9 +417,9 @@ void consolaKernel(){
 
 		}else if(string_starts_with(comando, "kill ")){
 
-			int pid = atoi(string_substring_from(comando, 5));
-			//todo: implementar
-			printf("Finalizo pid %d\n", pid);
+			int pidKill = atoi(string_substring_from(comando, 5));
+			finalizarPid(pidKill);
+			printf("Finalizo pid %d\n", pidKill);
 
 		}else if(string_equals_ignore_case(comando, "detener")){
 
@@ -418,7 +457,7 @@ void terminarKernel(){			//aca libero todos
 
 	queue_destroy(cola_New);
 	queue_destroy(cola_Ready);
-	list_destroy(cola_Exec);
+	queue_destroy(cola_Exec);
 	queue_destroy(cola_Block);
 	queue_destroy(cola_Exit);
 
@@ -438,4 +477,28 @@ void terminarKernel(){			//aca libero todos
 	log_destroy(logKernel);
 	exit(1);
 }
+
+
+
+void finalizarPid(int pid){
+	int _buscarPID(t_infosocket* i){
+		return i->pid == pid;
+	}
+	t_infosocket* info = list_find(lista_PCB_cpu, (void*) _buscarPID);
+	if(info == NULL)
+		log_info(logKernel, "No se encuentra cpu ejecutando pid %d", pid);
+
+	int _buscarCPU(t_cpu* c){
+		return c->socket == info->socket;
+	}
+	t_cpu* cpu = list_find(lista_cpus, (void*) _buscarCPU);
+	if(cpu == NULL)
+		log_info(logKernel, "No se encuentra cpu ejecutando pid %d", pid);
+
+	kill(cpu->pid, SIGUSR2);
+}
+
+
+
+
 

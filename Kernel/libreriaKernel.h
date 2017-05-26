@@ -68,8 +68,26 @@ typedef struct {
 
 typedef struct {
 	int socket;
+	t_num pid;
 	sem_t sem;
+	bool libre;
 }t_cpu;
+
+
+typedef struct {
+	int pid;
+	int cantRafagas;
+	int cantOpPriv;
+	int tablaArchivos; // fixme: wtf
+	int cantPagsHeap;
+	int cantOp_alocar;
+	int canrBytes_alocar;
+	int cantOp_liberar;
+	int canrBytes_liberar;
+	int cantSyscalls;
+}t_infoProceso;
+t_list* infoProcs;
+
 
 t_list* lista_cpus;
 t_list* lista_consolas;
@@ -98,7 +116,7 @@ t_num8 stackSize;
 
 t_queue* cola_New;
 t_queue* cola_Ready;
-t_list* cola_Exec;
+t_queue* cola_Exec;
 t_queue* cola_Block;
 t_queue* cola_Exit;
 
@@ -127,5 +145,7 @@ void atender_consola(int socket_consola);
 
 void consolaKernel();
 void terminarKernel();
+
+void finalizarPid(int pid);
 
 #endif /* LIBRERIAKERNEL_H_ */

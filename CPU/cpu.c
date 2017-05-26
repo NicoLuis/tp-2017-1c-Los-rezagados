@@ -26,7 +26,9 @@ int main(int argc, char* argv[]) {
 
 
 	signal (SIGINT, finalizarCPU);
-	signal (SIGUSR1, ultimaEjec);
+	signal (SIGUSR1, ultimaEjecTotal);
+	signal (SIGUSR2, ultimaEjec);
+	ultimaEjecucionTotal = false;
 	ultimaEjecucion = false;
 	finalizado = false;
 
@@ -72,6 +74,8 @@ int main(int argc, char* argv[]) {
 		log_trace(logCPU, "Me conecte correctamente al Kernel");
 	}
 
+	t_num pid = process_getpid();
+	send(socket_kernel, &pid, sizeof(t_num), 0);
 	free(bufferKernel);
 
 	//-------------------------------CONEXION AL LA MEMORIA-------------------------------------
@@ -140,6 +144,9 @@ int main(int argc, char* argv[]) {
 		default:
 			log_trace(logCPU, "Recibi verdura %d", msgRecibido->tipoMensaje);
 		}
+
+		if(ultimaEjecucionTotal)
+			finalizarCPU();
 
 	}
 

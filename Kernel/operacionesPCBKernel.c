@@ -60,6 +60,19 @@ bool _sacarDeCola(int pid, t_queue* cola){
 	return estaba;
 }
 
+bool _estaEnCola(int pid, t_queue* cola){
+	// todo: semaforear
+	int i = 0, tmppid;
+	bool esta = false;
+	for(; i < queue_size(cola) ; i++){
+		tmppid = (int) queue_pop(cola);
+		if( tmppid == pid )
+			esta = true;
+		queue_push(cola, &tmppid);
+	}
+	return esta;
+}
+
 void finalizarPCB(int pidPCB){
 
 	if(!_sacarDeCola(pidPCB, cola_New))

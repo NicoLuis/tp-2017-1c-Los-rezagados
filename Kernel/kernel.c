@@ -33,10 +33,11 @@ int main(int argc, char* argv[]) {
 	lista_PCBs = list_create();
 	lista_PCB_consola = list_create();
 	lista_PCB_cpu = list_create();
+	infoProcs = list_create();
 	pid = 0;
 	cola_New = queue_create();
 	cola_Ready = queue_create();
-	cola_Exec = list_create();
+	cola_Exec = queue_create();
 	cola_Block = queue_create();
 	cola_Exit = queue_create();
 
@@ -189,7 +190,9 @@ int conectar_select(char* puerto_escucha) {
 
 								cpuNueva = malloc(sizeof(t_cpu));
 								cpuNueva->socket = socket_cliente_aceptado;
+								recv(socket_cliente_aceptado, &cpuNueva->pid, sizeof(t_num), 0);
 								sem_init(&cpuNueva->sem, 0, 0);
+								cpuNueva->libre = true;
 								list_add(lista_cpus, cpuNueva);
 
 								if (pthread_create(&hilo_conexionCPU, &atributo,(void*) escucharCPU, (void*) socket_cliente_aceptado) < 0) {

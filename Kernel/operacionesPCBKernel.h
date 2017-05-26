@@ -15,5 +15,6 @@ int crearPCB(int);
 void llenarIndicesPCB(int, char*);
 void setearExitCode(int, int);
 bool _sacarDeCola(int pid, t_queue* cola);
+bool _estaEnCola(int pid, t_queue* cola);
 
 #endif /* OPERACIONESPCBKERNEL_H_ */

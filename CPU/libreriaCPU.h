@@ -37,6 +37,7 @@ t_log* logAnsisop;
 
 void mostrarArchivoConfig();
 void finalizarCPU();
+void ultimaEjecTotal();
 void ultimaEjec();
 void ejecutarInstruccion();
 t_posicion traducirSP();
@@ -47,6 +48,7 @@ t_posicion escribirMemoria(t_posicion puntero, t_valor_variable valor);
 int socket_kernel;
 int socket_memoria;
 
+bool ultimaEjecucionTotal;
 bool ultimaEjecucion;
 bool finalizado;
 

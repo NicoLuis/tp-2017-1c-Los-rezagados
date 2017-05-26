@@ -111,7 +111,7 @@ void retornar(t_valor_variable retorno){
 
 void finalizar(){
 	log_trace(logCPU, "Finalizo ejecucion");
-	ultimaEjec();
+	ultimaEjecucion = true;
 	finalizado = true;
 }
 

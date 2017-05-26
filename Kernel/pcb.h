@@ -39,9 +39,6 @@ typedef struct {
 }t_StackMetadata;
 
 
-t_PCB* pcb;
-
-
 void *serializarArgVar(t_list* lista, int tamanio);
 int tamanioIndiceStack(t_list* indiceStack);
 void *serializarIndiceStack(t_list* indiceStack, int tamanio);

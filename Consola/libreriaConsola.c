@@ -125,9 +125,9 @@ void escucharKernel(){
 		case IMPRIMIR_TEXTO:
 			log_trace(logConsola, "Recibi IMPRIMIR_TEXTO");
 			msg_recibir_data(socket_kernel, msgRecibido);
-			char* texto;
+			char* texto = malloc(msgRecibido->longitud);
 			memcpy(texto, msgRecibido->data, msgRecibido->longitud);
-			fprintf(stderr, texto);
+			fprintf(stderr, "%s\n", texto);
 			break;
 		}
 

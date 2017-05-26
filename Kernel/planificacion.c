@@ -38,7 +38,7 @@ void planificar_RR(){
 	log_trace(logKernel, "Inicio rafaga RR con quantum: %d", quantum);
 	int pidPCB;
 	sem_wait(&sem_cantColaReady);
-	memcpy(&pidPCB, queue_pop(cola_Ready), sizeof(int));
+	memcpy(&pidPCB, queue_pop(cola_Ready), sizeof(t_num8));
 	int _es_PCB(t_PCB* p){
 		return p->pid == pidPCB;
 	}
@@ -89,9 +89,9 @@ void planificar_FIFO(){
 	pthread_mutex_lock(&mut_planificacion);
 
 	log_trace(logKernel, "Inicio FIFO");
-	int pidPCB;
+	t_num8 pidPCB;
 	sem_wait(&sem_cantColaReady);
-	memcpy(&pidPCB, queue_pop(cola_Ready), sizeof(int));
+	memcpy(&pidPCB, queue_pop(cola_Ready), sizeof(t_num8));
 	int _es_PCB(t_PCB* p){
 		return p->pid == pidPCB;
 	}
@@ -147,6 +147,6 @@ void planificar_FIFO(){
 
 	free(pcbSerializado);
 	log_trace(logKernel, "Fin FIFO");
-
+	pthread_mutex_unlock(&mut_planificacion);
 }
 

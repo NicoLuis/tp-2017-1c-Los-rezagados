@@ -73,7 +73,7 @@ void ejecutarInstruccion(){
 
 	if (instruccion != NULL) {
 		log_trace(logCPU, "Instruccion recibida: %s", instruccion);
-		pcb->pc++;
+		pcb->pc += 1;
 		analizadorLinea(instruccion, &functions, &kernel_functions);
 	} else {
 		log_error(logCPU, "No se pudo recibir la instruccion");
@@ -109,6 +109,32 @@ void* _serializarPuntero(t_posicion puntero){
 	offset += tmpsize;
 
 	return buffer;
+}
+
+t_valor_variable leerMemoria(t_posicion puntero){
+
+	t_valor_variable valor;
+	void* buffer = _serializarPuntero(puntero);
+	msg_enviar_separado(LECTURA_PAGINA, sizeof(t_posicion) + sizeof(t_num8), buffer, socket_memoria);
+	free(buffer);
+
+	t_msg* msgRecibido = msg_recibir(socket_memoria);
+
+	switch(msgRecibido->tipoMensaje){
+	case LECTURA_PAGINA:
+		msg_recibir_data(socket_memoria, msgRecibido);
+		memcpy(&valor, msgRecibido->data, sizeof(t_valor_variable));
+		break;
+	case 0:
+		log_error(logCPU, "Se desconecto Memoria");
+		break;
+	case FINALIZAR_PROGRAMA:
+		log_error(logCPU, "Stack Overflow?");
+		break;
+	}
+
+	log_info(logCPU, "Valor %d", valor);
+	return valor;
 }
 
 t_posicion escribirMemoria(t_posicion puntero, t_valor_variable valor){

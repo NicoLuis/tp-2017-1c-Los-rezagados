@@ -38,7 +38,15 @@ t_puntero definirVariable(t_nombre_variable identificador_variable){
 
 t_valor_variable dereferenciar(t_puntero direccion_variable){
 
-	return 0;
+	log_trace(logAnsisop, "Dereferenciar direccion variable %d", direccion_variable);
+
+	int offsetTotal = INICIOSTACK + direccion_variable;
+	t_posicion puntero;
+	puntero.pagina = offsetTotal / tamanioPagina;
+	puntero.offset = offsetTotal % tamanioPagina;
+	puntero.size = sizeof(t_valor_variable);
+
+	return leerMemoria(puntero);
 }
 
 

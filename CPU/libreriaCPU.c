@@ -73,6 +73,7 @@ void ejecutarInstruccion(){
 
 	if (instruccion != NULL) {
 		log_trace(logCPU, "Instruccion recibida: %s", instruccion);
+		log_trace(logAnsisop, "\t\t%s", instruccion);
 		pcb->pc += 1;
 		analizadorLinea(instruccion, &functions, &kernel_functions);
 	} else {
@@ -134,6 +135,7 @@ t_valor_variable leerMemoria(t_posicion puntero){
 	}
 
 	log_info(logCPU, "Valor %d", valor);
+	log_trace(logAnsisop, "Valor %d", valor);
 	return valor;
 }
 

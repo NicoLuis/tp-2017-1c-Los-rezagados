@@ -145,16 +145,9 @@ void retornar(t_valor_variable retorno){
 
 	log_trace(logAnsisop, "Retorno valor %d", retorno);
 
-	t_Stack* stackActual = list_remove(pcb->indiceStack, list_size(pcb->indiceStack) - 1);
+	t_Stack* stackActual = list_get(pcb->indiceStack, list_size(pcb->indiceStack) - 1);
 
 	escribirMemoria(stackActual->retVar, retorno);
-	pcb->pc = stackActual->retPos;
-	pcb->sp = pcb->sp - list_size(stackActual->args) * sizeof(t_StackMetadata);
-	pcb->sp = pcb->sp - list_size(stackActual->vars) * sizeof(t_StackMetadata);
-
-	list_destroy_and_destroy_elements(stackActual->args, free);
-	list_destroy_and_destroy_elements(stackActual->vars, free);
-	free(stackActual);
 }
 
 void finalizar(){

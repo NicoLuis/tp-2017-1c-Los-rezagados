@@ -192,10 +192,10 @@ char* proximaInstruccion() {
 	free(instruction);
 
 	t_msg* msgRecibido = msg_recibir(socket_memoria);
-	msg_recibir_data(socket_memoria, msgRecibido);
 
 	switch(msgRecibido->tipoMensaje){
 	case LECTURA_PAGINA:
+		msg_recibir_data(socket_memoria, msgRecibido);
 		log_info(logCPU, "Recibo contenido");
 		proxInstruccion = malloc(msgRecibido->longitud);
 		memcpy(proxInstruccion, msgRecibido->data, msgRecibido->longitud);

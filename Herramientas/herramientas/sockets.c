@@ -72,11 +72,6 @@ int aceptarCliente(int socketEscucha) {
 /*			ENVIO 	MENSAJES		*/
 /************************************/
 
-typedef struct {
-	t_num size;
-	t_num *data;
-} t_buffer;
-
 t_msg* msg_crear(uint8_t tipoMensaje) {
 
 	t_msg *msg = (t_msg *) malloc(sizeof(t_msg));

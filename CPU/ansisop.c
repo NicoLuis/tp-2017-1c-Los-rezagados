@@ -11,6 +11,19 @@
 #define INICIOSTACK (pcb->cantPagsCodigo * tamanioPagina)
 
 
+//fixme:
+/*
+este script no detecta la instruccion end -> toma la instruccion "prints n a" como "prints n a end"
+
+begin
+variables a
+a = 20
+prints n a
+end
+ */
+
+
+
 t_puntero definirVariable(t_nombre_variable identificador_variable){
 
 	log_trace(logAnsisop, "Definir variable %c", identificador_variable);

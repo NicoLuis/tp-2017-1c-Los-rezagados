@@ -111,7 +111,7 @@ t_PCB* recibir_pcb(int socket_cpu, t_msg* msgRecibido, bool finalizado, bool blo
 	log_trace(logKernel, "Recibi PCB");
 	t_PCB* pcb = desserealizarPCB(msgRecibido->data);
 	list_remove_and_destroy_by_condition(lista_PCB_cpu, (void*) _esCPU2, free);
-	_sacarDeCola(pcb->pid, cola_Exec);
+	_sacarDeCola(pcb->pid, cola_Exec, mutex_Exec);
 	sigoFIFO = 0;
 	quantumRestante = 0;
 	if(finalizado){
@@ -123,9 +123,9 @@ t_PCB* recibir_pcb(int socket_cpu, t_msg* msgRecibido, bool finalizado, bool blo
 		msg_enviar_separado(FINALIZAR_PROGRAMA, sizeof(t_num8), &info->pid, info->socket);
 	}else{
 		if(bloqueo)
-			queue_push(cola_Block, &pcb->pid);
+			_ponerEnCola(pcb->pid, cola_Block, mutex_Block);
 		else{
-			queue_push(cola_Ready, &pcb->pid);
+			_ponerEnCola(pcb->pid, cola_Ready, mutex_Ready);
 			sem_wait(&sem_cantColaReady);
 		}
 	}
@@ -169,6 +169,11 @@ void escucharCPU(int socket_cpu) {
 		case ENVIO_PCB:		// si me devuelve el PCB es porque fue la ultima instruccion
 			msg_recibir_data(socket_cpu, msgRecibido);
 			pcb = recibir_pcb(socket_cpu, msgRecibido, finalizado, false);
+			list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
+			list_add(lista_PCBs, pcb);
+			_sacarDeCola(pcb->pid, cola_Exec, mutex_Exec);
+			cpuUsada->libre = true;
+			sem_post(&sem_cantCPUs);
 			break;
 		case 0: case FIN_CPU:
 			fprintf(stderr, "La cpu %d se ha desconectado \n", socket_cpu);
@@ -177,7 +182,9 @@ void escucharCPU(int socket_cpu) {
 			list_remove_by_condition(lista_cpus, (void*) _esCPU);
 			list_remove_and_destroy_by_condition(lista_PCB_cpu, (void*) _esCPU2, free);
 			setearExitCode(pcb->pid, -20);
-			_sacarDeCola(pcb->pid, cola_Exec);
+			_sacarDeCola(pcb->pid, cola_Exec, mutex_Exec);
+			list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
+			list_add(lista_PCBs, pcb);
 			sigoFIFO = 0;
 			quantumRestante = 0;
 			pthread_mutex_unlock(&mut_planificacion);
@@ -196,6 +203,8 @@ void escucharCPU(int socket_cpu) {
 			pcb = recibir_pcb(socket_cpu, msgRecibido, finalizado, true);
 			list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
 			list_add(lista_PCBs, pcb);
+			cpuUsada->libre = true;
+			sem_post(&sem_cantCPUs);
 			if(fd == 1){
 				log_trace(logKernel, "Imprimo por consola: %s", informacion);
 				bool _esPid(t_infosocket* a){ return a->pid == pcb->pid; }
@@ -207,9 +216,8 @@ void escucharCPU(int socket_cpu) {
 				log_trace(logKernel, "Escribo en fd %d: %s", fd, informacion);
 				//todo: lo trato como si fuese del FS
 			}
-			_sacarDeCola(pcb->pid, cola_Block);
-			queue_push(cola_Ready, &pcb->pid);
-			cpuUsada->libre = true;
+			_sacarDeCola(pcb->pid, cola_Block, mutex_Block);
+			_ponerEnCola(pcb->pid, cola_Ready, mutex_Ready);
 			sem_post(&sem_cantColaReady);
 			break;
 		}
@@ -240,8 +248,7 @@ void enviarScriptAMemoria(_t_hiloEspera* aux){
 	int socketConsola = a->socket;
 
 	sem_wait(&sem_gradoMp);
-	_sacarDeCola(aux->pid, cola_New);
-
+	_sacarDeCola(aux->pid, cola_New, mutex_New);
 
 	t_PCB* pcb = list_find(lista_PCBs, (void*) _buscarPCB);
 	send(socket_memoria, &aux->pid, sizeof(t_num8), 0);
@@ -260,7 +267,7 @@ void enviarScriptAMemoria(_t_hiloEspera* aux){
 		bzero(infP, sizeof(t_infoProceso));
 		infP->pid = aux->pid;
 		list_add(infoProcs, infP);
-		queue_push(cola_Ready, &aux->pid);
+		_ponerEnCola(aux->pid, cola_Ready, mutex_Ready);
 		sem_post(&sem_cantColaReady);
 		break;
 	case MARCOS_INSUFICIENTES:
@@ -295,7 +302,7 @@ void atender_consola(int socket_consola){
 		info->socket = socket_consola;
 		list_add(lista_PCB_consola, info);
 
-		queue_push(cola_New, &pidActual);
+		_ponerEnCola(pidActual, cola_New, mutex_New);
 
 		_t_hiloEspera* aux = malloc(sizeof(_t_hiloEspera));
 
@@ -369,15 +376,15 @@ void consolaKernel(){
 					t_PCB* pcbA = list_get(lista_PCBs, i);
 					char* cola = " -- ";
 
-					if(_estaEnCola(pcbA->pid, cola_New))
+					if(_estaEnCola(pcbA->pid, cola_New, mutex_New))
 						cola = "NEW";
-					if(_estaEnCola(pcbA->pid, cola_Ready))
+					if(_estaEnCola(pcbA->pid, cola_Ready, mutex_Ready))
 						cola = "READY";
-					if(_estaEnCola(pcbA->pid, cola_Exec))
+					if(_estaEnCola(pcbA->pid, cola_Exec, mutex_Exec))
 						cola = "EXEC";
-					if(_estaEnCola(pcbA->pid, cola_Block))
+					if(_estaEnCola(pcbA->pid, cola_Block, mutex_Block))
 						cola = "BLOCK";
-					if(_estaEnCola(pcbA->pid, cola_Exit))
+					if(_estaEnCola(pcbA->pid, cola_Exit, mutex_Exit))
 						cola = "EXIT";
 
 					if(string_starts_with(comando, "s") || !string_equals_ignore_case(cola, " -- "))
@@ -495,11 +502,11 @@ void terminarKernel(){			//aca libero todos
 	void _freePCBs(t_PCB* pcb){ liberarPCB(pcb, false); }
 	list_destroy_and_destroy_elements(lista_PCBs, (void*) _freePCBs);
 
-	queue_destroy(cola_New);
-	queue_destroy(cola_Ready);
-	queue_destroy(cola_Exec);
-	queue_destroy(cola_Block);
-	queue_destroy(cola_Exit);
+	queue_destroy_and_destroy_elements(cola_New, (void*) free);
+	queue_destroy_and_destroy_elements(cola_Ready, (void*) free);
+	queue_destroy_and_destroy_elements(cola_Exec, (void*) free);
+	queue_destroy_and_destroy_elements(cola_Block, (void*) free);
+	queue_destroy_and_destroy_elements(cola_Exit, (void*) free);
 
 	list_destroy_and_destroy_elements(lista_variablesCompartidas, free);
 	void _destruirSemaforos(t_VariableSemaforo* variable){

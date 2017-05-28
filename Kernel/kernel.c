@@ -200,6 +200,7 @@ int conectar_select(char* puerto_escucha) {
 									abort();
 								}
 								log_trace(conectar_select_log, "Nueva CPU");
+								sem_post(&sem_cantCPUs);
 
 								break;
 							case -1:

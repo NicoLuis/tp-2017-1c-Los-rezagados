@@ -38,16 +38,17 @@ void planificar_RR(){
 	log_trace(logKernel, "Inicio rafaga RR con quantum: %d", quantum);
 	int pidPCB;
 	sem_wait(&sem_cantColaReady);
-	memcpy(&pidPCB, queue_pop(cola_Ready), sizeof(t_num8));
+	pidPCB = _sacarDeCola(0, cola_Ready, mutex_Ready);
 	int _es_PCB(t_PCB* p){
 		return p->pid == pidPCB;
 	}
-	queue_push(cola_Exec, &pidPCB);
+	_ponerEnCola(pidPCB, cola_Exec, mutex_Exec);
 
 	t_PCB* pcb = list_find(lista_PCBs, (void*) _es_PCB);
 	if(pcb == NULL)
 		log_error(logKernel, "no existe el proceso con pid %d", pidPCB);
 
+	sem_wait(&sem_cantCPUs);
 	t_cpu* cpuUsada = list_remove(lista_cpus, 0);
 	log_trace(logKernel, "cpuUsada %d", cpuUsada->socket);
 
@@ -81,6 +82,7 @@ void planificar_RR(){
 
 	log_trace(logKernel, "Fin rafaga RR");
 	list_add(lista_cpus, cpuUsada);
+	sem_post(&sem_cantCPUs);
 }
 
 
@@ -94,22 +96,21 @@ void planificar_FIFO(){
 	log_trace(logKernel, "Inicio FIFO");
 	t_num8 pidPCB;
 	sem_wait(&sem_cantColaReady);
-	memcpy(&pidPCB, queue_pop(cola_Ready), sizeof(t_num8));
+	pidPCB = _sacarDeCola(0, cola_Ready, mutex_Ready);
 	int _es_PCB(t_PCB* p){
 		return p->pid == pidPCB;
 	}
 	int _cpuLibre(t_cpu* c){
 		return c->libre;
 	}
-	queue_push(cola_Exec, &pidPCB);
+	sem_wait(&sem_cantCPUs);
+	_ponerEnCola(pidPCB, cola_Exec, mutex_Exec);
 
 	t_PCB* pcb = list_find(lista_PCBs, (void*) _es_PCB);
 	if(pcb == NULL)
 		log_error(logKernel, "no existe el proceso con pid %d", pidPCB);
 
 	t_cpu* cpuUsada = list_find(lista_cpus, (void*) _cpuLibre);
-	if(cpuUsada == NULL)
-		log_error(logKernel, "No hay CPUS libres"); //todo: semaforo cnat cpus
 	cpuUsada->libre = false;
 	log_trace(logKernel, "cpuUsada %d", cpuUsada->socket);
 

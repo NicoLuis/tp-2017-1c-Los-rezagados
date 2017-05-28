@@ -119,9 +119,16 @@ t_queue* cola_Ready;
 t_queue* cola_Exec;
 t_queue* cola_Block;
 t_queue* cola_Exit;
+pthread_mutex_t mutex_New;
+pthread_mutex_t mutex_Ready;
+pthread_mutex_t mutex_Exec;
+pthread_mutex_t mutex_Block;
+pthread_mutex_t mutex_Exit;
+
 
 sem_t sem_gradoMp;
 sem_t sem_cantColaReady;
+sem_t sem_cantCPUs;
 
 
 

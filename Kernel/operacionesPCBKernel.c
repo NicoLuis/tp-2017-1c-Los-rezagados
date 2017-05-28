@@ -46,42 +46,64 @@ void llenarIndicesPCB(int pidPCB, char* codigo){
 }
 
 
-bool _sacarDeCola(t_num8 pid, t_queue* cola){
-	// todo: semaforear
+t_num8 _sacarDeCola(t_num8 pid, t_queue* cola, pthread_mutex_t mutex){
 	int i = 0;
-	t_num8 tmppid;
-	bool estaba = false;
-	for(; i < queue_size(cola) ; i++){
-		memcpy(&tmppid, queue_pop(cola), sizeof(t_num8));
-		if( tmppid != pid )
-			queue_push(cola, &tmppid);
-		else
-			estaba = true;
+	t_num8 tmppid, retorno = -1;
+	void* aux;
+	pthread_mutex_lock(&mutex);
+	if(pid == 0){		//si pid == 0 saco el ultimo
+		aux = queue_pop(cola);
+		memcpy(&retorno, aux, sizeof(t_num8));
+		free(aux);
 	}
-	return estaba;
+	else
+	for(; i < queue_size(cola) ; i++){
+		aux = queue_pop(cola);
+		memcpy(&tmppid, aux, sizeof(t_num8));
+		if( tmppid != pid )
+			queue_push(cola, aux);
+		else{
+			memcpy(&retorno, aux, sizeof(t_num8));
+			free(aux);
+		}
+	}
+	pthread_mutex_unlock(&mutex);
+	return retorno;
 }
 
-bool _estaEnCola(t_num8 pid, t_queue* cola){
+void _ponerEnCola(t_num8 pid, t_queue* cola, pthread_mutex_t mutex){
+	void* aux = malloc(sizeof(t_num8));
+	memcpy(aux, &pid, sizeof(t_num8));
+	pthread_mutex_lock(&mutex);
+	queue_push(cola, aux);
+	pthread_mutex_unlock(&mutex);
+}
+
+
+bool _estaEnCola(t_num8 pid, t_queue* cola, pthread_mutex_t mutex){
 	// todo: semaforear
 	int i = 0;
 	t_num8 tmppid;
+	void* aux;
 	bool esta = false;
+	pthread_mutex_lock(&mutex);
 	for(; i < queue_size(cola) ; i++){
-		memcpy(&tmppid, queue_pop(cola), sizeof(t_num8));
+		aux = queue_pop(cola);
+		memcpy(&tmppid, aux, sizeof(t_num8));
 		if( tmppid == pid )
 			esta = true;
-		queue_push(cola, &tmppid);
+		queue_push(cola, aux);
 	}
-
+	pthread_mutex_unlock(&mutex);
 	return esta;
 }
 
 void finalizarPCB(int pidPCB){
 
-	if(!_sacarDeCola(pidPCB, cola_New))
-		if( _sacarDeCola(pidPCB, cola_Ready) ||
-				_sacarDeCola(pidPCB, cola_Exec) ||
-				_sacarDeCola(pidPCB, cola_Block) )
+	if(!_sacarDeCola(pidPCB, cola_New, mutex_New))
+		if( _sacarDeCola(pidPCB, cola_Ready, mutex_Ready) ||
+				_sacarDeCola(pidPCB, cola_Exec, mutex_Exec) ||
+				_sacarDeCola(pidPCB, cola_Block, mutex_Block) )
 			sem_post(&sem_gradoMp);
 
 }
@@ -94,6 +116,6 @@ void setearExitCode(int pidPCB, int exitCode){
 
 	t_PCB* pcb = list_find(lista_PCBs, (void*) _buscarPCB);
 	pcb->exitCode = exitCode;
-	queue_push(cola_Exit, &pcb->pid);
+	_ponerEnCola(pcb->pid, cola_Exit, mutex_Exit);
 	liberarPCB(pcb, true);
 }

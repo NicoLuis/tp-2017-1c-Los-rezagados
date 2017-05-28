@@ -43,7 +43,8 @@ void leerComando(char* comando){
 		list_add(lista_programas, programaNuevo);
 
 		char* scriptCompleto = cargarScript(pathAIniciar);
-		msg_enviar_separado(ENVIO_CODIGO, string_length(scriptCompleto), scriptCompleto, socket_kernel);
+		log_trace(logConsola, "\n%s", scriptCompleto);
+		msg_enviar_separado(ENVIO_CODIGO, string_length(scriptCompleto) + 1, scriptCompleto, socket_kernel);
 
 	}else if(string_starts_with(comando, "kill")){
 
@@ -86,12 +87,12 @@ void escucharKernel(){
 	while(1){
 
 		t_msg* msgRecibido = msg_recibir(socket_kernel);
+		msg_recibir_data(socket_kernel, msgRecibido);
 
 		switch(msgRecibido->tipoMensaje){
 
 		case OK:
 			log_trace(logConsola, "Recibi OK");
-			msg_recibir_data(socket_kernel, msgRecibido);
 			memcpy(&pidProg, msgRecibido->data, sizeof(t_num8));
 			log_trace(logConsola, "El pid es %d", pidProg);
 
@@ -109,7 +110,6 @@ void escucharKernel(){
 			break;
 		case FINALIZAR_PROGRAMA:
 			log_trace(logConsola, "Recibi FINALIZAR_PROGRAMA");
-			msg_recibir_data(socket_kernel, msgRecibido);
 			memcpy(&pidProg, msgRecibido->data, sizeof(t_num8));
 			log_trace(logConsola, "El pid a finalizar es %d", pidProg);
 
@@ -124,10 +124,11 @@ void escucharKernel(){
 			break;
 		case IMPRIMIR_TEXTO:
 			log_trace(logConsola, "Recibi IMPRIMIR_TEXTO");
-			msg_recibir_data(socket_kernel, msgRecibido);
 			char* texto = malloc(msgRecibido->longitud);
 			memcpy(texto, msgRecibido->data, msgRecibido->longitud);
 			fprintf(stderr, "%s\n", texto);
+			programa = list_find(lista_programas, (void*) _esPrograma);
+			programa->cantImpresionesPantalla++;
 			break;
 		}
 

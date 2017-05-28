@@ -191,6 +191,7 @@ void escucharCPU(void* socket_cpu) {
 
 					void* contenido_leido = obtenerContenidoSegunCache(pidPeticion,puntero.pagina, puntero.offset, puntero.size);
 					msg_enviar_separado(LECTURA_PAGINA, puntero.size, contenido_leido, socketCPU);
+					log_info(log_memoria, "contenido_leido %s", contenido_leido);
 					free(contenido_leido);
 
 				} else if (estaEnMemoriaReal(pidPeticion, puntero.pagina)) {

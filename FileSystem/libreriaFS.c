@@ -27,7 +27,6 @@ void escucharKERNEL(void* socket_kernel) {
 
 		// lo unico q esta haciendo es mostrar lo que se recibio
 		t_msg* msgRecibido = msg_recibir(socketKernel);
-		msg_recibir_data(socketKernel, msgRecibido);
 
 		if (msgRecibido->tipoMensaje == 0) {
 			fprintf(stderr, "El Kernel %d se ha desconectado \n", socketKernel);

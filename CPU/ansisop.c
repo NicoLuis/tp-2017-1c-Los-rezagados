@@ -28,7 +28,10 @@ t_puntero definirVariable(t_nombre_variable identificador_variable){
 		stackActual->args = list_create();
 		stackActual->vars = list_create();
 	}
-	list_add(stackActual->vars, metadata);
+	if(identificador_variable >= '0' && identificador_variable <= '9')
+		list_add(stackActual->args, metadata);
+	else
+		list_add(stackActual->vars, metadata);
 	list_add(pcb->indiceStack, stackActual);
 
 	t_puntero retorno = metadata->posicionMemoria.pagina * tamanioPagina + metadata->posicionMemoria.offset - INICIOSTACK;
@@ -92,10 +95,18 @@ void asignar(t_puntero direccion_variable, t_valor_variable valor){
 	escribirMemoria(puntero, valor);
 }
 
-void irAlLabel(t_nombre_etiqueta etiqueta){
 
+
+
+
+void irAlLabel(t_nombre_etiqueta etiqueta){
 	log_trace(logAnsisop, "Voy al label %s", etiqueta);
 
+	t_puntero nro = metadata_buscar_etiqueta(etiqueta, pcb->indiceEtiquetas.bloqueSerializado, pcb->indiceEtiquetas.size);
+	pcb->pc = nro - 1;
+
+	if(nro == -1 )
+		log_error(logAnsisop, "No encontre label %s", etiqueta);
 }
 
 void llamarSinRetorno(t_nombre_etiqueta etiqueta){
@@ -107,6 +118,7 @@ void llamarSinRetorno(t_nombre_etiqueta etiqueta){
 void llamarConRetorno(t_nombre_etiqueta etiqueta, t_puntero donde_retornar){
 
 	log_trace(logAnsisop, "Llamar con retorno %s", etiqueta);
+
 }
 
 t_valor_variable asignarValorCompartida(t_nombre_compartida variable, t_valor_variable valor){

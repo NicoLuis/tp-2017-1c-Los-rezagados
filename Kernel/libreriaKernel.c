@@ -108,7 +108,6 @@ t_PCB* recibir_pcb(int socket_cpu, t_msg* msgRecibido, bool finalizado, bool blo
 	bool _esCPU2(t_infosocket* aux){
 		return aux->socket == socket_cpu;
 	}
-	msg_recibir_data(socket_cpu, msgRecibido);
 	log_trace(logKernel, "Recibi PCB");
 	t_PCB* pcb = desserealizarPCB(msgRecibido->data);
 	list_remove_and_destroy_by_condition(lista_PCB_cpu, (void*) _esCPU2, free);
@@ -168,6 +167,7 @@ void escucharCPU(int socket_cpu) {
 			finalizado = true;
 			//no break
 		case ENVIO_PCB:		// si me devuelve el PCB es porque fue la ultima instruccion
+			msg_recibir_data(socket_cpu, msgRecibido);
 			pcb = recibir_pcb(socket_cpu, msgRecibido, finalizado, false);
 			break;
 		case 0: case FIN_CPU:
@@ -192,6 +192,7 @@ void escucharCPU(int socket_cpu) {
 			memcpy(informacion, msgRecibido->data + sizeof(t_puntero), size);
 
 			msgRecibido = msg_recibir(socket_cpu);
+			msg_recibir_data(socket_cpu, msgRecibido);
 			pcb = recibir_pcb(socket_cpu, msgRecibido, finalizado, true);
 			list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
 			list_add(lista_PCBs, pcb);
@@ -221,6 +222,7 @@ void escucharCPU(int socket_cpu) {
 
 typedef struct {
 	t_num8 pid;
+	t_num size;
 	char* script;
 }_t_hiloEspera;
 
@@ -242,9 +244,8 @@ void enviarScriptAMemoria(_t_hiloEspera* aux){
 
 
 	t_PCB* pcb = list_find(lista_PCBs, (void*) _buscarPCB);
-
 	send(socket_memoria, &aux->pid, sizeof(t_num8), 0);
-	msg_enviar_separado(INICIALIZAR_PROGRAMA, (t_num) string_length(aux->script), aux->script, socket_memoria);
+	msg_enviar_separado(INICIALIZAR_PROGRAMA, aux->size, aux->script, socket_memoria);
 	send(socket_memoria, &stackSize, sizeof(t_num8), 0);
 	t_num8 respuesta;
 	recv(socket_memoria, &respuesta, sizeof(t_num8), 0);
@@ -278,14 +279,14 @@ void atender_consola(int socket_consola){
 
 	log_trace(logKernel, "Recibi tipoMensaje %d de consola", msgRecibido->tipoMensaje);
 
-	char* script;	//si lo declaro adentro del switch se queja
+	void* script;	//si lo declaro adentro del switch se queja
 	switch(msgRecibido->tipoMensaje){
 
 	case ENVIO_CODIGO:
 		pid++;
 		script = malloc(msgRecibido->longitud);
 		memcpy(script, msgRecibido->data, msgRecibido->longitud);
-		log_info(logKernel, script);
+		log_info(logKernel, "\n%s", script);
 		t_num8 pidActual = crearPCB(socket_consola);
 		llenarIndicesPCB(pidActual, script);
 
@@ -299,8 +300,9 @@ void atender_consola(int socket_consola){
 		_t_hiloEspera* aux = malloc(sizeof(_t_hiloEspera));
 
 		aux->pid = pidActual;
-		aux->script = malloc(string_length(script));
-		memcpy(aux->script, script, string_length(script));
+		aux->script = malloc(msgRecibido->longitud);
+		aux->size = msgRecibido->longitud;
+		memcpy(aux->script, script, msgRecibido->longitud);
 
 		pthread_attr_t atributo;
 		pthread_attr_init(&atributo);

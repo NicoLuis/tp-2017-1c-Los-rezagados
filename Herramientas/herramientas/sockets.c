@@ -72,6 +72,10 @@ int aceptarCliente(int socketEscucha) {
 /*			ENVIO 	MENSAJES		*/
 /************************************/
 
+typedef struct {
+	t_num size;
+	t_num *data;
+} t_buffer;
 
 t_msg* msg_crear(uint8_t tipoMensaje) {
 
@@ -88,9 +92,9 @@ void msg_destruir(t_msg *msg) {
 	free(msg);
 }
 
-void msg_enviar_separado(uint8_t tipoMensaje, t_num longitud, void* data, int socketTo){
+void msg_enviar_separado(t_num8 tipoMensaje, t_num longitud, void* data, int socketTo){
 
-	send(socketTo, &tipoMensaje, sizeof(uint8_t), 0);
+	send(socketTo, &tipoMensaje, sizeof(t_num8), 0);
 	send(socketTo, &longitud, sizeof(t_num), 0);
 	send(socketTo, data, longitud, 0);
 
@@ -98,7 +102,7 @@ void msg_enviar_separado(uint8_t tipoMensaje, t_num longitud, void* data, int so
 
 void msg_enviar(t_msg* msg, int socketTo){
 
-	send(socketTo, &msg->tipoMensaje, sizeof(uint8_t), 0);
+	send(socketTo, &msg->tipoMensaje, sizeof(t_num8), 0);
 	send(socketTo, &msg->longitud, sizeof(t_num), 0);
 	send(socketTo, msg->data, msg->longitud, 0);
 
@@ -115,8 +119,8 @@ t_msg* msg_recibir(int socketFrom){
 
 	t_msg* msg = msg_crear(0);
 
-	recv(socketFrom, &msg->tipoMensaje, sizeof(uint8_t), 0);
-	recv(socketFrom, &msg->longitud, sizeof(t_num), 0);
+	recv(socketFrom, &msg->tipoMensaje, sizeof(t_num8), MSG_WAITALL);
+	recv(socketFrom, &msg->longitud, sizeof(t_num), MSG_WAITALL);
 
 	return msg;
 }

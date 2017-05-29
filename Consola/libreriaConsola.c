@@ -156,16 +156,21 @@ char* cargarScript(void* pathScript){
 	char *data;
 	struct stat sbuf;
 
-	//todo: considerar errores
-
 	fd = open(pathScript, O_RDONLY);
-
-	stat(pathScript, &sbuf);
-
+	if (fd == -1) {
+		perror("error al abrir el archivo");
+		return -1;
+	}
+	if (stat(pathScript, &sbuf) == -1) {
+		perror("stat, chequear si el archivo esta corrupto");
+		return -1;
+	}
 	data = mmap((caddr_t)0, sbuf.st_size, PROT_READ, MAP_SHARED, fd, 0);
-
+	if (data == MAP_FAILED) {
+		perror("Fallo el mmap");
+		return -1;
+	}
 	close(fd);
-
 	return data;
 }
 

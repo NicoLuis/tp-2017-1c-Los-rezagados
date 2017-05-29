@@ -26,13 +26,14 @@ int main(int argc, char* argv[]) {
 	puertoFS = config_get_int_value(configuracion, "PUERTO");
 	puntoMontaje = config_get_string_value(configuracion, "PUNTO_MONTAJE");
 
+	//Creo archivo log
+	logFS = log_create("FS.log", "FS", false, LOG_LEVEL_TRACE);
+	log_trace(logFS, "  -----------  INICIO FILE SYSTEM  -----------  ");
 
 	//Muestro archivo de configuracion
-
 	mostrarArchivoConfig();
-
-	//Creo archivo log
-	t_log* log_fs = log_create("FS.log", "FS", false, LOG_LEVEL_TRACE);
+	leerMetadataArchivo();
+	leerBitMap();
 
 	//Creo un hilo para comunicarme con el Kernel
 		pthread_t hilo_conexionKERNEL;
@@ -43,7 +44,7 @@ int main(int argc, char* argv[]) {
 		pthread_attr_setdetachstate(&atributo, PTHREAD_CREATE_DETACHED);
 
 		//-------------CREAR UN SOCKET DE ESCUCHA PARA LAS CPU's Y EL KERNEL-------------------------
-		int socket_fs = crearSocketDeEscucha(string_itoa(puertoFS), log_fs);
+		int socket_fs = crearSocketDeEscucha(string_itoa(puertoFS), logFS);
 
 		char* bufferEscucha = malloc(200);
 

@@ -130,7 +130,9 @@ void escucharCPU(void* socket_cpu) {
 	int offset = 0, tmpsize;
 
 	//uint32_t pidAnterior;
-	t_proceso* proceso;	//fixme: q es este proceso?
+	//t_proceso* proceso;	//fixme: q es este proceso?
+	//fixme: SI NO ME EQUIVOCO ESTABA PARA SWAPEAR LAS PAGINAS QUE NO ESTABAN NI EN MEMORIA REAL NI EN CACHE. PERO ESTE TP NO LO TIENE ASIQUE NO SE USA
+
 	//list_add(listaCPUs, socketCPU);
 
 	log_info(log_memoria,"Se conecto un CPU");
@@ -273,6 +275,19 @@ void escucharCPU(void* socket_cpu) {
 						pthread_exit(NULL);
 					}
 
+				} else if ((Cache_Activada()) && (estaEnCache(pidPeticion, puntero.pagina))) {
+
+					escribirContenidoSegunCache(pidPeticion, puntero.pagina, puntero.offset, puntero.size, contenido_escribir);
+
+					//ENVIO ESCRITURA OK
+					header = ESCRITURA_PAGINA;
+
+					bytesEnviados = send(socketCPU, &header, sizeof(uint32_t), 0);
+					if (bytesEnviados <= 0) {
+						log_error(log_memoria, "Error send CPU");
+						pthread_exit(NULL);
+					}
+
 				} else if (estaEnMemoriaReal(pidPeticion, puntero.pagina)) {
 
 						log_info(log_memoria, "La pagina %d esta en Memoria Real",puntero.pagina);
@@ -302,29 +317,11 @@ void escucharCPU(void* socket_cpu) {
 							pthread_exit(NULL);
 						}
 
-						log_info(log_memoria, "Escribi correctamente");
-
-						/*	fixme: necesario? La cant de pags en stack es fija
-						//MODIFICAR
-						int cantidadDePaginas = puntero.size / tamanioDeMarcos;
-						lockFrames();
-						int hayFrameLibre = hayFramesLibres(cantidadDePaginas);
-						unlockFrames();
-
-						if ((!hayFrameLibre) && (proceso->cantFramesAsignados == 0)) {
-
-							log_info(log_memoria,"Finalizando programa: %d. No hay frames disponibles\n",pidPeticion);
-
-							//AVISO FINALIZACION PROGRAMA A LA CPU
-							header = MARCOS_INSUFICIENTES;
-
-							bytesEnviados = send(socketCPU, &header, sizeof(uint32_t),0);
-							if (bytesEnviados <= 0) {
-								log_error(log_memoria, "Error send CPU");
-								pthread_exit(NULL);
-							}
+						if(Cache_Activada()){
+							agregarEntradaCache(pidPeticion,puntero.pagina,pag->nroFrame);
 						}
-						*/
+
+						log_info(log_memoria, "Escribi correctamente");
 
 					}
 				}

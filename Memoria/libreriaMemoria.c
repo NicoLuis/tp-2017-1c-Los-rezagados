@@ -637,14 +637,7 @@ t_frame* buscarFrameLibre(uint32_t pid) {
 		frameLibre = list_find(listaFrames, (void*) _soy_frame_libre);
 
 	}
-/*
-	else {
-		//SI NO HAY FRAMES LIBRES O EL PROCESO TIENE OCUPADOS TODOS LOS MARCOS POR PROCESO
-		//REEMPLAZO UN FRAME DE ESE PROCESO
 
-		frameLibre = t_frame*
-	}
-	*/
 	frameLibre->pid = pid;
 
 	proceso->cantFramesAsignados++;
@@ -1110,7 +1103,7 @@ void dumpTodosLosProcesos() {
 	strcat(nombreArchivoDump, ".txt");
 	FILE* archivoDump = fopen(nombreArchivoDump, "w+");
 
-	unsigned int tamanioTotalMemoria = tamanioDeMarcos * cantidadDeMarcos;
+	//unsigned int tamanioTotalMemoria = tamanioDeMarcos * cantidadDeMarcos;
 
 	dumpEstructurasMemoriaTodosLosProcesos(archivoDump);
 

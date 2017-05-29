@@ -35,12 +35,11 @@
 //Archivo de Configuracion
 int puertoMemoria;
 int cantidadDeMarcos;
-uint32_t tamanioDeMarcos;
-//int cantidadaEntradasCache;	//fixme: cantidadaEntradasCache??
 int cantidadEntradasCache;
 int cachePorProceso;
 char* algoritmoReemplazo;
 int retardoMemoria;
+int tamanioDeMarcos;
 t_list* lista_cpus;
 t_list* listaFrames;
 t_list* listaProcesos;

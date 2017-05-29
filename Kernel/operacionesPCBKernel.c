@@ -10,7 +10,8 @@
 t_num8 crearPCB(int socketConsola){
 	t_PCB* pcb = malloc(sizeof(t_PCB));
 	pcb->pid = pid;
-	pcb->exitCode = -20;
+	pcb->exitCode = 1;
+	pcb->cantPagsStack = stackSize;
 	pcb->indiceStack = list_create();
 	list_add(lista_PCBs, pcb);
 	return pcb->pid;

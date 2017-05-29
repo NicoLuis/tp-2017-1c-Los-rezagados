@@ -115,12 +115,12 @@ t_PCB* recibir_pcb(int socket_cpu, t_msg* msgRecibido, bool finalizado, bool blo
 	sigoFIFO = 0;
 	quantumRestante = 0;
 	if(finalizado){
-		setearExitCode(pcb->pid, 0);
-		bool _esPid(t_infosocket* a){ return a->pid == pcb->pid; }
-		t_infosocket* info = list_find(lista_PCB_consola, (void*) _esPid);
-		if(info == NULL)
-			log_trace(logKernel, "No se ecuentra consola asociada a pid %d", pcb->pid);
-		msg_enviar_separado(FINALIZAR_PROGRAMA, sizeof(t_num8), &info->pid, info->socket);
+		log_trace(logKernel, "Finalizo PCB");
+		pcb->exitCode = 0;
+		msg_enviar_separado(FINALIZAR_PROGRAMA, 0, 0, socket_memoria);
+		send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
+		_ponerEnCola(pcb->pid, cola_Exit, mutex_Exit);
+		liberarPCB(pcb, true);
 	}else{
 		if(bloqueo)
 			_ponerEnCola(pcb->pid, cola_Block, mutex_Block);
@@ -142,11 +142,11 @@ void escucharCPU(int socket_cpu) {
 		return in->socket == socket_cpu;
 	}
 	t_cpu* cpuUsada = list_find(lista_cpus, (void*) _esCPU);
-	bool finalizado = false;
 
 	while(1){
 
 		sem_wait(&cpuUsada->sem);
+		bool finalizado = false;
 
 		t_msg* msgRecibido = msg_recibir(socket_cpu);
 
@@ -156,6 +156,8 @@ void escucharCPU(int socket_cpu) {
 		}
 
 		t_PCB* pcb = list_find(lista_PCBs, (void*) _es_PCB);
+
+		bool _esPid(t_infosocket* a){ return a->pid == pcb->pid; }
 
 		switch(msgRecibido->tipoMensaje){
 		case OK:
@@ -169,6 +171,13 @@ void escucharCPU(int socket_cpu) {
 		case ENVIO_PCB:		// si me devuelve el PCB es porque fue la ultima instruccion
 			msg_recibir_data(socket_cpu, msgRecibido);
 			pcb = recibir_pcb(socket_cpu, msgRecibido, finalizado, false);
+			if(finalizado){
+				bool _esPid(t_infosocket* a){ return a->pid == pcb->pid; }
+				t_infosocket* info = list_find(lista_PCB_consola, (void*) _esPid);
+				if(info == NULL)
+					log_trace(logKernel, "No se ecuentra consola asociada a pid %d", pcb->pid);
+				msg_enviar_separado(FINALIZAR_PROGRAMA, sizeof(t_num8), &info->pid, info->socket);
+			}
 			list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
 			list_add(lista_PCBs, pcb);
 			_sacarDeCola(pcb->pid, cola_Exec, mutex_Exec);
@@ -190,6 +199,18 @@ void escucharCPU(int socket_cpu) {
 			pthread_mutex_unlock(&mut_planificacion);
 			pthread_exit(NULL);
 			break;
+		case ERROR:
+			log_trace(logKernel, "Recibi ERROR");
+			msg_recibir_data(socket_cpu, msgRecibido);
+			pcb = recibir_pcb(socket_cpu, msgRecibido, true, false);
+			pcb->exitCode = -11;	//-11: error de sintaxis en script
+			list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
+			list_add(lista_PCBs, pcb);
+			cpuUsada->libre = true;
+			sem_post(&sem_cantCPUs);
+			t_infosocket* info = list_find(lista_PCB_consola, (void*) _esPid);
+			msg_enviar_separado(ERROR, sizeof(t_num8), &pcb->pid, info->socket);
+			break;
 		case ESCRIBIR_FD:
 			log_trace(logKernel, "Recibi ESCRIBIR_FD");
 			msg_recibir_data(socket_cpu, msgRecibido);
@@ -207,7 +228,6 @@ void escucharCPU(int socket_cpu) {
 			sem_post(&sem_cantCPUs);
 			if(fd == 1){
 				log_trace(logKernel, "Imprimo por consola: %s", informacion);
-				bool _esPid(t_infosocket* a){ return a->pid == pcb->pid; }
 				t_infosocket* info = list_find(lista_PCB_consola, (void*) _esPid);
 				if(info == NULL)
 					log_trace(logKernel, "No se ecuentra consola asociada a pid %d", pcb->pid);
@@ -375,7 +395,12 @@ void consolaKernel(){
 				for(i = 0; i < list_size(lista_PCBs); i++){
 					t_PCB* pcbA = list_get(lista_PCBs, i);
 					char* cola = " -- ";
+					char* exitCode;
 
+					if(pcbA->exitCode > 0)
+						exitCode = "-";
+					else
+						exitCode = string_itoa(pcbA->exitCode);	//fixme: se caga en este if
 					if(_estaEnCola(pcbA->pid, cola_New, mutex_New))
 						cola = "NEW";
 					if(_estaEnCola(pcbA->pid, cola_Ready, mutex_Ready))
@@ -388,8 +413,8 @@ void consolaKernel(){
 						cola = "EXIT";
 
 					if(string_starts_with(comando, "s") || !string_equals_ignore_case(cola, " -- "))
-						printf("   ----   %d   ----   %d   ----    %d     ----     %d    ----  %s  ----   \n",
-							pcbA->pid, pcbA->pc, (pcbA->cantPagsCodigo + stackSize), pcbA->exitCode, cola);
+						printf("   ----   %d   ----   %d   ----    %d     ----     %s    ----  %s  ----   \n",
+							pcbA->pid, pcbA->pc, (pcbA->cantPagsCodigo + pcbA->cantPagsStack), exitCode, cola);
 				}
 
 			}else printf("Flasheaste era s/n \n");

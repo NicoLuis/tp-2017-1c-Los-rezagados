@@ -52,5 +52,6 @@ int socket_memoria;
 bool ultimaEjecucionTotal;
 bool ultimaEjecucion;
 bool finalizado;
+bool error;
 
 #endif

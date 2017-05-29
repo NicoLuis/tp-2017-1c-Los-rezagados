@@ -81,6 +81,17 @@ void ejecutarInstruccion(){
 		return;
 	}
 
+	if(error){
+		log_trace(logCPU, "Devuelvo ERROR");
+		uint32_t size = tamanioTotalPCB(pcb);
+		void* pcbSerializado = serializarPCB(pcb);
+		msg_enviar_separado(ERROR, size, pcbSerializado, socket_kernel);
+		free(pcbSerializado);
+		finalizado = false;
+		ultimaEjecucion = false;
+		error = false;
+	}
+
 	if(ultimaEjecucion){
 		log_trace(logCPU, "Ultima Instruccion");
 		uint32_t size = tamanioTotalPCB(pcb);

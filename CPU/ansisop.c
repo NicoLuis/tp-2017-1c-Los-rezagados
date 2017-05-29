@@ -28,6 +28,11 @@ t_puntero definirVariable(t_nombre_variable identificador_variable){
 
 	log_trace(logAnsisop, "Definir variable %c", identificador_variable);
 
+	if( pcb->sp + sizeof(t_StackMetadata) >= (pcb->cantPagsCodigo + pcb->cantPagsStack)*tamanioPagina ){
+		log_error(logAnsisop, "STACKOVERFLOW");
+		error = true;
+		return -1;
+	}
 	t_StackMetadata* metadata = malloc(sizeof(t_StackMetadata));
 	metadata->id = identificador_variable;
 	metadata->posicionMemoria = traducirSP();
@@ -64,9 +69,11 @@ t_valor_variable dereferenciar(t_puntero direccion_variable){
 		puntero.size = sizeof(t_valor_variable);
 
 		return leerMemoria(puntero);
-	}else
+	}else{
 		log_error(logAnsisop, "No se puede obtener valor de %d", direccion_variable);
+		error = true;
 		return -1;
+	}
 }
 
 
@@ -101,6 +108,7 @@ t_puntero obtenerPosicionVariable(t_nombre_variable identificador_variable){
 		}
 
 	log_error(logAnsisop, "No se encontro la variable %c", identificador_variable);
+	error = true;
 	return -1;
 }
 
@@ -116,8 +124,10 @@ void asignar(t_puntero direccion_variable, t_valor_variable valor){
 		puntero.size = sizeof(t_valor_variable);
 
 		escribirMemoria(puntero, valor);
-	}else
+	}else{
 		log_error(logAnsisop, "No se puede asignar en %d", direccion_variable);
+		error = true;
+	}
 }
 
 
@@ -125,8 +135,10 @@ void irAlLabel(t_nombre_etiqueta etiqueta){
 	log_trace(logAnsisop, "Voy al label %s", etiqueta);
 
 	t_puntero nro = metadata_buscar_etiqueta(etiqueta, pcb->indiceEtiquetas.bloqueSerializado, pcb->indiceEtiquetas.size);
-	if(nro == -1)
+	if(nro == -1){
 		log_error(logAnsisop, "No encontre label %s", etiqueta);
+		error = true;
+	}
 	else
 		pcb->pc = nro;
 }
@@ -142,8 +154,10 @@ void llamarSinRetorno(t_nombre_etiqueta etiqueta){
 	list_add(pcb->indiceStack, stackActual);
 
 	t_puntero nro = metadata_buscar_etiqueta(etiqueta, pcb->indiceEtiquetas.bloqueSerializado, pcb->indiceEtiquetas.size);
-	if(nro == -1)
+	if(nro == -1){
 		log_error(logAnsisop, "No encontre label %s", etiqueta);
+		error = true;
+	}
 	else
 		pcb->pc = nro;
 }
@@ -166,8 +180,10 @@ void llamarConRetorno(t_nombre_etiqueta etiqueta, t_puntero donde_retornar){
 	list_add(pcb->indiceStack, stackActual);
 
 	t_puntero nro = metadata_buscar_etiqueta(etiqueta, pcb->indiceEtiquetas.bloqueSerializado, pcb->indiceEtiquetas.size);
-	if(nro == -1)
+	if(nro == -1){
 		log_error(logAnsisop, "No encontre label %s", etiqueta);
+		error = true;
+	}
 	else
 		pcb->pc = nro;
 }
@@ -187,7 +203,13 @@ void finalizar(){
 
 	t_Stack* stackActual = list_remove(pcb->indiceStack, list_size(pcb->indiceStack) - 1);
 
-	pcb->pc = stackActual->retPos;
+	if(list_size(pcb->indiceStack) == 0){
+		log_trace(logCPU, "Finalizo ejecucion");
+		ultimaEjecucion = true;
+		finalizado = true;
+	}else
+		pcb->pc = stackActual->retPos;
+
 	pcb->sp = pcb->sp - list_size(stackActual->args) * sizeof(t_StackMetadata);
 	pcb->sp = pcb->sp - list_size(stackActual->vars) * sizeof(t_StackMetadata);
 
@@ -195,11 +217,6 @@ void finalizar(){
 	list_destroy_and_destroy_elements(stackActual->vars, free);
 	free(stackActual);
 
-	if(list_size(pcb->indiceStack) == 0){
-		log_trace(logCPU, "Finalizo ejecucion");
-		ultimaEjecucion = true;
-		finalizado = true;
-	}
 }
 
 t_valor_variable asignarValorCompartida(t_nombre_compartida variable, t_valor_variable valor){

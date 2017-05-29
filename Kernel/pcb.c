@@ -78,7 +78,7 @@ int tamanioTotalPCB(t_PCB* pcb){
 	int tamanioIndiceEtiquetas =
 			sizeof(t_size) + pcb->indiceEtiquetas.size;
 
-	return sizeof(t_num8) + sizeof(t_num) * 5 +
+	return sizeof(t_num8) + sizeof(t_num) * 6 +
 		tamanioIndiceCodigo + tamanioIndiceEtiquetas + tamanioIndiceStack(pcb->indiceStack);
 }
 
@@ -92,6 +92,8 @@ void *serializarPCB(t_PCB* pcb){
 	memcpy(buffer + offset, &pcb->pc, tmpsize = sizeof(t_num));
 		offset += tmpsize;
 	memcpy(buffer + offset, &pcb->cantPagsCodigo, tmpsize = sizeof(t_num));
+		offset += tmpsize;
+	memcpy(buffer + offset, &pcb->cantPagsStack, tmpsize = sizeof(t_num));
 		offset += tmpsize;
 	memcpy(buffer + offset, &pcb->exitCode, tmpsize = sizeof(t_num));
 		offset += tmpsize;
@@ -191,6 +193,8 @@ t_PCB *desserealizarPCB(void* buffer){
 		offset += tmpsize;
 	memcpy(&pcb->cantPagsCodigo, buffer + offset, tmpsize = sizeof(t_num));
 		offset += tmpsize;
+	memcpy(&pcb->cantPagsStack, buffer + offset, tmpsize = sizeof(t_num));
+		offset += tmpsize;
 	memcpy(&pcb->exitCode, buffer + offset, tmpsize = sizeof(t_num));
 		offset += tmpsize;
 	memcpy(&pcb->sp, buffer + offset, tmpsize = sizeof(t_num));
@@ -221,12 +225,10 @@ t_PCB *desserealizarPCB(void* buffer){
 
 
 void liberarPCB(t_PCB* pcb, bool soloStructs){
-	void _destruirStackMetadata(t_StackMetadata* stack){
-		free(stack);
-	}
+
 	void _destruirIndiceStack(t_Stack* stack){
-		list_destroy_and_destroy_elements(stack->args, (void*) _destruirStackMetadata);
-		list_destroy_and_destroy_elements(stack->vars, (void*) _destruirStackMetadata);
+		list_destroy_and_destroy_elements(stack->args, free);
+		list_destroy_and_destroy_elements(stack->vars, free);
 		free(stack);
 	}
 	free(pcb->indiceCodigo.bloqueSerializado);
@@ -234,5 +236,4 @@ void liberarPCB(t_PCB* pcb, bool soloStructs){
 	list_destroy_and_destroy_elements(pcb->indiceStack, (void*) _destruirIndiceStack);
 	if(!soloStructs)
 		free(pcb);
-
 }

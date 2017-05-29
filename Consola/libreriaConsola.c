@@ -123,6 +123,17 @@ void escucharKernel(){
 			log_trace(logConsola, "La desconecto el kernel");
 			pthread_exit(NULL);
 			break;
+		case ERROR:
+			log_trace(logConsola, "Recibi ERROR");
+			msg_recibir_data(socket_kernel, msgRecibido);
+			memcpy(&pidProg, msgRecibido->data, sizeof(t_num8));
+			log_trace(logConsola, "El pid %d no pudo terminar su ejecucion", pidProg);
+			fprintf(stderr, "El pid %d no pudo terminar su ejecucion \n", pidProg);
+
+			programa = list_find(lista_programas, (void*) _esPrograma);
+			programa->horaFin = temporal_get_string_time();
+			//finalizarPrograma(programa);
+			break;
 		case IMPRIMIR_TEXTO:
 			log_trace(logConsola, "Recibi IMPRIMIR_TEXTO");
 			msg_recibir_data(socket_kernel, msgRecibido);

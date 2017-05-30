@@ -45,7 +45,14 @@ void escucharKERNEL(void* socket_kernel) {
 			memcpy(path, msgRecibido->data, msgRecibido->longitud);
 			log_info(logFS, "Path: %s", path);
 
-			//todo: implementar
+			bool existe = false;
+			int fd = open(path, O_RDONLY);
+			if (fd > 0)
+				existe = true;
+			fd > 0? log_info(logFS, "El archivo existe"): log_info(logFS, "El archivo no existe");
+			msg_enviar_separado(VALIDAR_ARCHIVO, 1, &existe, socketKernel);
+			close(fd);
+			free(path);
 			break;
 		case CREAR_ARCHIVO:
 			path = malloc(msgRecibido->longitud);

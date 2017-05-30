@@ -164,9 +164,9 @@ void leerBitMap(){
 	close(fd);
 }
 
-char* leerBloquesArchivo(void* path, int offset, int size){
-	char* data = malloc(size), *tmpdata, *pathBloque;
-	int i, tmpoffset = 0;
+
+void borrarArchivo(void* path){
+	int i;
 	char* rutaMetadata = string_new();
 	string_append(&rutaMetadata, puntoMontaje);
 	string_append(&rutaMetadata, "/Metadata/Bitmap.bin");
@@ -177,10 +177,39 @@ char* leerBloquesArchivo(void* path, int offset, int size){
 		log_error(logFS, "No se encuentra metadata");
 		free(rutaMetadata);
 		config_destroy(metadata);
+		return;
+	}
+	int tamanio = config_get_int_value(metadata, "TAMANIO");
+	char** bloques = config_get_array_value(metadata, "BLOQUES");
+
+	for(i = 0; i*tamanioBloques < tamanio; i++){
+		int nroBloque =  atoi(bloques[i / tamanioBloques]);
+		bitarray_clean_bit(bitMap, nroBloque);
+	}
+
+	config_destroy(metadata);
+	system(string_from_format("rm -f %s", rutaMetadata));
+	free(rutaMetadata);
+	free(bloques);
+}
+
+char* leerBloquesArchivo(void* path, int offset, int size){
+	char* data = malloc(size), *tmpdata, *pathBloque;
+	int i, tmpoffset = 0;
+	char* rutaMetadata = string_new();
+	string_append(&rutaMetadata, puntoMontaje);
+	string_append(&rutaMetadata, path);
+	log_info(logFS, "rutaMetadata %s", rutaMetadata);
+
+	t_config* metadata = config_create(rutaMetadata);
+	if(metadata == NULL){
+		log_error(logFS, "No se encuentra metadata");
+		free(rutaMetadata);
+		config_destroy(metadata);
 		return NULL;
 	}
 	int tamanio = config_get_int_value(metadata, "TAMANIO");
-	char** bloques= config_get_array_value(metadata, "BLOQUES");
+	char** bloques = config_get_array_value(metadata, "BLOQUES");
 
 	for(i = offset / tamanioBloques; i < tamanio; i += tamanioBloques, tmpoffset += tamanioBloques){
 		pathBloque = string_new();
@@ -198,6 +227,7 @@ char* leerBloquesArchivo(void* path, int offset, int size){
 
 	free(rutaMetadata);
 	free(pathBloque);
+	free(bloques);
 	return data;
 }
 
@@ -206,8 +236,8 @@ void escribirBloquesArchivo(void* path, int offset, int size, char* buffer){
 	int i, tmpoffset = 0;
 	char* rutaMetadata = string_new();
 	string_append(&rutaMetadata, puntoMontaje);
-	string_append(&rutaMetadata, "/Metadata/Bitmap.bin");
-	log_info(logFS, "rutaBitMap %s", rutaMetadata);
+	string_append(&rutaMetadata, path);
+	log_info(logFS, "rutaMetadata %s", rutaMetadata);
 
 	t_config* metadata = config_create(rutaMetadata);
 	if(metadata == NULL){
@@ -217,7 +247,7 @@ void escribirBloquesArchivo(void* path, int offset, int size, char* buffer){
 		return;
 	}
 	int tamanio = config_get_int_value(metadata, "TAMANIO");
-	char** bloques= config_get_array_value(metadata, "BLOQUES");
+	char** bloques = config_get_array_value(metadata, "BLOQUES");
 
 	for(i = offset / tamanioBloques; i < tamanio; i += tamanioBloques, tmpoffset += tamanioBloques){
 		pathBloque = string_new();
@@ -235,6 +265,7 @@ void escribirBloquesArchivo(void* path, int offset, int size, char* buffer){
 
 	free(rutaMetadata);
 	free(pathBloque);
+	free(bloques);
 }
 
 char* leerArchivo(void* path){

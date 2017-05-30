@@ -48,16 +48,15 @@ int main(int argc, char* argv[]) {
 		//-------------CREAR UN SOCKET DE ESCUCHA PARA LAS CPU's Y EL KERNEL-------------------------
 		int socket_fs = crearSocketDeEscucha(string_itoa(puertoFS), logFS);
 
-		char* bufferEscucha = malloc(200);
+ 		char* bufferEscucha = malloc(200);
 
 		int falloP_thread;
-
 
 		while (1) {
 			int socket_cliente = aceptarCliente(socket_fs);
 			if ((socket_cliente) == -1) {
 
-				printf("Error en el accept()\n");
+				fprintf(stderr, "Error en el accept()\n");
 
 				abort();
 			}

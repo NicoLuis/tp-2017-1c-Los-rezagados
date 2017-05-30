@@ -119,8 +119,7 @@ void escucharKERNEL(void* socket_kernel) {
 
 void leerMetadataArchivo(){
 
-	char* rutaMetadata = string_new();
-	string_append(&rutaMetadata, puntoMontaje);
+	char* rutaMetadata = string_duplicate(puntoMontaje);
 	string_append(&rutaMetadata, "/Metadata/Metadata.bin");
 	log_info(logFS, "rutaMetadata %s", rutaMetadata);
 
@@ -128,49 +127,39 @@ void leerMetadataArchivo(){
 	if(metadata == NULL){
 		log_error(logFS, "No se encuentra metadata");
 		fprintf(stderr, "No se encuentra metadata\n");
-		free(rutaMetadata);
-		free(metadata);
 		exit(1);
 	}
 	tamanioBloques = config_get_int_value(metadata, "TAMANIO_BLOQUES");
 	cantidadBloques = config_get_int_value(metadata, "CANTIDAD_BLOQUES");
-	char* magicNumber = config_get_string_value(metadata, "MAGIC_NUMBER");
 
-	if(!string_equals_ignore_case(magicNumber, "SADICA")){
+	if(!string_equals_ignore_case( config_get_string_value(metadata, "MAGIC_NUMBER") , "SADICA")){
 		log_error(logFS, "No es un FS SADICA");
 		fprintf(stderr, "No es un FS SADICA\n");
-		config_destroy(metadata);
-		free(rutaMetadata);
-		free(magicNumber);
 		exit(1);
 	}
 	config_destroy(metadata);
-	free(rutaMetadata);
-	free(magicNumber);
+
 }
 
 void leerBitMap(){		//fixme: con q numero arranc bloques 0 o 1?	considero 1
 	int fd;
 	char *data;
 	struct stat sbuf;
-	char* rutaBitMap = string_new();
-	string_append(&rutaBitMap, puntoMontaje);
+	char* rutaBitMap = string_duplicate(puntoMontaje);
 	string_append(&rutaBitMap, "/Metadata/Bitmap.bin");
 	log_info(logFS, "rutaBitMap %s", rutaBitMap);
 
 	fd = open(rutaBitMap, O_RDWR);
-	if (fd == -1) {
+	if (fd < 0) {
 		perror("error al abrir el archivo bitmap");
 		exit(1);		//fixme: reemplazar exit por funcion finalizar
 	}
-	if (stat(rutaBitMap, &sbuf) == -1) {
+	if (stat(rutaBitMap, &sbuf) < 0) {
 		perror("stat, chequear si el archivo esta corrupto");
 		exit(1);
 	}
 
-	log_info(logFS, "%d", sbuf.st_size);
 	data = mmap((caddr_t)0, sbuf.st_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-	log_info(logFS, "%d", string_length(data));
 	if (data == MAP_FAILED) {
 		perror("Fallo el mmap del bitmap");
 		exit(1);

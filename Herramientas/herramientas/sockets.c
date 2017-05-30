@@ -27,8 +27,8 @@ int crearSocketDeEscucha(char* puerto, t_log* log) {
 	hints.ai_flags = AI_PASSIVE; //netdb
 
 	if ((rv = getaddrinfo(NULL, puerto, &hints, &ai)) != 0) {
-		log_error(log, "selectserver: %s\n", gai_strerror(rv));
 		fprintf(stderr, "selectserver: %s\n", gai_strerror(rv));
+		log_error(log, "selectserver: %s\n", gai_strerror(rv));
 	}
 
 	for(p = ai; p != NULL; p = p->ai_next) {

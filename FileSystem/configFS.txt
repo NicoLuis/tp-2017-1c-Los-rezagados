@@ -1,2 +1,2 @@
 PUERTO=4444
-PUNTO_MONTAJE=/home/utnso/workspace/FS_SADICA
+PUNTO_MONTAJE=/home/utnso/FS_SADICA

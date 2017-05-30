@@ -13,11 +13,11 @@ void escucharKERNEL(void* socket_kernel) {
 	//Casteo socketNucleo
 	int socketKernel = (int) socket_kernel;
 
-	printf("Se conecto el Kernel\n");
+	fprintf(stderr, "Se conecto el Kernel\n");
 
 	int bytesEnviados = send(socketKernel, "Conexion Aceptada", 18, 0);
 	if (bytesEnviados <= 0) {
-		printf("Error send KERNEL");
+		fprintf(stderr, "Error send KERNEL\n");
 		pthread_exit(NULL);
 	}
 
@@ -127,8 +127,9 @@ void leerMetadataArchivo(){
 	t_config* metadata = config_create(rutaMetadata);
 	if(metadata == NULL){
 		log_error(logFS, "No se encuentra metadata");
+		fprintf(stderr, "No se encuentra metadata\n");
 		free(rutaMetadata);
-		config_destroy(metadata);
+		free(metadata);
 		exit(1);
 	}
 	tamanioBloques = config_get_int_value(metadata, "TAMANIO_BLOQUES");
@@ -137,6 +138,7 @@ void leerMetadataArchivo(){
 
 	if(!string_equals_ignore_case(magicNumber, "SADICA")){
 		log_error(logFS, "No es un FS SADICA");
+		fprintf(stderr, "No es un FS SADICA\n");
 		config_destroy(metadata);
 		free(rutaMetadata);
 		free(magicNumber);
@@ -147,7 +149,7 @@ void leerMetadataArchivo(){
 	free(magicNumber);
 }
 
-void leerBitMap(){
+void leerBitMap(){		//fixme: con q numero arranc bloques 0 o 1?	considero 1
 	int fd;
 	char *data;
 	struct stat sbuf;
@@ -165,7 +167,10 @@ void leerBitMap(){
 		perror("stat, chequear si el archivo esta corrupto");
 		exit(1);
 	}
+
+	log_info(logFS, "%d", sbuf.st_size);
 	data = mmap((caddr_t)0, sbuf.st_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+	log_info(logFS, "%d", string_length(data));
 	if (data == MAP_FAILED) {
 		perror("Fallo el mmap del bitmap");
 		exit(1);
@@ -189,7 +194,7 @@ void crearArchivo(void* path){
 		}
 	}
 
-	char* data = string_from_format("TAMANIO=1 BLOQUES=[%d]", nroBloque);
+	char* data = string_from_format("TAMANIO=1 BLOQUES=[%d]", nroBloque + 1);
 
 	system(string_from_format("touch %s", rutaMetadata));
 
@@ -210,8 +215,9 @@ void borrarArchivo(void* path){
 	t_config* metadata = config_create(rutaMetadata);
 	if(metadata == NULL){
 		log_error(logFS, "No se encuentra metadata");
+		fprintf(stderr, "No se encuentra archivo %s\n", rutaMetadata);
 		free(rutaMetadata);
-		config_destroy(metadata);
+		free(metadata);
 		return;
 	}
 	int tamanio = config_get_int_value(metadata, "TAMANIO");
@@ -219,7 +225,7 @@ void borrarArchivo(void* path){
 
 	for(i = 0; i*tamanioBloques < tamanio; i++){
 		int nroBloque =  atoi(bloques[i / tamanioBloques]);
-		bitarray_clean_bit(bitMap, nroBloque);
+		bitarray_clean_bit(bitMap, nroBloque - 1);
 	}
 
 	config_destroy(metadata);
@@ -239,8 +245,9 @@ char* leerBloquesArchivo(void* path, int offset, int size){
 	t_config* metadata = config_create(rutaMetadata);
 	if(metadata == NULL){
 		log_error(logFS, "No se encuentra metadata");
+		fprintf(stderr, "No se encuentra archivo %s\n", rutaMetadata);
 		free(rutaMetadata);
-		config_destroy(metadata);
+		free(metadata);
 		return NULL;
 	}
 	int tamanio = config_get_int_value(metadata, "TAMANIO");
@@ -277,8 +284,9 @@ void escribirBloquesArchivo(void* path, int offset, int size, char* buffer){
 	t_config* metadata = config_create(rutaMetadata);
 	if(metadata == NULL){
 		log_error(logFS, "No se encuentra metadata");
+		fprintf(stderr, "No se encuentra archivo %s\n", rutaMetadata);
 		free(rutaMetadata);
-		config_destroy(metadata);
+		free(metadata);
 		return;
 	}
 	int tamanio = config_get_int_value(metadata, "TAMANIO");

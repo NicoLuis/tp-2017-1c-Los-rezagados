@@ -25,6 +25,8 @@ int main(int argc, char* argv[]) {
 	t_config* configuracion = config_create(argv[1]);
 	puertoFS = config_get_int_value(configuracion, "PUERTO");
 	puntoMontaje = config_get_string_value(configuracion, "PUNTO_MONTAJE");
+	if(puntoMontaje[string_length(puntoMontaje)-1] == '/')
+		puntoMontaje[string_length(puntoMontaje)-1] = '\0';
 
 	//Creo archivo log
 	logFS = log_create("FS.log", "FS", false, LOG_LEVEL_TRACE);

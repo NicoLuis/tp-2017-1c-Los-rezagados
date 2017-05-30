@@ -52,14 +52,18 @@ void escucharKERNEL(void* socket_kernel) {
 			memcpy(path, msgRecibido->data, msgRecibido->longitud);
 			log_info(logFS, "Path: %s", path);
 
-			//todo: implementar
+			crearArchivo(path);
+			msg_enviar_separado(CREAR_ARCHIVO, 0, 0, socketKernel);
+			free(path);
 			break;
 		case BORRAR:
 			path = malloc(msgRecibido->longitud);
 			memcpy(path, msgRecibido->data, msgRecibido->longitud);
 			log_info(logFS, "Path: %s", path);
 
-			//todo: implementar
+			borrarArchivo(path);
+			msg_enviar_separado(BORRAR, 0, 0, socketKernel);
+			free(path);
 			break;
 		case OBTENER_DATOS:
 			tmpsize = msgRecibido->longitud - sizeof(t_num)*2;
@@ -92,7 +96,7 @@ void escucharKERNEL(void* socket_kernel) {
 			log_info(logFS, "Path: %s - offset: %d - size %d \n buffer %s", path, offset, size, buffer);
 
 			escribirBloquesArchivo(path, offset, size, buffer);
-			msg_enviar_separado(GUARDAR_DATOS, size, data, socketKernel);
+			msg_enviar_separado(GUARDAR_DATOS, 0, 0, socketKernel);
 			free(data);
 			break;
 
@@ -145,7 +149,7 @@ void leerBitMap(){
 	string_append(&rutaBitMap, "/Metadata/Bitmap.bin");
 	log_info(logFS, "rutaBitMap %s", rutaBitMap);
 
-	fd = open(rutaBitMap, O_RDONLY);
+	fd = open(rutaBitMap, O_RDWR);
 	if (fd == -1) {
 		perror("error al abrir el archivo bitmap");
 		exit(1);		//fixme: reemplazar exit por funcion finalizar
@@ -164,13 +168,37 @@ void leerBitMap(){
 	close(fd);
 }
 
+void crearArchivo(void* path){
+	int nroBloque;
+	char* rutaMetadata = string_new();
+	string_append(&rutaMetadata, puntoMontaje);
+	string_append(&rutaMetadata, path);
+	log_info(logFS, "rutaMetadata %s", rutaMetadata);
+
+	for(nroBloque = 0; nroBloque < bitMap->size; nroBloque++){
+		if(!bitarray_test_bit(bitMap, nroBloque)){
+			bitarray_set_bit(bitMap, nroBloque);
+			break;
+		}
+	}
+
+	char* data = string_from_format("TAMANIO=1 BLOQUES=[%d]", nroBloque);
+
+	system(string_from_format("touch %s", rutaMetadata));
+
+	int fd = open(rutaMetadata, O_RDWR);
+	write(fd, data, string_length(data));
+	close(fd);
+
+	free(rutaMetadata);
+}
 
 void borrarArchivo(void* path){
 	int i;
 	char* rutaMetadata = string_new();
 	string_append(&rutaMetadata, puntoMontaje);
-	string_append(&rutaMetadata, "/Metadata/Bitmap.bin");
-	log_info(logFS, "rutaBitMap %s", rutaMetadata);
+	string_append(&rutaMetadata, path);
+	log_info(logFS, "rutaMetadata %s", rutaMetadata);
 
 	t_config* metadata = config_create(rutaMetadata);
 	if(metadata == NULL){
@@ -273,7 +301,7 @@ char* leerArchivo(void* path){
 	char *data;
 	struct stat sbuf;
 
-	fd = open(path, O_RDONLY);
+	fd = open(path, O_RDWR);
 	if (fd == -1) {
 		perror("error al abrir el archivo");
 		return NULL;

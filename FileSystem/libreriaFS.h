@@ -42,6 +42,8 @@ pthread_mutex_t mutex_solicitud;
 void mostrarArchivoConfig();
 void leerMetadataArchivo();
 void leerBitMap();
+void crearArchivo(void* path);
+void borrarArchivo(void* path);
 char* leerBloquesArchivo(void* path, int offset, int size);
 void escribirBloquesArchivo(void* path, int offset, int size, char* buffer);
 char* leerArchivo(void* path);

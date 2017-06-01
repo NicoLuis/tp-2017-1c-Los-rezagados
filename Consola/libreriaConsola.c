@@ -43,8 +43,12 @@ void leerComando(char* comando){
 		list_add(lista_programas, programaNuevo);
 
 		char* scriptCompleto = cargarScript(pathAIniciar);
-		log_trace(logConsola, "\n%s", scriptCompleto);
-		msg_enviar_separado(ENVIO_CODIGO, string_length(scriptCompleto) + 1, scriptCompleto, socket_kernel);
+		if (scriptCompleto != NULL){
+			log_trace(logConsola, "\n%s", scriptCompleto);
+			msg_enviar_separado(ENVIO_CODIGO, string_length(scriptCompleto) + 1, scriptCompleto, socket_kernel);
+		}else{
+			log_error(logConsola, "Error al abrir el script en %s", pathAIniciar);
+		}
 
 	}else if(string_starts_with(comando, "kill")){
 
@@ -159,16 +163,16 @@ char* cargarScript(void* pathScript){
 	fd = open(pathScript, O_RDONLY);
 	if (fd == -1) {
 		perror("error al abrir el archivo");
-		return -1;
+		return NULL;
 	}
 	if (stat(pathScript, &sbuf) == -1) {
-		perror("stat, chequear si el archivo esta corrupto");
-		return -1;
+		perror("Stat");
+		return NULL;
 	}
 	data = mmap((caddr_t)0, sbuf.st_size, PROT_READ, MAP_SHARED, fd, 0);
 	if (data == MAP_FAILED) {
 		perror("Fallo el mmap");
-		return -1;
+		return NULL;
 	}
 	close(fd);
 	return data;
@@ -212,17 +216,10 @@ char* _contarTiempo(char* tiempo1, char* tiempo2){
 
 void finalizarPrograma(t_programa* prog){
 
-	/*todo: detallar
-	● Fecha y hora de inicio de ejecución
-	● Fecha y hora de fin de ejecución
-	● Cantidad de impresiones por pantalla
-	● Tiempo total de ejecución (diferencia entre tiempo de inicio y tiempo de fin)
-	 */
-
-	fprintf(stderr, "Fecha y hora de inicio %s \n",  prog->horaInicio);
-	fprintf(stderr, "Fecha y hora de fin %s \n",  prog->horaFin);
-	fprintf(stderr, "Impresiones por pantalla %d \n",  prog->cantImpresionesPantalla);
-	fprintf(stderr, "Tiempo total %s \n",  _contarTiempo(prog->horaFin, prog->horaInicio));
+	fprintf(stderr, "● Fecha y hora de inicio %s \n",  prog->horaInicio);
+	fprintf(stderr, "● Fecha y hora de fin %s \n",  prog->horaFin);
+	fprintf(stderr, "● Impresiones por pantalla %d \n",  prog->cantImpresionesPantalla);
+	fprintf(stderr, "● Tiempo total %s \n",  _contarTiempo(prog->horaFin, prog->horaInicio));
 
 	//todo: sacar de lista
 

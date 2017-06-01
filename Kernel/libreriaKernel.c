@@ -104,7 +104,7 @@ int handshake(int socket_cliente, int tipo){
 
 
 
-t_PCB* recibir_pcb(int socket_cpu, t_msg* msgRecibido, bool finalizado, bool bloqueo){
+t_PCB* recibir_pcb(int socket_cpu, t_msg* msgRecibido, bool flag_finalizado, bool flag_bloqueo){
 	bool _esCPU2(t_infosocket* aux){
 		return aux->socket == socket_cpu;
 	}
@@ -114,15 +114,15 @@ t_PCB* recibir_pcb(int socket_cpu, t_msg* msgRecibido, bool finalizado, bool blo
 	_sacarDeCola(pcb->pid, cola_Exec, mutex_Exec);
 	sigoFIFO = 0;
 	quantumRestante = 0;
-	if(finalizado){
+	if(flag_finalizado){
 		log_trace(logKernel, "Finalizo PCB");
 		pcb->exitCode = 0;
-		msg_enviar_separado(FINALIZAR_PROGRAMA, 0, 0, socket_memoria);
 		send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
+		msg_enviar_separado(FINALIZAR_PROGRAMA, 0, 0, socket_memoria);
 		_ponerEnCola(pcb->pid, cola_Exit, mutex_Exit);
 		liberarPCB(pcb, true);
 	}else{
-		if(bloqueo)
+		if(flag_bloqueo)
 			_ponerEnCola(pcb->pid, cola_Block, mutex_Block);
 		else{
 			_ponerEnCola(pcb->pid, cola_Ready, mutex_Ready);
@@ -146,7 +146,7 @@ void escucharCPU(int socket_cpu) {
 	while(1){
 
 		sem_wait(&cpuUsada->sem);
-		bool finalizado = false;
+		bool flag_finalizado = false;
 
 		t_msg* msgRecibido = msg_recibir(socket_cpu);
 
@@ -166,17 +166,18 @@ void escucharCPU(int socket_cpu) {
 			break;
 		case FINALIZAR_PROGRAMA:
 			log_trace(logKernel, "Finalizo programa");
-			finalizado = true;
+			flag_finalizado = true;
 			//no break
 		case ENVIO_PCB:		// si me devuelve el PCB es porque fue la ultima instruccion
 			msg_recibir_data(socket_cpu, msgRecibido);
-			pcb = recibir_pcb(socket_cpu, msgRecibido, finalizado, false);
-			if(finalizado){
+			pcb = recibir_pcb(socket_cpu, msgRecibido, flag_finalizado, 0);
+			if(flag_finalizado){
 				bool _esPid(t_infosocket* a){ return a->pid == pcb->pid; }
 				t_infosocket* info = list_find(lista_PCB_consola, (void*) _esPid);
 				if(info == NULL)
 					log_trace(logKernel, "No se ecuentra consola asociada a pid %d", pcb->pid);
 				msg_enviar_separado(FINALIZAR_PROGRAMA, sizeof(t_num8), &info->pid, info->socket);
+				sem_post(&sem_gradoMp);
 			}
 			list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
 			list_add(lista_PCBs, pcb);
@@ -197,12 +198,13 @@ void escucharCPU(int socket_cpu) {
 			sigoFIFO = 0;
 			quantumRestante = 0;
 			pthread_mutex_unlock(&mut_planificacion);
+			sem_post(&sem_gradoMp);
 			pthread_exit(NULL);
 			break;
 		case ERROR:
 			log_trace(logKernel, "Recibi ERROR");
 			msg_recibir_data(socket_cpu, msgRecibido);
-			pcb = recibir_pcb(socket_cpu, msgRecibido, true, false);
+			pcb = recibir_pcb(socket_cpu, msgRecibido, 1, 0);
 			pcb->exitCode = -11;	//-11: error de sintaxis en script
 			list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
 			list_add(lista_PCBs, pcb);
@@ -210,6 +212,7 @@ void escucharCPU(int socket_cpu) {
 			sem_post(&sem_cantCPUs);
 			t_infosocket* info = list_find(lista_PCB_consola, (void*) _esPid);
 			msg_enviar_separado(ERROR, sizeof(t_num8), &pcb->pid, info->socket);
+			sem_post(&sem_gradoMp);
 			break;
 		case ESCRIBIR_FD:
 			log_trace(logKernel, "Recibi ESCRIBIR_FD");
@@ -221,7 +224,7 @@ void escucharCPU(int socket_cpu) {
 
 			msgRecibido = msg_recibir(socket_cpu);
 			msg_recibir_data(socket_cpu, msgRecibido);
-			pcb = recibir_pcb(socket_cpu, msgRecibido, finalizado, true);
+			pcb = recibir_pcb(socket_cpu, msgRecibido, 0, 1);
 			list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
 			list_add(lista_PCBs, pcb);
 			cpuUsada->libre = true;
@@ -264,6 +267,7 @@ void enviarScriptAMemoria(_t_hiloEspera* aux){
 	bool _buscarConsola(t_infosocket* a){
 		return a->pid == aux->pid;
 	}
+
 	t_infosocket* a = list_find(lista_PCB_consola, (void*) _buscarConsola);
 	int socketConsola = a->socket;
 
@@ -273,7 +277,7 @@ void enviarScriptAMemoria(_t_hiloEspera* aux){
 	t_PCB* pcb = list_find(lista_PCBs, (void*) _buscarPCB);
 	send(socket_memoria, &aux->pid, sizeof(t_num8), 0);
 	msg_enviar_separado(INICIALIZAR_PROGRAMA, aux->size, aux->script, socket_memoria);
-	send(socket_memoria, &stackSize, sizeof(t_num8), 0);
+	send(socket_memoria, &pcb->cantPagsStack, sizeof(t_num8), 0);
 	t_num8 respuesta;
 	recv(socket_memoria, &respuesta, sizeof(t_num8), 0);
 	switch(respuesta){

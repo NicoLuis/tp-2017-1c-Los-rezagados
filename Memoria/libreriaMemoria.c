@@ -48,10 +48,15 @@ void escucharKERNEL(void* socket_kernel) {
 	uint32_t header;
 	while (1) {
 
+		log_info(log_memoria, "Espero");
+
 		if (recv(socketKernel, &pid, sizeof(t_num8), 0) <= 0) {
 			log_info(log_memoria,"El Kernel se ha desconectado");
 			pthread_exit(NULL);
 		}
+
+		log_info(log_memoria, "deje de esperar %d", pid);
+
 		t_msg* msg = msg_recibir(socketKernel);
 		msg_recibir_data(socketKernel, msg);
 		void* tmpBuffer;
@@ -76,7 +81,7 @@ void escucharKERNEL(void* socket_kernel) {
 
 			//guardo codigo en memoria
 
-			log_info(log_memoria, "Solicitud %s", msg->data);
+			log_info(log_memoria, "\n%s", msg->data);
 
 			if(hayFramesLibres(cantidadDePaginas)){
 				int i = 0;
@@ -97,11 +102,6 @@ void escucharKERNEL(void* socket_kernel) {
 
 
 		case FINALIZAR_PROGRAMA:
-			if (recv(socketKernel, &pid, sizeof(t_num8), 0) <= 0) {
-				log_info(log_memoria,"El Kernel se ha desconectado");
-				pthread_exit(NULL);
-			}
-
 			log_info(log_memoria,"Finalizando proceso %d", pid);
 
 			lockFramesYProcesos();

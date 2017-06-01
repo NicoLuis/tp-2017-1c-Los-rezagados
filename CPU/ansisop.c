@@ -28,6 +28,11 @@ t_puntero definirVariable(t_nombre_variable identificador_variable){
 
 	log_trace(logAnsisop, "Definir variable %c", identificador_variable);
 
+	if( pcb->sp + sizeof(t_StackMetadata) >= (pcb->cantPagsCodigo + pcb->cantPagsStack)*tamanioPagina ){
+		log_error(logAnsisop, "STACKOVERFLOW");
+		error = true;
+		return -1;
+	}
 	t_StackMetadata* metadata = malloc(sizeof(t_StackMetadata));
 	metadata->id = identificador_variable;
 	metadata->posicionMemoria = traducirSP();
@@ -54,15 +59,21 @@ t_puntero definirVariable(t_nombre_variable identificador_variable){
 
 t_valor_variable dereferenciar(t_puntero direccion_variable){
 
-	log_trace(logAnsisop, "Dereferenciar direccion variable %d", direccion_variable);
+	if(direccion_variable >= 0){
+		log_trace(logAnsisop, "Dereferenciar direccion variable %d", direccion_variable);
 
-	int offsetTotal = INICIOSTACK + direccion_variable;
-	t_posicion puntero;
-	puntero.pagina = offsetTotal / tamanioPagina;
-	puntero.offset = offsetTotal % tamanioPagina;
-	puntero.size = sizeof(t_valor_variable);
+		int offsetTotal = INICIOSTACK + direccion_variable;
+		t_posicion puntero;
+		puntero.pagina = offsetTotal / tamanioPagina;
+		puntero.offset = offsetTotal % tamanioPagina;
+		puntero.size = sizeof(t_valor_variable);
 
-	return leerMemoria(puntero);
+		return leerMemoria(puntero);
+	}else{
+		log_error(logAnsisop, "No se puede obtener valor de %d", direccion_variable);
+		error = true;
+		return -1;
+	}
 }
 
 
@@ -74,38 +85,49 @@ t_puntero obtenerPosicionVariable(t_nombre_variable identificador_variable){
 	t_Stack* stackActual = list_get(pcb->indiceStack, list_size(pcb->indiceStack)-1 );
 	t_puntero retorno;
 
-	for(i = 0; i < list_size(stackActual->vars); i++){
-		t_StackMetadata* aux = list_get(stackActual->vars, i);
-		if(aux->id == identificador_variable){
-			retorno = aux->posicionMemoria.pagina * tamanioPagina + aux->posicionMemoria.offset - INICIOSTACK;
-			log_trace(logAnsisop, "Puntero variable %c: %d", identificador_variable, retorno);
-			return retorno;
-		}
-	}
+	if(identificador_variable >= '0' && identificador_variable <= '9')
 
-	for(i = 0; i < list_size(stackActual->args); i++){
-		t_StackMetadata* aux = list_get(stackActual->args, i);
-		if(aux->id == identificador_variable){
-			retorno = aux->posicionMemoria.pagina * tamanioPagina + aux->posicionMemoria.offset - INICIOSTACK;
-			log_trace(logAnsisop, "Puntero variable %c: %d", identificador_variable, retorno);
-			return retorno;
+		for(i = 0; i < list_size(stackActual->args); i++){
+			t_StackMetadata* aux = list_get(stackActual->args, i);
+			if(aux->id == identificador_variable){
+				retorno = aux->posicionMemoria.pagina * tamanioPagina + aux->posicionMemoria.offset - INICIOSTACK;
+				log_trace(logAnsisop, "Puntero variable %c: %d", identificador_variable, retorno);
+				return retorno;
+			}
 		}
-	}
 
+	else
+
+		for(i = 0; i < list_size(stackActual->vars); i++){
+			t_StackMetadata* aux = list_get(stackActual->vars, i);
+			if(aux->id == identificador_variable){
+				retorno = aux->posicionMemoria.pagina * tamanioPagina + aux->posicionMemoria.offset - INICIOSTACK;
+				log_trace(logAnsisop, "Puntero variable %c: %d", identificador_variable, retorno);
+				return retorno;
+			}
+		}
+
+	log_error(logAnsisop, "No se encontro la variable %c", identificador_variable);
+	error = true;
 	return -1;
 }
 
 void asignar(t_puntero direccion_variable, t_valor_variable valor){
 
-	log_trace(logAnsisop, "Asigno valor %d en direccion variable %d", valor, direccion_variable);
+	if(direccion_variable >= 0){
+		log_trace(logAnsisop, "Asigno valor %d en direccion variable %d", valor, direccion_variable);
 
-	int offsetTotal = INICIOSTACK + direccion_variable;
-	t_posicion puntero;
-	puntero.pagina = offsetTotal / tamanioPagina;
-	puntero.offset = offsetTotal % tamanioPagina;
-	puntero.size = sizeof(t_valor_variable);
+		int offsetTotal = INICIOSTACK + direccion_variable;
+		t_posicion puntero;
+		puntero.pagina = offsetTotal / tamanioPagina;
+		puntero.offset = offsetTotal % tamanioPagina;
+		puntero.size = sizeof(t_valor_variable);
 
-	escribirMemoria(puntero, valor);
+		escribirMemoria(puntero, valor);
+	}else{
+		log_error(logAnsisop, "No se puede asignar en %d", direccion_variable);
+		error = true;
+	}
 }
 
 
@@ -113,10 +135,12 @@ void irAlLabel(t_nombre_etiqueta etiqueta){
 	log_trace(logAnsisop, "Voy al label %s", etiqueta);
 
 	t_puntero nro = metadata_buscar_etiqueta(etiqueta, pcb->indiceEtiquetas.bloqueSerializado, pcb->indiceEtiquetas.size);
-	pcb->pc = nro;
-
-	if(nro == -1)
+	if(nro == -1){
 		log_error(logAnsisop, "No encontre label %s", etiqueta);
+		error = true;
+	}
+	else
+		pcb->pc = nro;
 }
 
 void llamarSinRetorno(t_nombre_etiqueta etiqueta){
@@ -130,7 +154,12 @@ void llamarSinRetorno(t_nombre_etiqueta etiqueta){
 	list_add(pcb->indiceStack, stackActual);
 
 	t_puntero nro = metadata_buscar_etiqueta(etiqueta, pcb->indiceEtiquetas.bloqueSerializado, pcb->indiceEtiquetas.size);
-	pcb->pc = nro;
+	if(nro == -1){
+		log_error(logAnsisop, "No encontre label %s", etiqueta);
+		error = true;
+	}
+	else
+		pcb->pc = nro;
 }
 
 void llamarConRetorno(t_nombre_etiqueta etiqueta, t_puntero donde_retornar){
@@ -151,7 +180,12 @@ void llamarConRetorno(t_nombre_etiqueta etiqueta, t_puntero donde_retornar){
 	list_add(pcb->indiceStack, stackActual);
 
 	t_puntero nro = metadata_buscar_etiqueta(etiqueta, pcb->indiceEtiquetas.bloqueSerializado, pcb->indiceEtiquetas.size);
-	pcb->pc = nro;
+	if(nro == -1){
+		log_error(logAnsisop, "No encontre label %s", etiqueta);
+		error = true;
+	}
+	else
+		pcb->pc = nro;
 }
 
 void retornar(t_valor_variable retorno){
@@ -169,7 +203,13 @@ void finalizar(){
 
 	t_Stack* stackActual = list_remove(pcb->indiceStack, list_size(pcb->indiceStack) - 1);
 
-	pcb->pc = stackActual->retPos;
+	if(list_size(pcb->indiceStack) == 0){
+		log_trace(logCPU, "Finalizo ejecucion");
+		ultimaEjecucion = true;
+		finalizado = true;
+	}else
+		pcb->pc = stackActual->retPos;
+
 	pcb->sp = pcb->sp - list_size(stackActual->args) * sizeof(t_StackMetadata);
 	pcb->sp = pcb->sp - list_size(stackActual->vars) * sizeof(t_StackMetadata);
 
@@ -177,31 +217,11 @@ void finalizar(){
 	list_destroy_and_destroy_elements(stackActual->vars, free);
 	free(stackActual);
 
-	if(list_size(pcb->indiceStack) == 0){
-		log_trace(logCPU, "Finalizo ejecucion");
-		ultimaEjecucion = true;
-		finalizado = true;
-	}
 }
 
 t_valor_variable asignarValorCompartida(t_nombre_compartida variable, t_valor_variable valor){
-	//ariel
-	int longitud_buffer = 0;
-	longitud_buffer = sizeof(t_nombre_compartida) + sizeof(t_valor_variable);
-	void* buffer = malloc(longitud_buffer);
 
-	memcpy(buffer, &variable, sizeof(t_nombre_compartida));
-	memcpy(buffer+sizeof(t_nombre_compartida), &valor, sizeof(t_valor_variable));
-
-	if(buffer == NULL){
-		log_trace(logCPU, "error en la asignacion del buffer");
-	}
-
-	void msg_enviar_separado(VALOR_VARIABLE_COMPARTIDA, longitud_buffer, buffer, socket_kernel);
-	free(buffer);
-
-	return valor;
-
+	return 0;
 }
 
 t_valor_variable obtenerValorCompartida(t_nombre_compartida variable){

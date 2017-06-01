@@ -104,28 +104,28 @@ int handshake(int socket_cliente, int tipo){
 
 
 
-t_PCB* recibir_pcb(int socket_cpu, t_msg* msgRecibido, bool finalizado, bool bloqueo){
+t_PCB* recibir_pcb(int socket_cpu, t_msg* msgRecibido, bool flag_finalizado, bool flag_bloqueo){
 	bool _esCPU2(t_infosocket* aux){
 		return aux->socket == socket_cpu;
 	}
 	log_trace(logKernel, "Recibi PCB");
 	t_PCB* pcb = desserealizarPCB(msgRecibido->data);
 	list_remove_and_destroy_by_condition(lista_PCB_cpu, (void*) _esCPU2, free);
-	_sacarDeCola(pcb->pid, cola_Exec);
+	_sacarDeCola(pcb->pid, cola_Exec, mutex_Exec);
 	sigoFIFO = 0;
 	quantumRestante = 0;
-	if(finalizado){
-		setearExitCode(pcb->pid, 0);
-		bool _esPid(t_infosocket* a){ return a->pid == pcb->pid; }
-		t_infosocket* info = list_find(lista_PCB_consola, (void*) _esPid);
-		if(info == NULL)
-			log_trace(logKernel, "No se ecuentra consola asociada a pid %d", pcb->pid);
-		msg_enviar_separado(FINALIZAR_PROGRAMA, sizeof(t_num8), &info->pid, info->socket);
+	if(flag_finalizado){
+		log_trace(logKernel, "Finalizo PCB");
+		pcb->exitCode = 0;
+		send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
+		msg_enviar_separado(FINALIZAR_PROGRAMA, 0, 0, socket_memoria);
+		_ponerEnCola(pcb->pid, cola_Exit, mutex_Exit);
+		liberarPCB(pcb, true);
 	}else{
-		if(bloqueo)
-			queue_push(cola_Block, &pcb->pid);
+		if(flag_bloqueo)
+			_ponerEnCola(pcb->pid, cola_Block, mutex_Block);
 		else{
-			queue_push(cola_Ready, &pcb->pid);
+			_ponerEnCola(pcb->pid, cola_Ready, mutex_Ready);
 			sem_wait(&sem_cantColaReady);
 		}
 	}
@@ -142,11 +142,11 @@ void escucharCPU(int socket_cpu) {
 		return in->socket == socket_cpu;
 	}
 	t_cpu* cpuUsada = list_find(lista_cpus, (void*) _esCPU);
-	bool finalizado = false;
 
 	while(1){
 
 		sem_wait(&cpuUsada->sem);
+		bool flag_finalizado = false;
 
 		t_msg* msgRecibido = msg_recibir(socket_cpu);
 
@@ -157,6 +157,8 @@ void escucharCPU(int socket_cpu) {
 
 		t_PCB* pcb = list_find(lista_PCBs, (void*) _es_PCB);
 
+		bool _esPid(t_infosocket* a){ return a->pid == pcb->pid; }
+
 		switch(msgRecibido->tipoMensaje){
 		case OK:
 			log_trace(logKernel, "Recibi OK");
@@ -164,11 +166,24 @@ void escucharCPU(int socket_cpu) {
 			break;
 		case FINALIZAR_PROGRAMA:
 			log_trace(logKernel, "Finalizo programa");
-			finalizado = true;
+			flag_finalizado = true;
 			//no break
 		case ENVIO_PCB:		// si me devuelve el PCB es porque fue la ultima instruccion
 			msg_recibir_data(socket_cpu, msgRecibido);
-			pcb = recibir_pcb(socket_cpu, msgRecibido, finalizado, false);
+			pcb = recibir_pcb(socket_cpu, msgRecibido, flag_finalizado, 0);
+			if(flag_finalizado){
+				bool _esPid(t_infosocket* a){ return a->pid == pcb->pid; }
+				t_infosocket* info = list_find(lista_PCB_consola, (void*) _esPid);
+				if(info == NULL)
+					log_trace(logKernel, "No se ecuentra consola asociada a pid %d", pcb->pid);
+				msg_enviar_separado(FINALIZAR_PROGRAMA, sizeof(t_num8), &info->pid, info->socket);
+				sem_post(&sem_gradoMp);
+			}
+			list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
+			list_add(lista_PCBs, pcb);
+			_sacarDeCola(pcb->pid, cola_Exec, mutex_Exec);
+			cpuUsada->libre = true;
+			sem_post(&sem_cantCPUs);
 			break;
 		case 0: case FIN_CPU:
 			fprintf(stderr, "La cpu %d se ha desconectado \n", socket_cpu);
@@ -177,11 +192,27 @@ void escucharCPU(int socket_cpu) {
 			list_remove_by_condition(lista_cpus, (void*) _esCPU);
 			list_remove_and_destroy_by_condition(lista_PCB_cpu, (void*) _esCPU2, free);
 			setearExitCode(pcb->pid, -20);
-			_sacarDeCola(pcb->pid, cola_Exec);
+			_sacarDeCola(pcb->pid, cola_Exec, mutex_Exec);
+			list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
+			list_add(lista_PCBs, pcb);
 			sigoFIFO = 0;
 			quantumRestante = 0;
 			pthread_mutex_unlock(&mut_planificacion);
+			sem_post(&sem_gradoMp);
 			pthread_exit(NULL);
+			break;
+		case ERROR:
+			log_trace(logKernel, "Recibi ERROR");
+			msg_recibir_data(socket_cpu, msgRecibido);
+			pcb = recibir_pcb(socket_cpu, msgRecibido, 1, 0);
+			pcb->exitCode = -11;	//-11: error de sintaxis en script
+			list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
+			list_add(lista_PCBs, pcb);
+			cpuUsada->libre = true;
+			sem_post(&sem_cantCPUs);
+			t_infosocket* info = list_find(lista_PCB_consola, (void*) _esPid);
+			msg_enviar_separado(ERROR, sizeof(t_num8), &pcb->pid, info->socket);
+			sem_post(&sem_gradoMp);
 			break;
 		case ESCRIBIR_FD:
 			log_trace(logKernel, "Recibi ESCRIBIR_FD");
@@ -194,12 +225,13 @@ void escucharCPU(int socket_cpu) {
 
 			msgRecibido = msg_recibir(socket_cpu);
 			msg_recibir_data(socket_cpu, msgRecibido);
-			pcb = recibir_pcb(socket_cpu, msgRecibido, finalizado, true);
+			pcb = recibir_pcb(socket_cpu, msgRecibido, 0, 1);
 			list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
 			list_add(lista_PCBs, pcb);
+			cpuUsada->libre = true;
+			sem_post(&sem_cantCPUs);
 			if(fd == 1){
 				log_trace(logKernel, "Imprimo por consola: %s", informacion);
-				bool _esPid(t_infosocket* a){ return a->pid == pcb->pid; }
 				t_infosocket* info = list_find(lista_PCB_consola, (void*) _esPid);
 				if(info == NULL)
 					log_trace(logKernel, "No se ecuentra consola asociada a pid %d", pcb->pid);
@@ -208,51 +240,11 @@ void escucharCPU(int socket_cpu) {
 				log_trace(logKernel, "Escribo en fd %d: %s", fd, informacion);
 				//todo: lo trato como si fuese del FS
 			}
-			_sacarDeCola(pcb->pid, cola_Block);
-			queue_push(cola_Ready, &pcb->pid);
-			cpuUsada->libre = true;
+			_sacarDeCola(pcb->pid, cola_Block, mutex_Block);
+			_ponerEnCola(pcb->pid, cola_Ready, mutex_Ready);
 			sem_post(&sem_cantColaReady);
 			free(informacion);
 			break;
-
-		case VALOR_VARIABLE_COMPARTIDA:
-			log_trace(logKernel, "Recibi VALOR_VARIABLE_COMPARTIDA");
-			t_nombre_compartida nombreVariable;
-			t_valor_variable valor;
-
-			memcpy(nombreVariable, msgRecibido->data,sizeof(t_nombre_compartida));
-			memcpy(&valor, msgRecibido->data + sizeof(t_nombre_compartida), sizeof(t_valor_variable));
-
-			t_VariableCompartida varCompartida; //es un struct que tiene nombre *char y valor *void
-
-			varCompartida->nombre = nombreVariable;
-			varCompartida->valor = valor;
-
-			int resultado;
-
-			int _buscar_VarComp(t_VariableCompartida* p){
-			resultado = strcmp(p->nombre, nombreVariable);
-
-				if(resultado == 0) {
-					return 1;
-				}
-				else
-				{
-					return 0;
-				}
-			}
-
-			t_VariableCompartida* varBuscada = list_find(lista_variablesCompartidas, (void*) _buscar_VarComp);
-			if (varBuscada == NULL){
-				log_trace(logKernel, "error no encontre VALOR_VARIABLE_COMPARTIDA");
-			}
-			else
-			{
-				varBuscada->valor = valor;
-			}
-
-
-
 		}
 
 		msg_destruir(msgRecibido);
@@ -277,17 +269,17 @@ void enviarScriptAMemoria(_t_hiloEspera* aux){
 	bool _buscarConsola(t_infosocket* a){
 		return a->pid == aux->pid;
 	}
+
 	t_infosocket* a = list_find(lista_PCB_consola, (void*) _buscarConsola);
 	int socketConsola = a->socket;
 
 	sem_wait(&sem_gradoMp);
-	_sacarDeCola(aux->pid, cola_New);
-
+	_sacarDeCola(aux->pid, cola_New, mutex_New);
 
 	t_PCB* pcb = list_find(lista_PCBs, (void*) _buscarPCB);
 	send(socket_memoria, &aux->pid, sizeof(t_num8), 0);
 	msg_enviar_separado(INICIALIZAR_PROGRAMA, aux->size, aux->script, socket_memoria);
-	send(socket_memoria, &stackSize, sizeof(t_num8), 0);
+	send(socket_memoria, &pcb->cantPagsStack, sizeof(t_num8), 0);
 	t_num8 respuesta;
 	recv(socket_memoria, &respuesta, sizeof(t_num8), 0);
 	switch(respuesta){
@@ -301,7 +293,7 @@ void enviarScriptAMemoria(_t_hiloEspera* aux){
 		bzero(infP, sizeof(t_infoProceso));
 		infP->pid = aux->pid;
 		list_add(infoProcs, infP);
-		queue_push(cola_Ready, &aux->pid);
+		_ponerEnCola(aux->pid, cola_Ready, mutex_Ready);
 		sem_post(&sem_cantColaReady);
 		break;
 	case MARCOS_INSUFICIENTES:
@@ -336,7 +328,7 @@ void atender_consola(int socket_consola){
 		info->socket = socket_consola;
 		list_add(lista_PCB_consola, info);
 
-		queue_push(cola_New, &pidActual);
+		_ponerEnCola(pidActual, cola_New, mutex_New);
 
 		_t_hiloEspera* aux = malloc(sizeof(_t_hiloEspera));
 
@@ -409,21 +401,26 @@ void consolaKernel(){
 				for(i = 0; i < list_size(lista_PCBs); i++){
 					t_PCB* pcbA = list_get(lista_PCBs, i);
 					char* cola = " -- ";
+					char* exitCode;
 
-					if(_estaEnCola(pcbA->pid, cola_New))
+					if(pcbA->exitCode > 0)
+						exitCode = "-";
+					else
+						exitCode = string_itoa(pcbA->exitCode);	//fixme: se caga en este if
+					if(_estaEnCola(pcbA->pid, cola_New, mutex_New))
 						cola = "NEW";
-					if(_estaEnCola(pcbA->pid, cola_Ready))
+					if(_estaEnCola(pcbA->pid, cola_Ready, mutex_Ready))
 						cola = "READY";
-					if(_estaEnCola(pcbA->pid, cola_Exec))
+					if(_estaEnCola(pcbA->pid, cola_Exec, mutex_Exec))
 						cola = "EXEC";
-					if(_estaEnCola(pcbA->pid, cola_Block))
+					if(_estaEnCola(pcbA->pid, cola_Block, mutex_Block))
 						cola = "BLOCK";
-					if(_estaEnCola(pcbA->pid, cola_Exit))
+					if(_estaEnCola(pcbA->pid, cola_Exit, mutex_Exit))
 						cola = "EXIT";
 
 					if(string_starts_with(comando, "s") || !string_equals_ignore_case(cola, " -- "))
-						printf("   ----   %d   ----   %d   ----    %d     ----     %d    ----  %s  ----   \n",
-							pcbA->pid, pcbA->pc, (pcbA->cantPagsCodigo + stackSize), pcbA->exitCode, cola);
+						printf("   ----   %d   ----   %d   ----    %d     ----     %s    ----  %s  ----   \n",
+							pcbA->pid, pcbA->pc, (pcbA->cantPagsCodigo + pcbA->cantPagsStack), exitCode, cola);
 				}
 
 			}else printf("Flasheaste era s/n \n");
@@ -563,11 +560,11 @@ void terminarKernel(){			//aca libero todos
 	void _freePCBs(t_PCB* pcb){ liberarPCB(pcb, false); }
 	list_destroy_and_destroy_elements(lista_PCBs, (void*) _freePCBs);
 
-	queue_destroy(cola_New);
-	queue_destroy(cola_Ready);
-	queue_destroy(cola_Exec);
-	queue_destroy(cola_Block);
-	queue_destroy(cola_Exit);
+	queue_destroy_and_destroy_elements(cola_New, (void*) free);
+	queue_destroy_and_destroy_elements(cola_Ready, (void*) free);
+	queue_destroy_and_destroy_elements(cola_Exec, (void*) free);
+	queue_destroy_and_destroy_elements(cola_Block, (void*) free);
+	queue_destroy_and_destroy_elements(cola_Exit, (void*) free);
 
 	list_destroy_and_destroy_elements(lista_variablesCompartidas, free);
 	void _destruirSemaforos(t_VariableSemaforo* variable){

@@ -488,8 +488,35 @@ void consolaKernel(){
 
 		}else if(string_starts_with(comando, "grado mp ")){
 
-			gradoMultiprogramacion = atoi(string_substring_from(comando, 9));
-			printf("Nuevo grado de multiprogramacion: %d\n", gradoMultiprogramacion);
+			int valorSem, nuevoGMP;
+			nuevoGMP = atoi(string_substring_from(comando, 9));
+			sem_getvalue(&sem_gradoMp, &valorSem);
+
+			log_trace(logKernel, "Cambio grado multiprogramacion, anterior %d enEjecucion %d nuevo %d",
+					gradoMultiprogramacion, gradoMultiprogramacion-valorSem, nuevoGMP);
+
+			void _esperarGradoMP(){
+				sem_wait(&sem_gradoMp);
+			}
+
+			if(nuevoGMP < gradoMultiprogramacion && nuevoGMP < valorSem){
+				pthread_attr_t atributo;
+				pthread_attr_init(&atributo);
+				pthread_attr_setdetachstate(&atributo, PTHREAD_CREATE_DETACHED);
+				pthread_t hiloEspera;
+				while(valorSem > nuevoGMP){
+					pthread_create(&hiloEspera, &atributo,(void*) _esperarGradoMP, NULL);
+					sem_getvalue(&sem_gradoMp, &valorSem);
+				}
+				pthread_attr_destroy(&atributo);
+
+				gradoMultiprogramacion = nuevoGMP;
+				printf("Nuevo grado de multiprogramacion: %d\n", gradoMultiprogramacion);
+			}else{
+				sem_init(&sem_gradoMp, 0, nuevoGMP - valorSem);
+				gradoMultiprogramacion = nuevoGMP;
+				printf("Nuevo grado de multiprogramacion: %d\n", gradoMultiprogramacion);
+			}
 
 		}else if(string_starts_with(comando, "kill ")){
 

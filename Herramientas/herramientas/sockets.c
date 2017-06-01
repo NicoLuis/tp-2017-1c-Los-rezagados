@@ -106,6 +106,7 @@ void msg_enviar(t_msg* msg, int socketTo){
 void msg_recibir_data(int socketFrom, t_msg* msg){
 
 	msg->data = malloc(msg->longitud);
+	bzero(msg->data, msg->longitud);
 	recv(socketFrom, msg->data, msg->longitud, MSG_WAITALL);
 
 }

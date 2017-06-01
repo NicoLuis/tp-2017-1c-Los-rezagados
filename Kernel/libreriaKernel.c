@@ -221,6 +221,7 @@ void escucharCPU(int socket_cpu) {
 			void* informacion = malloc(size);
 			memcpy(&fd, msgRecibido->data, sizeof(t_puntero));
 			memcpy(informacion, msgRecibido->data + sizeof(t_puntero), size);
+			msg_destruir(msgRecibido);
 
 			msgRecibido = msg_recibir(socket_cpu);
 			msg_recibir_data(socket_cpu, msgRecibido);
@@ -242,6 +243,7 @@ void escucharCPU(int socket_cpu) {
 			_sacarDeCola(pcb->pid, cola_Block, mutex_Block);
 			_ponerEnCola(pcb->pid, cola_Ready, mutex_Ready);
 			sem_post(&sem_cantColaReady);
+			free(informacion);
 			break;
 		}
 

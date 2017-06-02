@@ -29,9 +29,9 @@ int main(int argc, char* argv[]) {
 	signal (SIGINT, finalizarCPU);
 	signal (SIGUSR1, ultimaEjecTotal);
 	signal (SIGUSR2, ultimaEjec);
-	ultimaEjecucionTotal = false;
-	ultimaEjecucion = false;
-	finalizado = false;
+	flag_ultimaEjecucionTotal = false;
+	flag_ultimaEjecucion = false;
+	flag_finalizado = false;
 
 	//Cargo archivo de configuracion
 
@@ -134,8 +134,8 @@ int main(int argc, char* argv[]) {
 			break;
 		case EJECUTAR_ULTIMA_INSTRUCCION:
 			log_trace(logCPU, "Recibi EJECUTAR_ULTIMA_INSTRUCCION");
-			finalizado = true;
-			ultimaEjecucion = true;
+			flag_finalizado = true;
+			flag_ultimaEjecucion = true;
 			ejecutarInstruccion();
 			break;
 		case 0:
@@ -146,7 +146,7 @@ int main(int argc, char* argv[]) {
 			log_trace(logCPU, "Recibi verdura %d", msgRecibido->tipoMensaje);
 		}
 
-		if(ultimaEjecucionTotal)
+		if(flag_ultimaEjecucionTotal)
 			finalizarCPU();
 
 	}

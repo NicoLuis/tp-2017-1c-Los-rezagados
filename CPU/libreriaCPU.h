@@ -49,9 +49,9 @@ t_posicion escribirMemoria(t_posicion puntero, t_valor_variable valor);
 int socket_kernel;
 int socket_memoria;
 
-bool ultimaEjecucionTotal;
-bool ultimaEjecucion;
-bool finalizado;
-bool error;
+bool flag_ultimaEjecucionTotal;
+bool flag_ultimaEjecucion;
+bool flag_finalizado;
+bool flag_error;
 
 #endif

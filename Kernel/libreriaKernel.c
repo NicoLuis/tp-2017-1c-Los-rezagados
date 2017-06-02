@@ -156,8 +156,13 @@ void escucharCPU(int socket_cpu) {
 		}
 
 		t_PCB* pcb = list_find(lista_PCBs, (void*) _es_PCB);
-
 		bool _esPid(t_infosocket* a){ return a->pid == pcb->pid; }
+
+		t_VariableCompartida* varCompartida;
+		int _buscar_VarComp(t_VariableCompartida* p){
+			return string_equals_ignore_case(p->nombre, varCompartida->nombre);
+		}
+		t_num tamanioNombre, offset;
 
 		switch(msgRecibido->tipoMensaje){
 		case OK:
@@ -244,6 +249,38 @@ void escucharCPU(int socket_cpu) {
 			_ponerEnCola(pcb->pid, cola_Ready, mutex_Ready);
 			sem_post(&sem_cantColaReady);
 			free(informacion);
+			break;
+		case GRABAR_VARIABLE_COMPARTIDA:
+			log_trace(logKernel, "Recibi GRABAR_VARIABLE_COMPARTIDA");
+
+			memcpy(&tamanioNombre, msgRecibido->data, sizeof(t_num));
+			offset += sizeof(t_num);
+			memcpy(varCompartida->nombre, msgRecibido->data + offset, tamanioNombre);
+			offset += tamanioNombre;
+			memcpy(&varCompartida->valor, msgRecibido->data + offset, sizeof(t_valor_variable));
+
+			t_VariableCompartida* varBuscada = list_find(lista_variablesCompartidas, (void*) _buscar_VarComp);
+			if (varBuscada == NULL)
+				log_trace(logKernel, "error no encontre VALOR_VARIABLE_COMPARTIDA");
+			else
+				varBuscada->valor = varCompartida->valor;
+			free(varCompartida);
+			break;
+		case VALOR_VARIABLE_COMPARTIDA:
+			log_trace(logKernel, "Recibi VALOR_VARIABLE_COMPARTIDA");
+
+			memcpy(&tamanioNombre, msgRecibido->longitud, sizeof(t_num));
+				offset += sizeof(t_num);
+			memcpy(varCompartida->nombre, msgRecibido->data + offset, tamanioNombre);
+
+			// fixme: TENGO Q ENVIAR Y ESPERAR POR EL PCB?
+
+			t_VariableCompartida* varBuscad = list_find(lista_variablesCompartidas, (void*) _buscar_VarComp);
+			if (varBuscad == NULL)
+				log_trace(logKernel, "error no encontre VALOR_VARIABLE_COMPARTIDA");
+			else
+				msg_enviar_separado(VALOR_VARIABLE_COMPARTIDA, sizeof(t_valor_variable), &varBuscad->valor, socket_cpu);
+			free(varCompartida);
 			break;
 		}
 

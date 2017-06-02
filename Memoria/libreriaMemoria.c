@@ -402,10 +402,11 @@ void liberarFramesDeProceso(uint32_t unPid) {
 
 	int i = 0;
 	while (i < framesAsignadosAlProceso) {
-		t_frame* frame = list_find(listaFrames, (void *) _soy_el_frame_buscado);
+		t_frame* frame = list_remove_by_condition(listaFrames, (void *) _soy_el_frame_buscado);
 		frame->pid = 0;
 
 		log_info(log_memoria,"Frame %d liberado", frame->nroFrame);
+		list_add(listaFrames, frame);
 
 		i++;
 	}
@@ -1192,12 +1193,13 @@ void flushMemoria() {
 
 	while (i < cantidadDeMarcos) {
 
-		t_frame* frame = list_get(listaFrames, i);
+		t_frame* frame = list_remove(listaFrames, i);
 
 		if (frame->pid != 0) {
 
 			frame->bit_modif = 1;
 		}
+		list_add(listaFrames, frame);
 
 		i++;
 	}

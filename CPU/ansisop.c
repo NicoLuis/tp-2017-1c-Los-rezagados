@@ -30,7 +30,7 @@ t_puntero definirVariable(t_nombre_variable identificador_variable){
 
 	if( pcb->sp + sizeof(t_StackMetadata) >= (pcb->cantPagsCodigo + pcb->cantPagsStack)*tamanioPagina ){
 		log_error(logAnsisop, "STACKOVERFLOW");
-		error = true;
+		flag_error = true;
 		return -1;
 	}
 	t_StackMetadata* metadata = malloc(sizeof(t_StackMetadata));
@@ -71,7 +71,7 @@ t_valor_variable dereferenciar(t_puntero direccion_variable){
 		return leerMemoria(puntero);
 	}else{
 		log_error(logAnsisop, "No se puede obtener valor de %d", direccion_variable);
-		error = true;
+		flag_error = true;
 		return -1;
 	}
 }
@@ -108,7 +108,7 @@ t_puntero obtenerPosicionVariable(t_nombre_variable identificador_variable){
 		}
 
 	log_error(logAnsisop, "No se encontro la variable %c", identificador_variable);
-	error = true;
+	flag_error = true;
 	return -1;
 }
 
@@ -126,7 +126,7 @@ void asignar(t_puntero direccion_variable, t_valor_variable valor){
 		escribirMemoria(puntero, valor);
 	}else{
 		log_error(logAnsisop, "No se puede asignar en %d", direccion_variable);
-		error = true;
+		flag_error = true;
 	}
 }
 
@@ -137,7 +137,7 @@ void irAlLabel(t_nombre_etiqueta etiqueta){
 	t_puntero nro = metadata_buscar_etiqueta(etiqueta, pcb->indiceEtiquetas.bloqueSerializado, pcb->indiceEtiquetas.size);
 	if(nro == -1){
 		log_error(logAnsisop, "No encontre label %s", etiqueta);
-		error = true;
+		flag_error = true;
 	}
 	else
 		pcb->pc = nro;
@@ -156,7 +156,7 @@ void llamarSinRetorno(t_nombre_etiqueta etiqueta){
 	t_puntero nro = metadata_buscar_etiqueta(etiqueta, pcb->indiceEtiquetas.bloqueSerializado, pcb->indiceEtiquetas.size);
 	if(nro == -1){
 		log_error(logAnsisop, "No encontre label %s", etiqueta);
-		error = true;
+		flag_error = true;
 	}
 	else
 		pcb->pc = nro;
@@ -182,7 +182,7 @@ void llamarConRetorno(t_nombre_etiqueta etiqueta, t_puntero donde_retornar){
 	t_puntero nro = metadata_buscar_etiqueta(etiqueta, pcb->indiceEtiquetas.bloqueSerializado, pcb->indiceEtiquetas.size);
 	if(nro == -1){
 		log_error(logAnsisop, "No encontre label %s", etiqueta);
-		error = true;
+		flag_error = true;
 	}
 	else
 		pcb->pc = nro;
@@ -205,8 +205,8 @@ void finalizar(){
 
 	if(list_size(pcb->indiceStack) == 0){
 		log_trace(logCPU, "Finalizo ejecucion");
-		ultimaEjecucion = true;
-		finalizado = true;
+		flag_ultimaEjecucion = true;
+		flag_finalizado = true;
 	}else
 		pcb->pc = stackActual->retPos;
 
@@ -220,13 +220,44 @@ void finalizar(){
 }
 
 t_valor_variable asignarValorCompartida(t_nombre_compartida variable, t_valor_variable valor){
+	//ariel
+	log_trace(logAnsisop, "Asignar valor %d a variable %s", valor, variable);
 
-	return 0;
+	int longitud_buffer = 0;
+	longitud_buffer = sizeof(t_num) + string_length(variable) + sizeof(t_valor_variable);
+	void* buffer = malloc(longitud_buffer);
+	t_num tamanioNombre = string_length(variable);
+
+	memcpy(buffer, &tamanioNombre, sizeof(t_num));
+	memcpy(buffer + sizeof(t_num), &variable, tamanioNombre);
+	memcpy(buffer + sizeof(t_num) + tamanioNombre, &valor, sizeof(t_valor_variable));
+
+	if(buffer == NULL){
+		log_trace(logCPU, "error en la asignacion del buffer");
+	}
+
+	msg_enviar_separado(GRABAR_VARIABLE_COMPARTIDA, longitud_buffer, buffer, socket_kernel);
+	free(buffer);
+	flag_ultimaEjecucion = true;
+
+	return valor;
 }
 
 t_valor_variable obtenerValorCompartida(t_nombre_compartida variable){
 
-	return 0;
+	log_trace(logAnsisop, "Obtener valor de variable %s", variable);
+	msg_enviar_separado(VALOR_VARIABLE_COMPARTIDA, string_length(variable), variable, socket_kernel);
+
+	// fixme: TENGO Q ENVIAR Y ESPERAR POR EL PCB?
+
+	t_msg* msgRecibido = msg_recibir(socket_kernel);
+	msg_recibir_data(socket_kernel, msgRecibido);
+
+	t_valor_variable valor;
+	memcpy(&valor, msgRecibido->data, sizeof(t_valor_variable));
+
+	log_trace(logAnsisop, "Valor %d", valor);
+	return valor;
 }
 
 /*
@@ -257,7 +288,7 @@ void escribir(t_descriptor_archivo descriptor_archivo, void* informacion, t_valo
 	memcpy(buf, &descriptor_archivo, tmpsize);
 	memcpy(buf + tmpsize, informacion, tamanio);
 	msg_enviar_separado(ESCRIBIR_FD, tamanio + tmpsize, buf, socket_kernel);
-	ultimaEjecucion = true;
+	flag_ultimaEjecucion = true;
 }
 
 void leer(t_descriptor_archivo descriptor_archivo, t_puntero informacion, t_valor_variable tamanio){

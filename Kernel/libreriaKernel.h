@@ -38,7 +38,7 @@
 
 typedef struct {
 	char* nombre;
-	void* valor;
+	t_valor_variable valor;
 }t_VariableCompartida;
 t_list* lista_variablesCompartidas;
 

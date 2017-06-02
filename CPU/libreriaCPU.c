@@ -56,13 +56,13 @@ void finalizarCPU(){
 
 void ultimaEjecTotal(){
 	ultimaEjec();
-	ultimaEjecucionTotal = true;
+	flag_ultimaEjecucionTotal = true;
 }
 
 void ultimaEjec(){
 	log_info(logCPU, "Signal ultimaEjecucion");
-	finalizado = true;
-	ultimaEjecucion = true;
+	flag_finalizado = true;
+	flag_ultimaEjecucion = true;
 }
 
 
@@ -81,28 +81,28 @@ void ejecutarInstruccion(){
 		return;
 	}
 
-	if(error){
+	if(flag_error){
 		log_trace(logCPU, "Devuelvo ERROR");
 		uint32_t size = tamanioTotalPCB(pcb);
 		void* pcbSerializado = serializarPCB(pcb);
 		msg_enviar_separado(ERROR, size, pcbSerializado, socket_kernel);
 		free(pcbSerializado);
-		finalizado = false;
-		ultimaEjecucion = false;
-		error = false;
+		flag_finalizado = false;
+		flag_ultimaEjecucion = false;
+		flag_error = false;
 	}
 
-	if(ultimaEjecucion){
+	if(flag_ultimaEjecucion){
 		log_trace(logCPU, "Ultima Instruccion");
 		uint32_t size = tamanioTotalPCB(pcb);
 		void* pcbSerializado = serializarPCB(pcb);
-		if(finalizado)
+		if(flag_finalizado)
 			msg_enviar_separado(FINALIZAR_PROGRAMA, size, pcbSerializado, socket_kernel);
 		else
 			msg_enviar_separado(ENVIO_PCB, size, pcbSerializado, socket_kernel);
 		free(pcbSerializado);
-		finalizado = false;
-		ultimaEjecucion = false;
+		flag_finalizado = false;
+		flag_ultimaEjecucion = false;
 	}else
 		msg_enviar_separado(OK, 0, 0, socket_kernel);
 }

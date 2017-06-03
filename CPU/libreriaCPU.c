@@ -68,7 +68,7 @@ void ultimaEjec(){
 
 void ejecutarInstruccion(){
 	log_info(logCPU, "PCB pid: %d", pcb->pid);
-
+	flag_OK = 1;
 	char* instruccion = proximaInstruccion();
 
 	if (instruccion != NULL) {
@@ -103,7 +103,7 @@ void ejecutarInstruccion(){
 		free(pcbSerializado);
 		flag_finalizado = false;
 		flag_ultimaEjecucion = false;
-	}else
+	}else if (flag_OK)
 		msg_enviar_separado(OK, 0, 0, socket_kernel);
 }
 

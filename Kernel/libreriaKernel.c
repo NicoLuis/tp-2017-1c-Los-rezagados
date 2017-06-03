@@ -42,9 +42,10 @@ void inicializarSemaforosYVariables(char** ids, char** valores, char** shared_va
 	lista_variablesCompartidas = list_create();
 	for(i = 0; shared_vars[i] != NULL ;i++){
 		t_VariableCompartida* variable = malloc(sizeof(t_VariableCompartida));
-		variable->nombre = shared_vars[i];
+		variable->nombre = string_substring(shared_vars[i], 1, string_length(shared_vars[i])-1);
 		variable->valor = 0;
-		list_add(lista_variablesSemaforo, variable);
+		log_info(logKernel, "shared_vars[%d] %s", i, variable->nombre);
+		list_add(lista_variablesCompartidas, variable);
 	}
 
 	sem_init(&sem_gradoMp, 0, gradoMultiprogramacion);
@@ -158,11 +159,11 @@ void escucharCPU(int socket_cpu) {
 		t_PCB* pcb = list_find(lista_PCBs, (void*) _es_PCB);
 		bool _esPid(t_infosocket* a){ return a->pid == pcb->pid; }
 
-		t_VariableCompartida* varCompartida;
+		t_VariableCompartida* varCompartida = malloc(sizeof(varCompartida));
 		int _buscar_VarComp(t_VariableCompartida* p){
 			return string_equals_ignore_case(p->nombre, varCompartida->nombre);
 		}
-		t_num tamanioNombre, offset;
+		t_num tamanioNombre, offset = 0;
 
 		switch(msgRecibido->tipoMensaje){
 		case OK:
@@ -202,7 +203,6 @@ void escucharCPU(int socket_cpu) {
 			list_add(lista_PCBs, pcb);
 			sigoFIFO = 0;
 			quantumRestante = 0;
-			pthread_mutex_unlock(&mut_planificacion);
 			sem_post(&sem_gradoMp);
 			pthread_exit(NULL);
 			break;
@@ -245,6 +245,7 @@ void escucharCPU(int socket_cpu) {
 				log_trace(logKernel, "Escribo en fd %d: %s", fd, informacion);
 				//todo: lo trato como si fuese del FS
 			}
+			sigoFIFO = 0;
 			_sacarDeCola(pcb->pid, cola_Block, mutex_Block);
 			_ponerEnCola(pcb->pid, cola_Ready, mutex_Ready);
 			sem_post(&sem_cantColaReady);
@@ -253,39 +254,51 @@ void escucharCPU(int socket_cpu) {
 		case GRABAR_VARIABLE_COMPARTIDA:
 			log_trace(logKernel, "Recibi GRABAR_VARIABLE_COMPARTIDA");
 
+			msg_recibir_data(socket_cpu, msgRecibido);
 			memcpy(&tamanioNombre, msgRecibido->data, sizeof(t_num));
 			offset += sizeof(t_num);
+			varCompartida->nombre = malloc(tamanioNombre+1);
 			memcpy(varCompartida->nombre, msgRecibido->data + offset, tamanioNombre);
+			varCompartida->nombre[tamanioNombre] = '\0';
 			offset += tamanioNombre;
 			memcpy(&varCompartida->valor, msgRecibido->data + offset, sizeof(t_valor_variable));
+			log_info(logKernel, "Variable %s, valor %d", varCompartida->nombre, varCompartida->valor);
 
 			t_VariableCompartida* varBuscada = list_find(lista_variablesCompartidas, (void*) _buscar_VarComp);
-			if (varBuscada == NULL)
-				log_trace(logKernel, "error no encontre VALOR_VARIABLE_COMPARTIDA");
-			else
+			if (varBuscada == NULL){
+				log_error(logKernel, "Error no encontre VALOR_VARIABLE_COMPARTIDA");
+				msg_enviar_separado(ERROR, 0, 0, socket_cpu);
+			}else{
 				varBuscada->valor = varCompartida->valor;
-			free(varCompartida);
+				msg_enviar_separado(GRABAR_VARIABLE_COMPARTIDA, 0, 0, socket_cpu);
+			}
+			free(varCompartida->nombre);
 			break;
 		case VALOR_VARIABLE_COMPARTIDA:
 			log_trace(logKernel, "Recibi VALOR_VARIABLE_COMPARTIDA");
 
-			memcpy(&tamanioNombre, msgRecibido->longitud, sizeof(t_num));
-				offset += sizeof(t_num);
-			memcpy(varCompartida->nombre, msgRecibido->data + offset, tamanioNombre);
-
-			// fixme: TENGO Q ENVIAR Y ESPERAR POR EL PCB?
+			msg_recibir_data(socket_cpu, msgRecibido);
+			memcpy(&tamanioNombre, &msgRecibido->longitud, sizeof(t_num));
+			varCompartida->nombre = malloc(tamanioNombre+1);
+			memcpy(varCompartida->nombre, msgRecibido->data, tamanioNombre);
+			varCompartida->nombre[tamanioNombre] = '\0';
+			log_info(logKernel, "Variable %s", varCompartida->nombre);
 
 			t_VariableCompartida* varBuscad = list_find(lista_variablesCompartidas, (void*) _buscar_VarComp);
-			if (varBuscad == NULL)
-				log_trace(logKernel, "error no encontre VALOR_VARIABLE_COMPARTIDA");
-			else
+			if (varBuscad == NULL){
+				log_error(logKernel, "Error no encontre VALOR_VARIABLE_COMPARTIDA");
+				msg_enviar_separado(ERROR, 0, 0, socket_cpu);
+			}else{
+				log_info(logKernel, "Valor %d", varBuscad->valor);
 				msg_enviar_separado(VALOR_VARIABLE_COMPARTIDA, sizeof(t_valor_variable), &varBuscad->valor, socket_cpu);
-			free(varCompartida);
+			}
+			free(varCompartida->nombre);
 			break;
 		}
 
+		free(varCompartida);
 		msg_destruir(msgRecibido);
-		pthread_mutex_unlock(&mut_planificacion);
+		pthread_mutex_unlock(&mut_planificacion);	//fixme: bug printear variable global
 	}
 }
 
@@ -338,7 +351,10 @@ void enviarScriptAMemoria(_t_hiloEspera* aux){
 		msg_enviar_separado(MARCOS_INSUFICIENTES, 0, 0, socketConsola);
 		setearExitCode(pcb->pid, -1);
 		break;
+	default:
+		log_trace(logKernel, "RECIBI %d", respuesta);
 	}
+	free(aux->script);
 	free(aux);
 }
 
@@ -363,6 +379,7 @@ void atender_consola(int socket_consola){
 		t_infosocket* info = malloc(sizeof(t_infosocket));
 		info->pid = pidActual;
 		info->socket = socket_consola;
+
 		list_add(lista_PCB_consola, info);
 
 		_ponerEnCola(pidActual, cola_New, mutex_New);
@@ -418,7 +435,6 @@ void consolaKernel(){
 	2. Obtener para un proceso dado:
 		c. Obtener la tabla de archivos abiertos por el proceso.
 	3. Obtener la tabla global de archivos.
-	6. Detener la planificación a fin de que no se produzcan cambios de estado de los procesos.
 	*/
 
 	while(1){

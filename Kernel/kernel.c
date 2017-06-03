@@ -42,6 +42,10 @@ int main(int argc, char* argv[]) {
 	cola_Exit = queue_create();
 
 
+	//Creo archivo log
+	logKernel = log_create("kernel.log", "KERNEL", false, LOG_LEVEL_TRACE);
+	log_trace(logKernel, "  -----------  INICIO KERNEL  -----------  ");
+
 	//Cargo archivo de configuracion
 
 	t_config* configuracion = config_create(argv[1]);
@@ -65,9 +69,6 @@ int main(int argc, char* argv[]) {
 
 	mostrarArchivoConfig();
 
-	//Creo archivo log
-	logKernel = log_create("kernel.log", "KERNEL", false, LOG_LEVEL_TRACE);
-	log_trace(logKernel, "  -----------  INICIO KERNEL  -----------  ");
 
 	//Defino señales
 	signal (SIGINT, terminarKernel);

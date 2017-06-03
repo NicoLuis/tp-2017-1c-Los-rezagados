@@ -130,6 +130,7 @@ void planificar_FIFO(){
 	uint32_t size = tamanioTotalPCB(pcb);
 	void* pcbSerializado = serializarPCB(pcb);
 	msg_enviar_separado(ENVIO_PCB, size, pcbSerializado, cpuUsada->socket);
+	log_trace(logKernel, "ENVIO_PCB");
 
 	int _proc(t_infoProceso* a){
 		return a->pid == pcb->pid;
@@ -141,7 +142,6 @@ void planificar_FIFO(){
 		pthread_mutex_unlock(&mut_planificacion2);
 
 		log_trace(logKernel, "Planifico proceso %d en cpu %d", pcb->pid, cpuUsada->socket);
-
 		msg_enviar_separado(EJECUTAR_INSTRUCCION, 0, 0, cpuUsada->socket);
 
 		infoProc->cantRafagas++;

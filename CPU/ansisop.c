@@ -10,20 +10,6 @@
 
 #define INICIOSTACK (pcb->cantPagsCodigo * tamanioPagina)
 
-
-//fixme:
-/*
-este script no detecta la instruccion end -> toma la instruccion "prints n a" como "prints n a end"
-
-begin
-variables a
-a = 20
-prints n a
-end
- */
-
-
-
 t_puntero definirVariable(t_nombre_variable identificador_variable){
 
 	log_trace(logAnsisop, "Definir variable %c", identificador_variable);
@@ -223,41 +209,57 @@ t_valor_variable asignarValorCompartida(t_nombre_compartida variable, t_valor_va
 	//ariel
 	log_trace(logAnsisop, "Asignar valor %d a variable %s", valor, variable);
 
+	flag_OK = 0;
 	int longitud_buffer = 0;
 	longitud_buffer = sizeof(t_num) + string_length(variable) + sizeof(t_valor_variable);
 	void* buffer = malloc(longitud_buffer);
 	t_num tamanioNombre = string_length(variable);
 
 	memcpy(buffer, &tamanioNombre, sizeof(t_num));
-	memcpy(buffer + sizeof(t_num), &variable, tamanioNombre);
+	memcpy(buffer + sizeof(t_num), variable, tamanioNombre);
 	memcpy(buffer + sizeof(t_num) + tamanioNombre, &valor, sizeof(t_valor_variable));
 
 	if(buffer == NULL){
-		log_trace(logCPU, "error en la asignacion del buffer");
+		log_error(logCPU, "error en la asignacion del buffer");
 	}
 
 	msg_enviar_separado(GRABAR_VARIABLE_COMPARTIDA, longitud_buffer, buffer, socket_kernel);
 	free(buffer);
-	flag_ultimaEjecucion = true;
-
-	return valor;
-}
-
-t_valor_variable obtenerValorCompartida(t_nombre_compartida variable){
-
-	log_trace(logAnsisop, "Obtener valor de variable %s", variable);
-	msg_enviar_separado(VALOR_VARIABLE_COMPARTIDA, string_length(variable), variable, socket_kernel);
-
-	// fixme: TENGO Q ENVIAR Y ESPERAR POR EL PCB?
 
 	t_msg* msgRecibido = msg_recibir(socket_kernel);
 	msg_recibir_data(socket_kernel, msgRecibido);
 
-	t_valor_variable valor;
-	memcpy(&valor, msgRecibido->data, sizeof(t_valor_variable));
+	if(msgRecibido->tipoMensaje == GRABAR_VARIABLE_COMPARTIDA){
+		log_trace(logAnsisop, "Se asigno correctamente");
+		return valor;
+	}
 
-	log_trace(logAnsisop, "Valor %d", valor);
-	return valor;
+	log_error(logAnsisop, "No se pudo asignar - se recibio %d", msgRecibido->tipoMensaje);
+	flag_error = true;
+
+	return -1;
+}
+
+t_valor_variable obtenerValorCompartida(t_nombre_compartida variable){
+	flag_OK = 0;
+	log_trace(logAnsisop, "Obtener valor de variable %s", variable);
+	msg_enviar_separado(VALOR_VARIABLE_COMPARTIDA, string_length(variable), variable, socket_kernel);
+
+	t_msg* msgRecibido = msg_recibir(socket_kernel);
+	msg_recibir_data(socket_kernel, msgRecibido);
+
+	if(msgRecibido->tipoMensaje == VALOR_VARIABLE_COMPARTIDA){
+		t_valor_variable valor;
+		memcpy(&valor, msgRecibido->data, sizeof(t_valor_variable));
+
+		log_trace(logAnsisop, "Valor %d", valor);
+
+		return valor;
+	}else{
+		log_error(logAnsisop, "Error al obtener variable - se recibio %d", msgRecibido->tipoMensaje);
+		flag_error = true;
+		return -1;
+	}
 }
 
 /*

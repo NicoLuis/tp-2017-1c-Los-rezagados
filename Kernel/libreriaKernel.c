@@ -68,16 +68,25 @@ int handshake(int socket_cliente, int tipo){
 	}
 
 	bufferEscucha[bytesRecibidos] = '\0';
-
 	if(tipo == 0){
-		if (strcmp("Hola soy la Consola", bufferEscucha) == 0)
+		if (strcmp("Hola soy la Consola", bufferEscucha) == 0){
+			if (send(socket_cliente, "Conexion Aceptada", 18, 0) <= 0)
+				retorno = -2;
 			retorno = 1;
-		else if (strcmp("Hola soy la CPU", bufferEscucha) == 0)
-			retorno = 2;
+		}else
+		if (strcmp("Hola soy la CPU", bufferEscucha) == 0){
 
-		int bytesEnviados = send(socket_cliente, "Conexion Aceptada", 18, 0);
-		if (bytesEnviados <= 0)
-			retorno = -2;
+			void* buffer = malloc(18 + 5 + sizeof(t_num)*2);
+			memcpy(buffer, "Conexion Aceptada", 18);
+			memcpy(buffer + 18, algoritmo, 5);
+			memcpy(buffer + 18 + 5, &quantum, sizeof(t_num));
+			memcpy(buffer + 18 + 5 + sizeof(t_num), &quantumSleep, sizeof(t_num));
+
+			if (send(socket_cliente, buffer, 18 + 5 + sizeof(t_num)*2, 0) <= 0)
+				retorno = -2;
+			retorno = 2;
+			free(buffer);
+		}
 	}else{
 		if(strcmp("Hola quien sos?", bufferEscucha) != 0){
 			free(bufferEscucha);
@@ -113,8 +122,6 @@ t_PCB* recibir_pcb(int socket_cpu, t_msg* msgRecibido, bool flag_finalizado, boo
 	t_PCB* pcb = desserealizarPCB(msgRecibido->data);
 	list_remove_and_destroy_by_condition(lista_PCB_cpu, (void*) _esCPU2, free);
 	_sacarDeCola(pcb->pid, cola_Exec, mutex_Exec);
-	sigoFIFO = 0;
-	quantumRestante = 0;
 	if(flag_finalizado){
 		log_trace(logKernel, "Finalizo PCB");
 		pcb->exitCode = 0;
@@ -166,10 +173,6 @@ void escucharCPU(int socket_cpu) {
 		t_num tamanioNombre, offset = 0;
 
 		switch(msgRecibido->tipoMensaje){
-		case OK:
-			log_trace(logKernel, "Recibi OK");
-			quantumRestante--;
-			break;
 		case FINALIZAR_PROGRAMA:
 			log_trace(logKernel, "Finalizo programa");
 			flag_finalizado = true;
@@ -189,6 +192,7 @@ void escucharCPU(int socket_cpu) {
 			list_add(lista_PCBs, pcb);
 			_sacarDeCola(pcb->pid, cola_Exec, mutex_Exec);
 			cpuUsada->libre = true;
+			pthread_mutex_unlock(&mut_planificacion);
 			sem_post(&sem_cantCPUs);
 			break;
 		case 0: case FIN_CPU:
@@ -201,9 +205,8 @@ void escucharCPU(int socket_cpu) {
 			_sacarDeCola(pcb->pid, cola_Exec, mutex_Exec);
 			list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
 			list_add(lista_PCBs, pcb);
-			sigoFIFO = 0;
-			quantumRestante = 0;
 			sem_post(&sem_gradoMp);
+			pthread_mutex_unlock(&mut_planificacion);
 			pthread_exit(NULL);
 			break;
 		case ERROR:
@@ -218,6 +221,7 @@ void escucharCPU(int socket_cpu) {
 			t_infosocket* info = list_find(lista_PCB_consola, (void*) _esPid);
 			msg_enviar_separado(ERROR, sizeof(t_num8), &pcb->pid, info->socket);
 			sem_post(&sem_gradoMp);
+			pthread_mutex_unlock(&mut_planificacion);
 			break;
 		case ESCRIBIR_FD:
 			log_trace(logKernel, "Recibi ESCRIBIR_FD");
@@ -226,30 +230,20 @@ void escucharCPU(int socket_cpu) {
 			void* informacion = malloc(size);
 			memcpy(&fd, msgRecibido->data, sizeof(t_puntero));
 			memcpy(informacion, msgRecibido->data + sizeof(t_puntero), size);
-			msg_destruir(msgRecibido);
 
-			msgRecibido = msg_recibir(socket_cpu);
-			msg_recibir_data(socket_cpu, msgRecibido);
-			pcb = recibir_pcb(socket_cpu, msgRecibido, 0, 1);
-			list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
-			list_add(lista_PCBs, pcb);
-			cpuUsada->libre = true;
-			sem_post(&sem_cantCPUs);
 			if(fd == 1){
 				log_trace(logKernel, "Imprimo por consola: %s", informacion);
 				t_infosocket* info = list_find(lista_PCB_consola, (void*) _esPid);
 				if(info == NULL)
 					log_trace(logKernel, "No se ecuentra consola asociada a pid %d", pcb->pid);
 				msg_enviar_separado(IMPRIMIR_TEXTO, size, informacion, info->socket);
+				msg_enviar_separado(ESCRIBIR_FD, 0, 0, socket_cpu);
 			}else{
 				log_trace(logKernel, "Escribo en fd %d: %s", fd, informacion);
 				//todo: lo trato como si fuese del FS
 			}
-			sigoFIFO = 0;
-			_sacarDeCola(pcb->pid, cola_Block, mutex_Block);
-			_ponerEnCola(pcb->pid, cola_Ready, mutex_Ready);
-			sem_post(&sem_cantColaReady);
 			free(informacion);
+			sem_post(&cpuUsada->sem);
 			break;
 		case GRABAR_VARIABLE_COMPARTIDA:
 			log_trace(logKernel, "Recibi GRABAR_VARIABLE_COMPARTIDA");
@@ -273,6 +267,7 @@ void escucharCPU(int socket_cpu) {
 				msg_enviar_separado(GRABAR_VARIABLE_COMPARTIDA, 0, 0, socket_cpu);
 			}
 			free(varCompartida->nombre);
+			sem_post(&cpuUsada->sem);
 			break;
 		case VALOR_VARIABLE_COMPARTIDA:
 			log_trace(logKernel, "Recibi VALOR_VARIABLE_COMPARTIDA");
@@ -293,12 +288,12 @@ void escucharCPU(int socket_cpu) {
 				msg_enviar_separado(VALOR_VARIABLE_COMPARTIDA, sizeof(t_valor_variable), &varBuscad->valor, socket_cpu);
 			}
 			free(varCompartida->nombre);
+			sem_post(&cpuUsada->sem);
 			break;
 		}
 
 		free(varCompartida);
 		msg_destruir(msgRecibido);
-		pthread_mutex_unlock(&mut_planificacion);	//fixme: bug printear variable global
 	}
 }
 
@@ -577,12 +572,12 @@ void consolaKernel(){
 		}else if(string_equals_ignore_case(comando, "detener")){
 
 			log_trace(logKernel, "Detengo planificacion");
-			pthread_mutex_lock(&mut_planificacion2);
+			pthread_mutex_lock(&mut_planificacion);	//fixme: ahora como hago esto
 
 		}else if(string_equals_ignore_case(comando, "reanudar")){
 
 			log_trace(logKernel, "Reanudo planificacion");
-			pthread_mutex_unlock(&mut_planificacion2);
+			pthread_mutex_unlock(&mut_planificacion);
 
 		}else if(string_equals_ignore_case(comando, "help")){
 			printf("Comandos:\n"

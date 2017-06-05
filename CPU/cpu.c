@@ -54,29 +54,32 @@ int main(int argc, char* argv[]) {
 	char* bufferKernel = malloc(200);
 
 	int bytesRecibidos = recv(socket_kernel, bufferKernel, 50, 0);
-	if (bytesRecibidos <= 0) {
+	if (bytesRecibidos <= 0)
 		log_info(logCPU, "El Kernel se ha desconectado");
-	}
-
 	bufferKernel[bytesRecibidos] = '\0';
-
 	log_info(logCPU, "Recibi %d bytes con el siguiente mensaje: %s",bytesRecibidos, bufferKernel);
 
 	send(socket_kernel, "Hola soy la CPU", 16, 0);
 
 	bytesRecibidos = recv(socket_kernel, bufferKernel, 50, 0);
-
-	if (bytesRecibidos <= 0) {
-		log_info(logCPU, "El Kernel se ha desconectado");
-	}
-
+	if (bytesRecibidos <= 0)
+		log_trace(logCPU, "El Kernel se ha desconectado");
 	bufferKernel[bytesRecibidos] = '\0';
-	if (strcmp("Conexion aceptada", bufferKernel) == 0) {
-		log_trace(logCPU, "Me conecte correctamente al Kernel");
-	}
+
+	algoritmo = string_new();
+	memcpy(algoritmo, bufferKernel + 18, 5);
+	memcpy(&quantum, bufferKernel + 18 + 5, sizeof(t_num));
+	memcpy(&quantumSleep, bufferKernel + 18 + 5 + sizeof(t_num), sizeof(t_num));
 
 	t_num pid = process_getpid();
 	send(socket_kernel, &pid, sizeof(t_num), 0);
+
+	if (string_equals_ignore_case("Conexion Aceptada", string_substring(bufferKernel, 0, 18))) {
+		log_trace(logCPU, "Me conecte correctamente al Kernel");
+		log_info(logCPU, "Algoritmo %s quantum %d quantumSleep %d", algoritmo, quantum, quantumSleep);
+	}else{
+		log_info(logCPU, "bytesRecibidos %s", bufferKernel);
+	}
 	free(bufferKernel);
 
 	//-------------------------------CONEXION AL LA MEMORIA-------------------------------------
@@ -126,11 +129,8 @@ int main(int argc, char* argv[]) {
 			log_trace(logCPU, "pcb->cantPagsCodigo %d", pcb->cantPagsCodigo);
 			log_trace(logCPU, "pcb->indiceCodigo.size %d", pcb->indiceCodigo.size);
 			log_trace(logCPU, "pcb->indiceEtiquetas.size %d", pcb->indiceEtiquetas.size);
+			ejecutar();
 
-			break;
-		case EJECUTAR_INSTRUCCION:
-			log_trace(logCPU, "Recibi EJECUTAR_INSTRUCCION");
-			ejecutarInstruccion();
 			break;
 		case EJECUTAR_ULTIMA_INSTRUCCION:
 			log_trace(logCPU, "Recibi EJECUTAR_ULTIMA_INSTRUCCION");

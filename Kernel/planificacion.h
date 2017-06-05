@@ -10,15 +10,10 @@
 
 #include "libreriaKernel.h"
 
-int sigoFIFO;
-int quantumRestante;
-
 pthread_mutex_t mut_planificacion;
 pthread_mutex_t mut_planificacion2;
 
 void planificar();
-void planificar_FIFO();
-void planificar_RR();
 
 
 #endif /* PLANIFICACION_H_ */

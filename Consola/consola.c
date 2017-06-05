@@ -63,7 +63,7 @@ int main(int argc, char* argv[]) {
 
 	log_trace(logConsola, "Respuesta: %s", bufferKernel);
 
-	if (strcmp("Conexion aceptada", bufferKernel) == 0) {
+	if (strcmp("Conexion Aceptada", bufferKernel) == 0) {
 		log_trace(logConsola, "Me conecte correctamente al Kernel");
 	}
 

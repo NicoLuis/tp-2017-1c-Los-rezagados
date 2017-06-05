@@ -209,7 +209,6 @@ t_valor_variable asignarValorCompartida(t_nombre_compartida variable, t_valor_va
 	//ariel
 	log_trace(logAnsisop, "Asignar valor %d a variable %s", valor, variable);
 
-	flag_OK = 0;
 	int longitud_buffer = 0;
 	longitud_buffer = sizeof(t_num) + string_length(variable) + sizeof(t_valor_variable);
 	void* buffer = malloc(longitud_buffer);
@@ -227,21 +226,21 @@ t_valor_variable asignarValorCompartida(t_nombre_compartida variable, t_valor_va
 	free(buffer);
 
 	t_msg* msgRecibido = msg_recibir(socket_kernel);
-	msg_recibir_data(socket_kernel, msgRecibido);
 
 	if(msgRecibido->tipoMensaje == GRABAR_VARIABLE_COMPARTIDA){
 		log_trace(logAnsisop, "Se asigno correctamente");
+		msg_destruir(msgRecibido);
 		return valor;
 	}
 
 	log_error(logAnsisop, "No se pudo asignar - se recibio %d", msgRecibido->tipoMensaje);
 	flag_error = true;
+	msg_destruir(msgRecibido);
 
 	return -1;
 }
 
 t_valor_variable obtenerValorCompartida(t_nombre_compartida variable){
-	flag_OK = 0;
 	log_trace(logAnsisop, "Obtener valor de variable %s", variable);
 	msg_enviar_separado(VALOR_VARIABLE_COMPARTIDA, string_length(variable), variable, socket_kernel);
 
@@ -254,10 +253,12 @@ t_valor_variable obtenerValorCompartida(t_nombre_compartida variable){
 
 		log_trace(logAnsisop, "Valor %d", valor);
 
+		msg_destruir(msgRecibido);
 		return valor;
 	}else{
 		log_error(logAnsisop, "Error al obtener variable - se recibio %d", msgRecibido->tipoMensaje);
 		flag_error = true;
+		msg_destruir(msgRecibido);
 		return -1;
 	}
 }
@@ -290,7 +291,15 @@ void escribir(t_descriptor_archivo descriptor_archivo, void* informacion, t_valo
 	memcpy(buf, &descriptor_archivo, tmpsize);
 	memcpy(buf + tmpsize, informacion, tamanio);
 	msg_enviar_separado(ESCRIBIR_FD, tamanio + tmpsize, buf, socket_kernel);
-	flag_ultimaEjecucion = true;
+
+	t_msg* msgRecibido = msg_recibir(socket_kernel);
+
+	if(msgRecibido->tipoMensaje == ESCRIBIR_FD)
+		log_trace(logAnsisop, "Escribio bien");
+	else
+		log_error(logAnsisop, "Error al escribir");
+
+	msg_destruir(msgRecibido);
 }
 
 void leer(t_descriptor_archivo descriptor_archivo, t_puntero informacion, t_valor_variable tamanio){

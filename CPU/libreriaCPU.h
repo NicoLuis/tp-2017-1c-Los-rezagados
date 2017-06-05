@@ -31,6 +31,9 @@ int puertoKernel;
 char* ipMemoria;
 int puertoMemoria;
 int tamanioPagina;
+char* algoritmo;
+t_num quantum;
+t_num quantumSleep;
 
 t_log* logCPU;
 t_log* logAnsisop;
@@ -39,6 +42,7 @@ void mostrarArchivoConfig();
 void finalizarCPU();
 void ultimaEjecTotal();
 void ultimaEjec();
+void ejecutar();
 void ejecutarInstruccion();
 t_posicion traducirSP();
 
@@ -53,6 +57,6 @@ bool flag_ultimaEjecucionTotal;
 bool flag_ultimaEjecucion;
 bool flag_finalizado;
 bool flag_error;
-bool flag_OK;
+bool flag_FIFO;
 
 #endif

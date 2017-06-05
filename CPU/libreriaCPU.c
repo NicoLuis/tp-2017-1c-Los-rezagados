@@ -66,9 +66,18 @@ void ultimaEjec(){
 }
 
 
+void ejecutar(){
+	int quantumRestante = quantum;
+	while((string_equals_ignore_case(algoritmo, "FIFO") || quantumRestante > 0) && !flag_ultimaEjecucion){
+		ejecutarInstruccion();
+		quantumRestante--;
+	}
+	flag_ultimaEjecucion = 1;
+}
+
+
 void ejecutarInstruccion(){
 	log_info(logCPU, "PCB pid: %d", pcb->pid);
-	flag_OK = 1;
 	char* instruccion = proximaInstruccion();
 
 	if (instruccion != NULL) {
@@ -103,8 +112,7 @@ void ejecutarInstruccion(){
 		free(pcbSerializado);
 		flag_finalizado = false;
 		flag_ultimaEjecucion = false;
-	}else if (flag_OK)
-		msg_enviar_separado(OK, 0, 0, socket_kernel);
+	}
 }
 
 void* _serializarPuntero(t_posicion puntero){

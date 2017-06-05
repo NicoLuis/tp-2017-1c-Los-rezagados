@@ -30,6 +30,7 @@
 #include <commons/process.h>
 #include <herramientas/sockets.h>
 #include <herramientas/enum.h>
+#include "hexdump.h"
 
 
 //Archivo de Configuracion
@@ -40,6 +41,7 @@ int cachePorProceso;
 char* algoritmoReemplazo;
 int retardoMemoria;
 int tamanioDeMarcos;
+int cantidadFramesEstructurasAdministrativas;
 t_list* lista_cpus;
 t_list* listaFrames;
 t_list* listaProcesos;
@@ -142,6 +144,8 @@ t_frame* buscarFrame(int numeroFrame);
 
 int estaEnMemoriaReal(uint32_t pid, uint8_t numero_pagina);
 
+int funcionHashing(uint32_t pid, uint8_t numero_pagina,int tamanio_pagina,int cantidad_marcos);
+
 //Cache
 
 t_list* crearCache();
@@ -191,6 +195,7 @@ t_proceso* buscarProcesoEnListaProcesosParaDump(uint32_t pid);
 void mostrarContenidoTodosLosProcesos();
 
 void mostrarContenidoDeUnProceso(uint32_t pid);
+
 
 //Variable Global para LRU
 int cantAccesosMemoria;

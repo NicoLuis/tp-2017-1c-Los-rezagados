@@ -23,6 +23,8 @@ void mostrarArchivoConfig() {
 	log_info(log_memoria,"El algoritmo de reemplaco de la Cache es: %s", algoritmoReemplazo);
 	printf("El retardo de la memoria es de: %d\n",retardoMemoria);
 	log_info(log_memoria,"El retardo de la memoria es de: %d",retardoMemoria);
+	printf("La cantidad de Frames reservados para estructuras Administrtivas es de: %d",cantidadFramesEstructurasAdministrativas);
+	log_info("La cantidad de Frames reservados para estructuras Administrtivas es de: %d",cantidadFramesEstructurasAdministrativas);
 
 }
 
@@ -126,10 +128,6 @@ void escucharCPU(void* socket_cpu) {
 	int offset = 0, tmpsize;
 
 	//uint32_t pidAnterior;
-	//t_proceso* proceso;	//fixme: q es este proceso?
-	//fixme: SI NO ME EQUIVOCO ESTABA PARA SWAPEAR LAS PAGINAS QUE NO ESTABAN NI EN MEMORIA REAL NI EN CACHE. PERO ESTE TP NO LO TIENE ASIQUE NO SE USA
-
-	//list_add(listaCPUs, socketCPU);
 
 	log_info(log_memoria,"Se conecto un CPU");
 
@@ -336,11 +334,12 @@ void escucharCPU(void* socket_cpu) {
 	}
 }
 
-void* reservarMemoria(int cantidadMarcos, int capacidadMarco) {
+void* reservarMemoria(int cantidad_marcos, int capacidad_marco) {
 	// La creo con calloc para que me la llene de \0
-	void * memoria = calloc(cantidadMarcos, capacidadMarco);
+	void * memoria = calloc(cantidad_marcos, capacidad_marco);
 	log_info(log_memoria,"Memoria reservada");
-	return memoria;
+	//fixme: Devuelvo la direccion a la memoria reserva sumandole la cantidad de frames que se predefinieron para estructuras administrativas multiplicadas por la capacidad de marco
+	return memoria + (cantidadFramesEstructurasAdministrativas * capacidad_marco);
 }
 
 void lockProcesos() {
@@ -487,6 +486,7 @@ int paginaInvalida(uint32_t pid, uint8_t numero_pagina) {
 
 }
 
+//fixme: Hacer Funcion Hashing.
 t_pag* buscarPaginaEnListaDePaginas(uint32_t pid, uint8_t numero_pagina) {
 
 	t_proceso* proceso = buscarProcesoEnListaProcesos(pid);
@@ -617,6 +617,8 @@ void cargarPaginaAMemoria(uint32_t pid, uint8_t numero_pagina,void* paginaLeida,
 
 }
 
+
+//fixme: Usar funcion Hashin?
 t_frame* buscarFrameLibre(uint32_t pid) {
 
 	int _soy_frame_libre(t_frame* frame) {
@@ -700,6 +702,8 @@ void ponerBitModificadoEn1(int nroFrame) {
 	frame->bit_modif = 1;
 }
 
+
+//fixme: Utilizar funcion Hashing?
 t_frame* buscarFrame(int numeroFrame) {
 
 	int _soy_el_frame_buscado(t_frame* frame) {
@@ -916,14 +920,14 @@ void ejecutarComandos() {
 	char buffer[1000];
 
 	while (1) {
-		printf("Ingrese comando:\n");
+		printf("Ingrese comando:\n\n");
 		scanf("%s", buffer);
 
 		if (!strcmp(buffer, "retardo")) {
 
 			int retardoNuevo;
 
-			printf("\nIngrese nuevo valor de retardo:\n");
+			printf("\nIngrese nuevo valor de retardo:\n\n");
 			scanf("%d", &retardoNuevo);
 
 			pthread_mutex_lock(&mutexRetardo);
@@ -939,7 +943,7 @@ void ejecutarComandos() {
 
 			int pid;
 
-			printf("Ingrese 0 si quiere un reporte de todos los procesos o ingrese el pid del proceso para un reporte particular\n");
+			printf("Ingrese 0 si quiere un reporte de todos los procesos o ingrese el pid del proceso para un reporte particular\n\n");
 			scanf("%d", &pid);
 
 			lockFramesYProcesos();
@@ -956,14 +960,14 @@ void ejecutarComandos() {
 			}
 	else if (!strcmp(buffer, "flush")) {
 
-			printf("Escriba cache o memory\n");
+			printf("Escriba cache o memoria\n\n");
 			scanf("%s", buffer);
 
 			if (!strcmp(buffer, "cache")) {
 
 				vaciarCache();
 
-			} else if (!strcmp(buffer, "memory")) {
+			} else if (!strcmp(buffer, "memoria")) {
 
 				lockFrames();
 
@@ -973,10 +977,10 @@ void ejecutarComandos() {
 
 				printf("Flush memory realizado\n\n");
 
-				log_info(log_memoria, "Flush memory realizado");
+				log_info(log_memoria, "Flush memory realizado\n\n");
 
 			} else {
-				printf("Comando Incorrecto\n");
+				printf("Comando Incorrecto\n\n");
 			}
 
 		} else if(!strcmp(buffer,"size")) {
@@ -1008,7 +1012,7 @@ void ejecutarComandos() {
 				t_proceso* proceso = buscarProcesoEnListaProcesosParaDump(pid);
 
 				if (proceso == NULL) {
-					printf("No existe ese proceso\n");
+					printf("No existe ese proceso\n\n");
 
 				}
 				else{
@@ -1017,7 +1021,7 @@ void ejecutarComandos() {
 				}
 			}
 			else{
-				printf("Comando Incorrecto\n");
+				printf("Comando Incorrecto\n\n");
 			}
 		}
 		else{
@@ -1035,9 +1039,9 @@ void dumpTablaDePaginasDeProceso(t_proceso* proceso, FILE* archivoDump) {
 	printf("Tabla de paginas:\n\n");
 
 	fprintf(archivoDump,
-			"Nro de pagina\tNro de frame\tBit de presencia\tBit de modificado\n");
+			"Nro de pagina\tNro de frame\tBit de presencia\tBit de modificado\n\n");
 	printf(
-			"Nro de pagina\tNro de frame\tBit de presencia\tBit de modificado\n");
+			"Nro de pagina\tNro de frame\tBit de presencia\tBit de modificado\n\n");
 
 	while (i < sizeListaPaginas) {
 		t_pag* pagina = buscarPaginaEnListaDePaginas(proceso->PID, i);
@@ -1135,7 +1139,7 @@ void dumpContenidoMemoriaProceso(t_proceso* proceso, FILE* archivoDump) {
 		if (pagina->bit_pres == 1) {
 			t_frame* frame = buscarFrame(pagina->nroFrame);
 			contenidoFrame = obtenerContenido(frame->nroFrame, 0,tamanioDeMarcos);
-			//hexdump(contenidoFrame, tamanioDeMarcos, archivoDump);
+			hexdump(contenidoFrame, tamanioDeMarcos, archivoDump);
 		}
 		i++;
 	}
@@ -1235,10 +1239,17 @@ void mostrarContenidoDeUnProceso(uint32_t pid){
 		unlockProcesos();
 		void* contenido_leido = obtenerContenido(pagina->nroFrame, 0, tamanioDeMarcos);
 
-		printf("Numero de Pagina: %d \n",numeroPagina);
+		printf("Numero de Pagina: %d \n\n",numeroPagina);
 		printf("Contenido: %p",contenido_leido);
 
 		pagina++;
 	}
 
 }
+
+int funcionHashing(uint32_t pid, uint8_t numero_pagina,int tamanio_pagina,int cantidad_marcos){
+	int numero_frame_buscada;
+	numero_frame_buscada = ((pid * cantidad_marcos) + (numero_pagina * tamanio_pagina)) / cantidad_marcos;
+	return numero_frame_buscada;
+}
+

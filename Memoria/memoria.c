@@ -41,6 +41,7 @@ int main(int argc, char* argv[]) {
 	cachePorProceso = config_get_int_value(configuracion, "CACHE_X_PROC");
 	algoritmoReemplazo = config_get_string_value(configuracion, "REEMPLAZO_CACHE");
 	retardoMemoria = config_get_int_value(configuracion, "RETARDO_MEMORIA");
+	cantidadFramesEstructurasAdministrativas = config_get_int_value(configuracion,"CANTIDAD_FRAME_ESTTRUCTURAS_ADMINISTRATIVAS");
 
 	//Muestro archivo de configuracion
 

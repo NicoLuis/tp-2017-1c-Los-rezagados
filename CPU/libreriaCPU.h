@@ -54,8 +54,8 @@ int socket_kernel;
 int socket_memoria;
 
 bool flag_ultimaEjecucionTotal;
-bool flag_ultimaEjecucion;
 bool flag_finalizado;
+bool flag_ultimaEjecucion;
 bool flag_error;
 bool flag_FIFO;
 

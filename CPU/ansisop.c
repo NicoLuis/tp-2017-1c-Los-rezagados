@@ -191,8 +191,8 @@ void finalizar(){
 
 	if(list_size(pcb->indiceStack) == 0){
 		log_trace(logCPU, "Finalizo ejecucion");
-		flag_ultimaEjecucion = true;
-		flag_finalizado = true;
+		flag_ultimaEjecucion = 1;
+		flag_finalizado = 1;
 	}else
 		pcb->pc = stackActual->retPos;
 

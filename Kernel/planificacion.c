@@ -15,13 +15,10 @@ void planificar(){
 	while(1){
 
 		sem_wait(&sem_cantColaReady);
-		sem_post(&sem_cantColaReady);		//una vez q entre xq wait me resto 1 sin cambiar el tamaniodeCola
+		log_trace(logKernel, "Inicio FIFO");
 		pthread_mutex_lock(&mut_planificacion);
 
-		log_trace(logKernel, "Inicio FIFO");
-		t_num8 pidPCB;
-		sem_wait(&sem_cantColaReady);
-		pidPCB = _sacarDeCola(0, cola_Ready, mutex_Ready);
+		t_num8 pidPCB = _sacarDeCola(0, cola_Ready, mutex_Ready);
 		int _es_PCB(t_PCB* p){
 			return p->pid == pidPCB;
 		}
@@ -63,6 +60,7 @@ void planificar(){
 
 		free(pcbSerializado);
 		log_trace(logKernel, "Fin FIFO");
+		pthread_mutex_unlock(&mut_planificacion);
 	}
 }
 

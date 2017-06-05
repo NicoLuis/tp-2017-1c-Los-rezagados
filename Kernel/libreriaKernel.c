@@ -134,7 +134,7 @@ t_PCB* recibir_pcb(int socket_cpu, t_msg* msgRecibido, bool flag_finalizado, boo
 			_ponerEnCola(pcb->pid, cola_Block, mutex_Block);
 		else{
 			_ponerEnCola(pcb->pid, cola_Ready, mutex_Ready);
-			sem_wait(&sem_cantColaReady);
+			sem_post(&sem_cantColaReady);
 		}
 	}
 	return pcb;
@@ -496,7 +496,7 @@ void consolaKernel(){
 
 				switch(getchar()){
 				case 'a':
-					printf( "Cantidad de rafagas ejecutadas: %d \n", infP->cantRafagas);
+					printf( "Cantidad de rafagas ejecutadas: %d \n", infP->cantRafagas);	//todo
 					break;
 				case 'b':
 					printf( "Cantidad de operaciones privilegiadas que ejecutó: %d \n", infP->cantOpPriv);

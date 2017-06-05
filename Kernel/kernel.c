@@ -216,7 +216,7 @@ int conectar_select(char* puerto_escucha) {
 					}
 
 				} else
-					atender_consola(current_fd);		//todo: ver q pasa con las conexiones de CPU
+					atender_consola(current_fd);
 			}
 		}
 	}

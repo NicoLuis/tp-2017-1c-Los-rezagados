@@ -68,11 +68,14 @@ void ultimaEjec(){
 
 void ejecutar(){
 	int quantumRestante = quantum;
-	while((string_equals_ignore_case(algoritmo, "FIFO") || quantumRestante > 0) && !flag_ultimaEjecucion){
-		ejecutarInstruccion();
+	flag_finalizado = 0;
+	flag_ultimaEjecucion = 0;
+	while(!flag_ultimaEjecucion){
 		quantumRestante--;
+		if(quantumRestante <= 0 && string_equals_ignore_case(algoritmo, "RR"))
+			flag_ultimaEjecucion = 1;
+		ejecutarInstruccion();
 	}
-	flag_ultimaEjecucion = 1;
 }
 
 
@@ -96,11 +99,11 @@ void ejecutarInstruccion(){
 		void* pcbSerializado = serializarPCB(pcb);
 		msg_enviar_separado(ERROR, size, pcbSerializado, socket_kernel);
 		free(pcbSerializado);
-		flag_finalizado = false;
-		flag_ultimaEjecucion = false;
-		flag_error = false;
+		flag_finalizado = 1;
+		flag_ultimaEjecucion = 1;
+		flag_error = 0;
 	}
-
+	else
 	if(flag_ultimaEjecucion){
 		log_trace(logCPU, "Ultima Instruccion");
 		uint32_t size = tamanioTotalPCB(pcb);
@@ -110,8 +113,6 @@ void ejecutarInstruccion(){
 		else
 			msg_enviar_separado(ENVIO_PCB, size, pcbSerializado, socket_kernel);
 		free(pcbSerializado);
-		flag_finalizado = false;
-		flag_ultimaEjecucion = false;
 	}
 }
 

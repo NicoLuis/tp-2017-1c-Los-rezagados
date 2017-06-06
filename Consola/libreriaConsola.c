@@ -55,8 +55,17 @@ void leerComando(char* comando){
 		int pidAFinalizar = atoi(string_substring_from(comando, 5));
 		//fprintf(stderr, "El pid es %d\n", pidAFinalizar);
 
-		//todo: mando mensaje a kernel para que mate el pid
-		msg_enviar_separado(FINALIZAR_PROGRAMA, sizeof(t_num8), &pidAFinalizar, socket_kernel);
+		int _esPid(t_programa* p){
+			return p->pid == pidAFinalizar;
+		}
+		t_programa* prog = list_find(lista_programas, (void*) _esPid);
+		if(prog != NULL){
+			msg_enviar_separado(FINALIZAR_PROGRAMA, sizeof(t_num8), &pidAFinalizar, socket_kernel);
+			finalizarPrograma(prog, 0);
+		}
+		else
+			fprintf(stderr, "El pid %d no pertenece a esta consola\n", pidAFinalizar);
+
 
 	}else if(string_equals_ignore_case(comando, "disconnect")){
 
@@ -112,7 +121,7 @@ void escucharKernel(){
 		case MARCOS_INSUFICIENTES:
 			log_trace(logConsola, "Recibi MARCOS_INSUFICIENTES");
 			fprintf(stderr, "No hay espacio suficiente en memoria \n");
-			finalizarPrograma(programa);
+			finalizarPrograma(programa, 0);
 			break;
 		case FINALIZAR_PROGRAMA:
 			log_trace(logConsola, "Recibi FINALIZAR_PROGRAMA");
@@ -122,7 +131,7 @@ void escucharKernel(){
 
 			programa = list_find(lista_programas, (void*) _esPrograma);
 			programa->horaFin = temporal_get_string_time();
-			finalizarPrograma(programa);
+			finalizarPrograma(programa, 1);
 			break;
 		case 0:
 			fprintf(stderr, "El kernel se ha desconectado \n");
@@ -216,12 +225,14 @@ char* _contarTiempo(char* tiempo1, char* tiempo2){
 	return tiempoTranscurrido;
 }
 
-void finalizarPrograma(t_programa* prog){
+void finalizarPrograma(t_programa* prog, bool flag_print){
 
-	fprintf(stderr, "● Fecha y hora de inicio %s \n",  prog->horaInicio);
-	fprintf(stderr, "● Fecha y hora de fin %s \n",  prog->horaFin);
-	fprintf(stderr, "● Impresiones por pantalla %d \n",  prog->cantImpresionesPantalla);
-	fprintf(stderr, "● Tiempo total %s \n",  _contarTiempo(prog->horaFin, prog->horaInicio));
+	if(flag_print){
+		fprintf(stderr, "● Fecha y hora de inicio %s \n",  prog->horaInicio);
+		fprintf(stderr, "● Fecha y hora de fin %s \n",  prog->horaFin);
+		fprintf(stderr, "● Impresiones por pantalla %d \n",  prog->cantImpresionesPantalla);
+		fprintf(stderr, "● Tiempo total %s \n",  _contarTiempo(prog->horaFin, prog->horaInicio));
+	}
 
 	int _esPid(t_programa* p){
 		return p->pid == prog->pid;

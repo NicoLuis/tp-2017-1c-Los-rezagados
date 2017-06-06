@@ -242,6 +242,12 @@ void escucharCPU(int socket_cpu) {
 				log_trace(logKernel, "Escribo en fd %d: %s", fd, informacion);
 				//todo: lo trato como si fuese del FS
 			}
+
+			int _espidproc(t_infoProceso* a){ return a->pid == pcb->pid; }
+			t_infoProceso* infP = list_remove_by_condition(infoProcs, (void*) _espidproc);
+			infP->cantOpPriv++;
+			list_add(infoProcs, infP);
+
 			free(informacion);
 			sem_post(&cpuUsada->sem);
 			break;
@@ -588,8 +594,17 @@ void consolaKernel(){
 		}else if(string_starts_with(comando, "kill ")){
 
 			int pidKill = atoi(string_substring_from(comando, 5));
-			finalizarPid(pidKill, COMANDO_FINALIZAR);
-			printf("Finalizo pid %d\n", pidKill);
+
+			int _es_PCB(t_PCB* p){
+				return p->pid == pidKill;
+			}
+			t_PCB* pcbKill = list_find(lista_PCBs, (void*) _es_PCB);
+			if(pcbKill == NULL)
+				printf( "No existe el pid %d \n", pidKill);
+			else{
+				finalizarPid(pidKill, COMANDO_FINALIZAR);
+				printf("Finalizo pid %d\n", pidKill);
+			}
 
 		}else if(string_equals_ignore_case(comando, "detener")){
 

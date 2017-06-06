@@ -53,6 +53,6 @@ t_log* logConsola;
 void leerComando(char* comando);
 void escucharKernel();
 char* cargarScript(void* pathScript);
-void finalizarPrograma(t_programa* prog);
+void finalizarPrograma(t_programa* prog, bool flag_print);
 
 #endif /* LIBRERIACONSOLA_H_ */

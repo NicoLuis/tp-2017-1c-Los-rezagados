@@ -83,7 +83,8 @@ t_msg* msg_crear(uint8_t tipoMensaje) {
 }
 
 void msg_destruir(t_msg *msg) {
-	free(msg->data);
+	if(msg->data != NULL)
+		free(msg->data);
 	free(msg);
 }
 

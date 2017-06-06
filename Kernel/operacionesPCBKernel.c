@@ -99,7 +99,7 @@ bool _estaEnCola(t_num8 pid, t_queue* cola, pthread_mutex_t mutex){
 	return esta;
 }
 
-void finalizarPCB(int pidPCB){
+void finalizarPCB(t_num8 pidPCB){
 
 	if(!_sacarDeCola(pidPCB, cola_New, mutex_New))
 		if( _sacarDeCola(pidPCB, cola_Ready, mutex_Ready) ||
@@ -110,13 +110,14 @@ void finalizarPCB(int pidPCB){
 }
 
 
-void setearExitCode(int pidPCB, int exitCode){
+void setearExitCode(t_num8 pidPCB, int exitCode){
 	bool _buscarPCB(t_PCB* pcb){
 		return pcb->pid == pidPCB;
 	}
 
-	t_PCB* pcb = list_find(lista_PCBs, (void*) _buscarPCB);
+	t_PCB* pcb = list_remove_by_condition(lista_PCBs, (void*) _buscarPCB);
 	pcb->exitCode = exitCode;
+	list_add(lista_PCBs, pcb);
 	_ponerEnCola(pcb->pid, cola_Exit, mutex_Exit);
 	liberarPCB(pcb, true);
 }

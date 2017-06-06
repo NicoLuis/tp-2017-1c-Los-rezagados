@@ -24,7 +24,7 @@ void mostrarArchivoConfig() {
 	printf("El retardo de la memoria es de: %d\n",retardoMemoria);
 	log_info(log_memoria,"El retardo de la memoria es de: %d",retardoMemoria);
 	printf("La cantidad de Frames reservados para estructuras Administrtivas es de: %d",cantidadFramesEstructurasAdministrativas);
-	log_info("La cantidad de Frames reservados para estructuras Administrtivas es de: %d",cantidadFramesEstructurasAdministrativas);
+	log_info(log_memoria,"La cantidad de Frames reservados para estructuras Administrtivas es de: %d",cantidadFramesEstructurasAdministrativas);
 
 }
 

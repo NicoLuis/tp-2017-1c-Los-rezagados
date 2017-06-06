@@ -56,10 +56,12 @@ void leerComando(char* comando){
 		//fprintf(stderr, "El pid es %d\n", pidAFinalizar);
 
 		//todo: mando mensaje a kernel para que mate el pid
+		msg_enviar_separado(FINALIZAR_PROGRAMA, sizeof(t_num8), &pidAFinalizar, socket_kernel);
 
 	}else if(string_equals_ignore_case(comando, "disconnect")){
 
 		//todo: mando mensaje a kernel para matar a todos
+		msg_enviar_separado(DESCONECTAR, 0, 0, socket_kernel);
 
 	}else if(string_equals_ignore_case(comando, "clear")){
 		system("clear");
@@ -221,6 +223,9 @@ void finalizarPrograma(t_programa* prog){
 	fprintf(stderr, "● Impresiones por pantalla %d \n",  prog->cantImpresionesPantalla);
 	fprintf(stderr, "● Tiempo total %s \n",  _contarTiempo(prog->horaFin, prog->horaInicio));
 
-	//todo: sacar de lista
+	int _esPid(t_programa* p){
+		return p->pid == prog->pid;
+	}
+	list_remove_and_destroy_by_condition(lista_programas, (void*) _esPid, free);
 
 }

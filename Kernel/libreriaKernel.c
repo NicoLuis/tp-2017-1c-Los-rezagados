@@ -201,8 +201,8 @@ void escucharCPU(int socket_cpu) {
 			//si la cpu se desconecto la saco de la lista
 			list_remove_by_condition(lista_cpus, (void*) _esCPU);
 			list_remove_and_destroy_by_condition(lista_PCB_cpu, (void*) _esCPU2, free);
-			setearExitCode(pcb->pid, -20);
 			_sacarDeCola(pcb->pid, cola_Exec, mutex_Exec);
+			setearExitCode(pcb->pid, SIN_DEFINICION);
 			list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
 			list_add(lista_PCBs, pcb);
 			sem_post(&sem_gradoMp);
@@ -265,6 +265,11 @@ void escucharCPU(int socket_cpu) {
 			}else{
 				varBuscada->valor = varCompartida->valor;
 				msg_enviar_separado(GRABAR_VARIABLE_COMPARTIDA, 0, 0, socket_cpu);
+
+				int _espidproc(t_infoProceso* a){ return a->pid == pcb->pid; }
+				t_infoProceso* infP = list_remove_by_condition(infoProcs, (void*) _espidproc);
+				infP->cantOpPriv++;	//fixme: no suma si no lo saco
+				list_add(infoProcs, infP);
 			}
 			free(varCompartida->nombre);
 			sem_post(&cpuUsada->sem);
@@ -286,6 +291,11 @@ void escucharCPU(int socket_cpu) {
 			}else{
 				log_info(logKernel, "Valor %d", varBuscad->valor);
 				msg_enviar_separado(VALOR_VARIABLE_COMPARTIDA, sizeof(t_valor_variable), &varBuscad->valor, socket_cpu);
+
+				int _espidproc(t_infoProceso* a){ return a->pid == pcb->pid; }
+				t_infoProceso* infP = list_remove_by_condition(infoProcs, (void*) _espidproc);
+				infP->cantOpPriv++;
+				list_add(infoProcs, infP);
 			}
 			free(varCompartida->nombre);
 			sem_post(&cpuUsada->sem);
@@ -344,7 +354,7 @@ void enviarScriptAMemoria(_t_hiloEspera* aux){
 	case MARCOS_INSUFICIENTES:
 		log_trace(logKernel, "MARCOS INSUFICIENTES");
 		msg_enviar_separado(MARCOS_INSUFICIENTES, 0, 0, socketConsola);
-		setearExitCode(pcb->pid, -1);
+		setearExitCode(pcb->pid, RECURSOS_INSUFICIENTES);
 		break;
 	default:
 		log_trace(logKernel, "RECIBI %d", respuesta);
@@ -356,14 +366,17 @@ void enviarScriptAMemoria(_t_hiloEspera* aux){
 void atender_consola(int socket_consola){
 
 	t_msg* msgRecibido = msg_recibir(socket_consola);
-	msg_recibir_data(socket_consola, msgRecibido);
-
-	log_trace(logKernel, "Recibi tipoMensaje %d de consola", msgRecibido->tipoMensaje);
 
 	void* script;	//si lo declaro adentro del switch se queja
+	void _finalizarPIDs(t_infosocket* i){
+		if(i->socket == socket_consola)
+			finalizarPid(i->pid, DESCONEXION_CONSOLA);
+	}
 	switch(msgRecibido->tipoMensaje){
 
 	case ENVIO_CODIGO:
+		log_trace(logKernel, "Recibi script de consola %d", socket_consola);
+		msg_recibir_data(socket_consola, msgRecibido);
 		pid++;
 		script = malloc(msgRecibido->longitud);
 		memcpy(script, msgRecibido->data, msgRecibido->longitud);
@@ -395,9 +408,18 @@ void atender_consola(int socket_consola){
 
 		free(script);
 		break;
+	case FINALIZAR_PROGRAMA:
+		msg_recibir_data(socket_consola, msgRecibido);
+		t_num8 pidAFinalizar;
+		memcpy(&pidAFinalizar, msgRecibido->data, sizeof(t_num8));
+		log_trace(logKernel, "Recibi FINALIZAR_PROGRAMA de consola %d - pid %d", socket_consola, pidAFinalizar);
+		finalizarPid(pidAFinalizar, COMANDO_FINALIZAR);
+		break;
 
-	case 0:
+	case 0: case DESCONECTAR:
 		fprintf(stderr, "La consola %d se ha desconectado \n", socket_consola);
+		log_trace(logKernel, "Recibi DESCONECTAR de consola %d", socket_consola);
+		list_iterate(lista_PCB_consola, (void*) _finalizarPIDs);
 
 		//si la consola se desconecto la saco de la lista
 		bool _esConsola(int socketC){ return socketC == socket_consola; }
@@ -454,7 +476,7 @@ void consolaKernel(){
 					if(pcbA->exitCode > 0)
 						exitCode = "-";
 					else
-						exitCode = string_itoa(pcbA->exitCode);	//fixme: se caga en este if
+						exitCode = string_from_format("%d", pcbA->exitCode);	//fixme: se caga en este if
 					if(_estaEnCola(pcbA->pid, cola_New, mutex_New))
 						cola = "NEW";
 					if(_estaEnCola(pcbA->pid, cola_Ready, mutex_Ready))
@@ -496,7 +518,7 @@ void consolaKernel(){
 
 				switch(getchar()){
 				case 'a':
-					printf( "Cantidad de rafagas ejecutadas: %d \n", infP->cantRafagas);	//todo
+					printf( "Cantidad de rafagas ejecutadas: %d \n", infP->cantRafagas);	//todo: le preguto a cpu cuantas lleva?
 					break;
 				case 'b':
 					printf( "Cantidad de operaciones privilegiadas que ejecutó: %d \n", infP->cantOpPriv);
@@ -566,7 +588,7 @@ void consolaKernel(){
 		}else if(string_starts_with(comando, "kill ")){
 
 			int pidKill = atoi(string_substring_from(comando, 5));
-			finalizarPid(pidKill);
+			finalizarPid(pidKill, COMANDO_FINALIZAR);
 			printf("Finalizo pid %d\n", pidKill);
 
 		}else if(string_equals_ignore_case(comando, "detener")){
@@ -630,25 +652,29 @@ void terminarKernel(){			//aca libero todos
 
 
 
-void finalizarPid(int pid){
+void finalizarPid(t_num8 pid, int exitCode){
+	log_trace(logKernel, "Finalizo pid %d con exitCode %d", pid, exitCode);
 	int _buscarPID(t_infosocket* i){
 		return i->pid == pid;
 	}
 	t_infosocket* info = list_find(lista_PCB_cpu, (void*) _buscarPID);
-	if(info == NULL)
+	if(info == NULL){
 		log_info(logKernel, "No se encuentra cpu ejecutando pid %d", pid);
-
-	int _buscarCPU(t_cpu* c){
-		return c->socket == info->socket;
+		_sacarDeCola(pid, cola_Block, mutex_Block);
+		if(_sacarDeCola(pid, cola_Ready, mutex_Ready) == pid)
+			sem_wait(&sem_cantColaReady);
 	}
-	t_cpu* cpu = list_find(lista_cpus, (void*) _buscarCPU);
-	if(cpu == NULL)
-		log_info(logKernel, "No se encuentra cpu ejecutando pid %d", pid);
-
-	kill(cpu->pid, SIGUSR2);
+	else{
+		_sacarDeCola(pid, cola_Exec, mutex_Exec);
+		int _buscarCPU(t_cpu* c){
+			return c->socket == info->socket;
+		}
+		t_cpu* cpu = list_find(lista_cpus, (void*) _buscarCPU);
+		if(cpu == NULL)
+			log_info(logKernel, "No se encuentra cpu ejecutando pid %d", pid);
+		else
+			kill(cpu->pid, SIGUSR2);
+	}
+	setearExitCode(pid, exitCode);
 }
-
-
-
-
 

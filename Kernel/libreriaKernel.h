@@ -35,6 +35,17 @@
 #include <herramientas/enum.h>
 #include <parser/metadata_program.h>
 
+#define FINALIZO_CORRECTAMENTE 0
+#define RECURSOS_INSUFICIENTES -1
+#define ARCHIVO_INEXISTENTE -2
+#define LECTURA_SIN_PERMISOS -3
+#define ESCRITURA_SIN_PERMISOS -4
+#define EXCEPCION_MEMORIA -5
+#define DESCONEXION_CONSOLA -6
+#define COMANDO_FINALIZAR -7
+#define MAS_MEMORIA_TAMANIO_PAG -8
+#define CANT_PAGS_INSUFICIENTES -9
+#define SIN_DEFINICION -20
 
 typedef struct {
 	char* nombre;
@@ -153,6 +164,6 @@ void atender_consola(int socket_consola);
 void consolaKernel();
 void terminarKernel();
 
-void finalizarPid(int pid);
+void finalizarPid(t_num8 pid, int exitCode);
 
 #endif /* LIBRERIAKERNEL_H_ */

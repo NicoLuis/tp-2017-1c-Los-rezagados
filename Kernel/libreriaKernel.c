@@ -461,7 +461,7 @@ void consolaKernel(){
 	*/
 
 	while(1){
-		char* comando = malloc(200);
+		char* comando = malloc(200);	//fixme: liberar?
 		fgets(comando, 200, stdin);
 
 		comando[strlen(comando)-1] = '\0';

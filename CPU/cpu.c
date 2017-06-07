@@ -121,7 +121,7 @@ int main(int argc, char* argv[]) {
 		switch(msgRecibido->tipoMensaje){
 		case ENVIO_PCB:
 
-			log_trace(logCPU, "Recibi ENVIO_PCB");
+			log_trace(logCPU, "\t\t ---- EJECUTO PCB ---- ");
 			pcb = desserealizarPCB(msgRecibido->data);
 
 			log_trace(logCPU, "pcb->pid %d", pcb->pid);

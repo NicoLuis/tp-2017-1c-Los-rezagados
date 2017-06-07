@@ -10,8 +10,7 @@
 
 #include "libreriaKernel.h"
 
-pthread_mutex_t mut_planificacion;
-pthread_mutex_t mut_planificacion2;
+pthread_mutex_t mut_detengo_plani;
 
 void planificar();
 

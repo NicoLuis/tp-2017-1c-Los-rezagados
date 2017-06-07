@@ -31,6 +31,7 @@ AnSISOP_kernel kernel_functions = {
 
 void mostrarArchivoConfig() {
 
+	printf("Nº log %d \n", process_getpid());
 	printf("La IP del Kernel es: %s \n", ipKernel);
 	printf("El puerto del Kernel es: %d\n", puertoKernel);
 	printf("La IP de la Memorial es: %s \n", ipMemoria);
@@ -39,6 +40,8 @@ void mostrarArchivoConfig() {
 
 
 void finalizarCPU(){
+	log_trace(logCPU, "  FIN CPU  ");
+	log_trace(logAnsisop, "  FIN CPU  ");
 
 	if(socket_kernel != 0){
 		msg_enviar_separado(FIN_CPU, 1, 0, socket_kernel);
@@ -50,7 +53,12 @@ void finalizarCPU(){
 		close(socket_memoria);
 	}
 
-	liberarPCB(pcb, false);
+	if(pcb != NULL)
+		liberarPCB(pcb, false);
+
+	log_destroy(logCPU);
+	log_destroy(logAnsisop);
+
 	exit(1);
 }
 
@@ -76,6 +84,8 @@ void ejecutar(){
 			flag_ultimaEjecucion = 1;
 		ejecutarInstruccion();
 	}
+	liberarPCB(pcb, 0);
+	pcb = NULL;
 }
 
 

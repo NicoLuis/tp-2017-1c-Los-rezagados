@@ -80,7 +80,7 @@ typedef struct {
 typedef struct {
 	int socket;
 	t_num pid;
-	sem_t sem;
+	pthread_mutex_t mutex;
 	bool libre;
 }t_cpu;
 

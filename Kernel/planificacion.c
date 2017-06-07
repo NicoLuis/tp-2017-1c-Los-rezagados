@@ -16,7 +16,6 @@ void planificar(){
 
 		sem_wait(&sem_cantColaReady);
 		log_trace(logKernel, "Inicio FIFO");
-		pthread_mutex_lock(&mut_planificacion);
 
 		t_num8 pidPCB = _sacarDeCola(0, cola_Ready, mutex_Ready);
 		int _es_PCB(t_PCB* p){
@@ -51,16 +50,17 @@ void planificar(){
 		}
 		//t_infoProceso* infoProc = list_find(infoProcs, (void*) _proc);
 		log_trace(logKernel, "Planifico proceso %d en cpu %d", pcb->pid, cpuUsada->socket);
-		sem_post(&cpuUsada->sem);
 
-		pthread_mutex_lock(&mut_planificacion2);
-		pthread_mutex_unlock(&mut_planificacion2);
+		pthread_mutex_unlock(&cpuUsada->mutex);
 
-		pthread_mutex_lock(&mut_planificacion);
+		pthread_mutex_lock(&mut_detengo_plani);
+		pthread_mutex_unlock(&mut_detengo_plani);
+
+		pthread_mutex_lock(&cpuUsada->mutex);
 
 		free(pcbSerializado);
 		log_trace(logKernel, "Fin FIFO");
-		pthread_mutex_unlock(&mut_planificacion);
+		pthread_mutex_unlock(&cpuUsada->mutex);
 	}
 }
 

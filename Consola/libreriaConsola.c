@@ -9,6 +9,7 @@
 
 void mostrarArchivoConfig() {
 
+	printf("Nº log %d \n", process_getpid());
 	printf("La IP del Kernel es: %s \n", ipKernel);
 	printf("El puerto del Kernel es: %d\n", puertoKernel);
 }
@@ -246,11 +247,14 @@ void finalizarPrograma(t_programa* prog, bool flag_print){
 
 
 void finalizarConsola(){
+	log_trace(logConsola, "  FIN CONSOLA  ");
 
 	if(socket_kernel != 0){
 		msg_enviar_separado(DESCONECTAR, 0, 0, socket_kernel);
 		close(socket_kernel);
 	}
+
+	log_destroy(logConsola);
 
 	exit(1);
 }

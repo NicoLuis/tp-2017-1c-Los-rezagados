@@ -21,7 +21,7 @@ int main(int argc, char* argv[]) {
 	signal (SIGINT, finalizarConsola);
 
 	//Creo archivo log
-	logConsola = log_create("consola.log", "CONSOLA", false, LOG_LEVEL_TRACE);
+	logConsola = log_create(string_from_format("consola_%d.log", process_getpid()), "CONSOLA", false, LOG_LEVEL_TRACE);
 	log_trace(logConsola, "  -----------  INICIO CONSOLA  -----------  ");
 
 	//Cargo archivo de configuracion

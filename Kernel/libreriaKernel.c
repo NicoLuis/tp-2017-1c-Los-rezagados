@@ -153,7 +153,7 @@ void escucharCPU(int socket_cpu) {
 
 	while(1){
 
-		sem_wait(&cpuUsada->sem);
+		pthread_mutex_lock(&cpuUsada->mutex);
 		bool flag_finalizado = false;
 
 		t_msg* msgRecibido = msg_recibir(socket_cpu);
@@ -192,7 +192,7 @@ void escucharCPU(int socket_cpu) {
 			list_add(lista_PCBs, pcb);
 			_sacarDeCola(pcb->pid, cola_Exec, mutex_Exec);
 			cpuUsada->libre = true;
-			pthread_mutex_unlock(&mut_planificacion);
+			pthread_mutex_unlock(&cpuUsada->mutex);
 			sem_post(&sem_cantCPUs);
 			break;
 		case 0: case FIN_CPU:
@@ -206,7 +206,7 @@ void escucharCPU(int socket_cpu) {
 			list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
 			list_add(lista_PCBs, pcb);
 			sem_post(&sem_gradoMp);
-			pthread_mutex_unlock(&mut_planificacion);
+			pthread_mutex_unlock(&cpuUsada->mutex);
 			pthread_exit(NULL);
 			break;
 		case ERROR:
@@ -221,7 +221,7 @@ void escucharCPU(int socket_cpu) {
 			t_infosocket* info = list_find(lista_PCB_consola, (void*) _esPid);
 			msg_enviar_separado(ERROR, sizeof(t_num8), &pcb->pid, info->socket);
 			sem_post(&sem_gradoMp);
-			pthread_mutex_unlock(&mut_planificacion);
+			pthread_mutex_unlock(&cpuUsada->mutex);
 			break;
 		case ESCRIBIR_FD:
 			log_trace(logKernel, "Recibi ESCRIBIR_FD");
@@ -249,7 +249,7 @@ void escucharCPU(int socket_cpu) {
 			list_add(infoProcs, infP);
 
 			free(informacion);
-			sem_post(&cpuUsada->sem);
+			pthread_mutex_unlock(&cpuUsada->mutex);
 			break;
 		case GRABAR_VARIABLE_COMPARTIDA:
 			log_trace(logKernel, "Recibi GRABAR_VARIABLE_COMPARTIDA");
@@ -278,7 +278,7 @@ void escucharCPU(int socket_cpu) {
 				list_add(infoProcs, infP);
 			}
 			free(varCompartida->nombre);
-			sem_post(&cpuUsada->sem);
+			pthread_mutex_unlock(&cpuUsada->mutex);
 			break;
 		case VALOR_VARIABLE_COMPARTIDA:
 			log_trace(logKernel, "Recibi VALOR_VARIABLE_COMPARTIDA");
@@ -304,7 +304,7 @@ void escucharCPU(int socket_cpu) {
 				list_add(infoProcs, infP);
 			}
 			free(varCompartida->nombre);
-			sem_post(&cpuUsada->sem);
+			pthread_mutex_unlock(&cpuUsada->mutex);
 			break;
 		}
 
@@ -609,12 +609,12 @@ void consolaKernel(){
 		}else if(string_equals_ignore_case(comando, "detener")){
 
 			log_trace(logKernel, "Detengo planificacion");
-			pthread_mutex_lock(&mut_planificacion);	//fixme: ahora como hago esto
+			pthread_mutex_lock(&mut_detengo_plani);	//fixme: ahora como hago esto
 
 		}else if(string_equals_ignore_case(comando, "reanudar")){
 
 			log_trace(logKernel, "Reanudo planificacion");
-			pthread_mutex_unlock(&mut_planificacion);
+			pthread_mutex_unlock(&mut_detengo_plani);
 
 		}else if(string_equals_ignore_case(comando, "help")){
 			printf("Comandos:\n"

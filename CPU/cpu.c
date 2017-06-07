@@ -140,6 +140,8 @@ int main(int argc, char* argv[]) {
 			break;
 		case 0:
 			fprintf(stderr, "El Kernel %d se ha desconectado \n", socket_kernel);
+			close(socket_kernel);
+			socket_kernel = 0;
 			finalizarCPU();
 			break;
 		default:

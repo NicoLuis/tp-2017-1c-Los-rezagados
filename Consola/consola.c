@@ -18,6 +18,8 @@ int main(int argc, char* argv[]) {
 		return -2;
 	}
 
+	signal (SIGINT, finalizarConsola);
+
 	//Creo archivo log
 	logConsola = log_create("consola.log", "CONSOLA", false, LOG_LEVEL_TRACE);
 	log_trace(logConsola, "  -----------  INICIO CONSOLA  -----------  ");
@@ -82,7 +84,7 @@ int main(int argc, char* argv[]) {
 		fgets(mensaje, 200, stdin);
 
 		leerComando(mensaje);
-
+		free(mensaje);
 	}
 
 	return 0;

@@ -136,6 +136,9 @@ void escucharKernel(){
 		case 0:
 			fprintf(stderr, "El kernel se ha desconectado \n");
 			log_trace(logConsola, "La desconecto el kernel");
+			close(socket_kernel);
+			socket_kernel = 0;
+			finalizarConsola();
 			pthread_exit(NULL);
 			break;
 		case ERROR:
@@ -239,4 +242,15 @@ void finalizarPrograma(t_programa* prog, bool flag_print){
 	}
 	list_remove_and_destroy_by_condition(lista_programas, (void*) _esPid, free);
 
+}
+
+
+void finalizarConsola(){
+
+	if(socket_kernel != 0){
+		msg_enviar_separado(DESCONECTAR, 0, 0, socket_kernel);
+		close(socket_kernel);
+	}
+
+	exit(1);
 }

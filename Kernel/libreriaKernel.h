@@ -55,7 +55,8 @@ t_list* lista_variablesCompartidas;
 
 typedef struct {
 	char* nombre;
-	sem_t semaforo;
+	int valorSemaforo;
+	t_queue* colaBloqueados;
 }t_VariableSemaforo;
 t_list* lista_variablesSemaforo;
 
@@ -95,7 +96,6 @@ typedef struct {
 	int canrBytes_alocar;
 	int cantOp_liberar;
 	int canrBytes_liberar;
-	int cantSyscalls;
 }t_infoProceso;
 t_list* infoProcs;
 
@@ -156,10 +156,10 @@ t_log* logKernel;
 t_num tamanioPag;
 
 void escucharCPU(int);
+void _sumarCantOpPriv(t_num8);
 
 int handshake(int socket_cliente, int tipo);
 void atender_consola(int socket_consola);
-
 
 void consolaKernel();
 void terminarKernel();

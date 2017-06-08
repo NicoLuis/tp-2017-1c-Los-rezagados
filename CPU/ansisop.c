@@ -205,6 +205,16 @@ void finalizar(){
 
 }
 
+
+/*
+ *
+ *
+ * KERNEL
+ *
+ *
+ *
+ */
+
 t_valor_variable asignarValorCompartida(t_nombre_compartida variable, t_valor_variable valor){
 	//ariel
 	log_trace(logAnsisop, "Asignar valor %d a variable %s", valor, variable);
@@ -263,23 +273,15 @@ t_valor_variable obtenerValorCompartida(t_nombre_compartida variable){
 	}
 }
 
-/*
- *
- *
- * KERNEL
- *
- *
- *
- */
-
-
 t_descriptor_archivo abrir(t_direccion_archivo direccion, t_banderas flags){
 
 	return 0;
 }
+
 void borrar(t_descriptor_archivo direccion){
 
 }
+
 void cerrar(t_descriptor_archivo descriptor_archivo){
 
 }
@@ -305,21 +307,48 @@ void escribir(t_descriptor_archivo descriptor_archivo, void* informacion, t_valo
 void leer(t_descriptor_archivo descriptor_archivo, t_puntero informacion, t_valor_variable tamanio){
 
 }
+
 void liberar(t_puntero puntero){
 
 }
+
 void moverCursor(t_descriptor_archivo descriptor_archivo, t_valor_variable posicion){
 
 }
+
 t_puntero reservar(t_valor_variable espacio){
 
 	return 0;
 }
 void ansisop_signal(t_nombre_semaforo identificador_semaforo){
+	log_trace(logAnsisop, "Signal semaforo %s", identificador_semaforo);
+	msg_enviar_separado(SIGNAL, string_length(identificador_semaforo), identificador_semaforo, socket_kernel);
 
+	t_msg* msgRecibido = msg_recibir(socket_kernel);
+	msg_recibir_data(socket_kernel, msgRecibido);
+
+	if(msgRecibido->tipoMensaje != SIGNAL){
+		log_error(logAnsisop, "Error al hacer el signal - se recibio %d", msgRecibido->tipoMensaje);
+		flag_error = true;
+	}
+	msg_destruir(msgRecibido);
 }
-void ansisop_wait(t_nombre_semaforo identificador_semaforo){
 
+void ansisop_wait(t_nombre_semaforo identificador_semaforo){
+	log_trace(logAnsisop, "Wait semaforo %s", identificador_semaforo);
+	msg_enviar_separado(WAIT, string_length(identificador_semaforo), identificador_semaforo, socket_kernel);
+
+	t_msg* msgRecibido = msg_recibir(socket_kernel);
+	msg_recibir_data(socket_kernel, msgRecibido);
+
+	if(msgRecibido->tipoMensaje == WAIT){
+		flag_ultimaEjecucion = 1;
+		msg_destruir(msgRecibido);
+	}else{
+		log_error(logAnsisop, "Error al hacer el signal - se recibio %d", msgRecibido->tipoMensaje);
+		flag_error = true;
+		msg_destruir(msgRecibido);
+	}
 }
 
 

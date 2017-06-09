@@ -8,6 +8,7 @@
 #include "ansisop.h"
 #include "pcb.h"
 
+
 #define INICIOSTACK (pcb->cantPagsCodigo * tamanioPagina)
 
 t_puntero definirVariable(t_nombre_variable identificador_variable){
@@ -274,6 +275,25 @@ t_valor_variable obtenerValorCompartida(t_nombre_compartida variable){
 
 
 t_descriptor_archivo abrir(t_direccion_archivo direccion, t_banderas flags){
+	
+	log_trace(logAnsisop, "abrir el siguiente archivo ubicado en: %s", direccion);
+	int longitud_buffer = sizeof(t_num) + string_length(direccion) + sizeof(t_banderas) + sizeof(t_num8);
+	void* buffer = malloc(longitud_buffer);
+	t_num longitud_path = string_length(direccion);
+
+	memcpy(buffer, &longitud_path, sizeof(t_num));
+	memcpy(buffer + sizeof(t_num), direccion, longitud_path);
+	memcpy(buffer+ string_length(direccion) + longitud_path, &flags, sizeof(t_banderas));
+	memcpy(buffer+ string_length(direccion) + longitud_path + sizeof(t_banderas),&pcb->pid,sizeof(t_num8));
+	if(buffer == NULL){
+			log_trace(logCPU, "error en al cargar el buffer");
+			flag_error=1;// matar proceso CPU scaso de erro
+		}
+	msg_enviar_separado(ABRIR_ANSISOP, longitud_buffer, buffer, socket_kernel);
+
+
+
+
 
 	return 0;
 }

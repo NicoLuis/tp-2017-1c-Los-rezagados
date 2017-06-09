@@ -47,6 +47,46 @@
 #define CANT_PAGS_INSUFICIENTES -9
 #define SIN_DEFINICION -20
 
+//////////////////////// CAPA FS ////////////////////////////
+
+typedef struct{
+	uint indice; //fd??
+	char* bandera;
+	uint referenciaGlobalTable;
+}t_entrada_proceso;
+
+typedef struct{
+	t_num8 pid;
+	uint indiceMax;
+	t_list* lista_entradas_de_proceso;
+
+} t_tabla_proceso;
+
+t_list* lista_tabla_de_procesos;
+
+typedef struct{
+	uint indiceGlobalTable;
+	char* FilePath;
+	uint Open;
+}t_entrada_GlobalFile;
+
+t_list* lista_tabla_global;
+
+
+////////////////////////////////////////////////////////
+
+
+typedef struct{
+	uint indice;
+	char Flags[2];
+	uint GlobalFD;
+}t_ProcessFile;
+
+typedef struct{
+	char* File
+	
+};
+
 typedef struct {
 	char* nombre;
 	t_valor_variable valor;
@@ -106,6 +146,7 @@ t_list* lista_PCBs;
 t_list* lista_PCB_consola;
 t_list* lista_PCB_cpu;
 t_num8 pid;
+int indiceGlobal;
 
 //Archivo de Configuracion
 int puertoPrograma;

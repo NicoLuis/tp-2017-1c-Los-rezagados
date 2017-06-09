@@ -306,6 +306,94 @@ void escucharCPU(int socket_cpu) {
 			free(varCompartida->nombre);
 			sem_post(&cpuUsada->sem);
 			break;
+		case ABRIR_ANSISOP:
+			log_trace(logKernel, "Recibi la siguiente operacion ABRIR_ANSISOP de CPU");
+			msg_recibir_data(socket_cpu, msgRecibido);
+			//t_num longitud_msj = 0;
+			t_direccion_archivo pathArchivo;
+			t_num longitudPath;
+			t_banderas flags;
+			t_num8 pid;
+			memcpy(&longitudPath, msgRecibido->data, sizeof(t_num));
+			pathArchivo = malloc(longitudPath) + 1;
+			memcpy(pathArchivo, msgRecibido->data + sizeof(t_num), longitudPath);
+			pathArchivo[longitudPath] = '\0';
+			memcpy(&flags, msgRecibido->data + sizeof(t_num) + longitudPath, sizeof(t_banderas));
+			memcpy(&pid, msgRecibido->data + sizeof(t_num) + longitudPath + sizeof(t_banderas),sizeof(t_num8));
+
+//-------------- seteo variables de la tabla global --------------
+
+			t_entrada_GlobalFile * entradaGlobalNew = malloc(sizeof(t_entrada_GlobalFile));
+
+
+//-------------- busco si ya tengo este path en la tabla global ---------
+
+			int _buscarPath(t_entrada_GlobalFile* a){ return string_equals_ignore_case(a->FilePath,pathArchivo); }
+			t_entrada_GlobalFile* entradaGlobalOld = list_find(lista_tabla_global, (void*) _buscarPath);
+
+			uint indiceActualGlobal;
+
+			if(entradaGlobalOld == NULL){
+				// si es nulo significa qe se abre el archivo por primera vez
+				memcpy(entradaGlobalNew->FilePath, pathArchivo, longitudPath+1);
+
+				//entradaGlobalNew->FilePath = pathArchivo;
+				entradaGlobalNew->Open = 1;
+				entradaGlobalNew->indiceGlobalTable = indiceGlobal;
+				indiceGlobal++;
+				indiceActualGlobal = indiceGlobal;
+				list_add(lista_tabla_global,entradaGlobalNew);
+			} else {
+				// de lo contrario este se encuentra abierto y un proceso esta qeriendo abrirlo
+				list_remove_by_condition(lista_tabla_global, (void*) _buscarPath);
+				entradaGlobalOld->Open++;
+				indiceActualGlobal= entradaGlobalOld->Open;
+				list_add(lista_tabla_global,entradaGlobalOld);
+			}
+
+//-------------- seteo variable necesarias para la tabla de procesos ------------------------------
+
+			t_entrada_proceso *entradaProcesoNew = malloc(sizeof(t_entrada_proceso));
+
+			entradaProcesoNew->bandera =string_new();
+
+			//considero el caso qe venga con + de 2 flags
+
+			if(flags.lectura){
+				entradaProcesoNew->bandera = "r";
+			}
+			if(flags.escritura){
+				string_append(&entradaProcesoNew->bandera,"w");
+			}
+			if(flags.creacion){ //si lo crea entoncs puede leer y escribir
+				string_append(&entradaProcesoNew->bandera,"c");
+				msg_enviar_separado(CREAR_ARCHIVO, longitudPath, pathArchivo, socket_fs);//
+				//crear archivo en fs
+			}
+
+			entradaProcesoNew->referenciaGlobalTable = indiceActualGlobal;
+
+			//-------------- busco si ya tengo la tabla para este id de proceso -------------------------
+
+			int _espid(t_tabla_proceso* a){ return a->pid == pid; }
+			t_tabla_proceso* tablaProceso = list_find(lista_tabla_de_procesos, (void*) _esPid);
+
+			// si la tabla del proceso no tiene entradas entoncs agrego una entrada nueva
+			if(tablaProceso == NULL){
+				entradaProcesoNew->indice = 3; // inicio indice en 3
+				tablaProceso->indiceMax = 3;
+				// en este momento ya estan cargados los flags, el indice y la referencia a tabla global
+
+				list_add(tablaProceso->lista_entradas_de_proceso, entradaProcesoNew);
+
+			} else {
+				// defino indice de tabla
+
+				entradaProcesoNew->indice = tablaProceso->indiceMax + 1;
+				tablaProceso->indiceMax++;
+				list_add(tablaProceso->lista_entradas_de_proceso, entradaProcesoNew);
+			}
+
 		}
 
 		free(varCompartida);

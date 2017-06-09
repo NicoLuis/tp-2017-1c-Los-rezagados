@@ -35,12 +35,15 @@ int main(int argc, char* argv[]) {
 	lista_PCB_cpu = list_create();
 	infoProcs = list_create();
 	pid = 0;
+	indiceGlobal = 0;
 	cola_New = queue_create();
 	cola_Ready = queue_create();
 	cola_Exec = queue_create();
 	cola_Block = queue_create();
 	cola_Exit = queue_create();
 
+	lista_tabla_de_procesos =  list_create(); //capa FS creo lista de estructuras de procesos
+	lista_tabla_global = list_create(); //capa FS creo lista de estructuras globales
 
 	//Creo archivo log
 	logKernel = log_create("kernel.log", "KERNEL", false, LOG_LEVEL_TRACE);
@@ -72,6 +75,8 @@ int main(int argc, char* argv[]) {
 
 	//Defino señales
 	signal (SIGINT, terminarKernel);
+
+
 
 
 	//-------------------------------CONEXION AL LA MEMORIA-------------------------------------

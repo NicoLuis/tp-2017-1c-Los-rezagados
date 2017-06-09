@@ -54,5 +54,6 @@ void leerComando(char* comando);
 void escucharKernel();
 char* cargarScript(void* pathScript);
 void finalizarPrograma(t_programa* prog, bool flag_print);
+void finalizarConsola();
 
 #endif /* LIBRERIACONSOLA_H_ */

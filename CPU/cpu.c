@@ -20,8 +20,8 @@ int main(int argc, char* argv[]) {
 	}
 
 	//Creo archivo log
-	logAnsisop = log_create("ansisop.log", "Ansisop", false, LOG_LEVEL_TRACE);
-	logCPU = log_create("cpu.log", "CPU", false, LOG_LEVEL_TRACE);
+	logAnsisop = log_create(string_from_format("ansisop_%d.log", process_getpid()), "Ansisop", false, LOG_LEVEL_TRACE);
+	logCPU = log_create(string_from_format("cpu_%d.log", process_getpid()), "CPU", false, LOG_LEVEL_TRACE);
 	log_trace(logAnsisop, "  -----------  INICIO CPU  -----------  ");
 	log_trace(logCPU, "  -----------  INICIO CPU  -----------  ");
 
@@ -121,7 +121,7 @@ int main(int argc, char* argv[]) {
 		switch(msgRecibido->tipoMensaje){
 		case ENVIO_PCB:
 
-			log_trace(logCPU, "Recibi ENVIO_PCB");
+			log_trace(logCPU, "\t\t ---- EJECUTO PCB ---- ");
 			pcb = desserealizarPCB(msgRecibido->data);
 
 			log_trace(logCPU, "pcb->pid %d", pcb->pid);
@@ -140,6 +140,8 @@ int main(int argc, char* argv[]) {
 			break;
 		case 0:
 			fprintf(stderr, "El Kernel %d se ha desconectado \n", socket_kernel);
+			close(socket_kernel);
+			socket_kernel = 0;
 			finalizarCPU();
 			break;
 		default:

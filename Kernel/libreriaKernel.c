@@ -35,7 +35,8 @@ void inicializarSemaforosYVariables(char** ids, char** valores, char** shared_va
 	for(i = 0; ids[i] != NULL ;i++){
 		t_VariableSemaforo* semaforo = malloc(sizeof(t_VariableSemaforo));
 		semaforo->nombre = ids[i];
-		sem_init(&semaforo->semaforo, 0, (int)valores[i]);
+		semaforo->valorSemaforo = 0;
+		semaforo->colaBloqueados = queue_create();
 		list_add(lista_variablesSemaforo, semaforo);
 	}
 
@@ -153,7 +154,7 @@ void escucharCPU(int socket_cpu) {
 
 	while(1){
 
-		sem_wait(&cpuUsada->sem);
+		pthread_mutex_lock(&cpuUsada->mutex);
 		bool flag_finalizado = false;
 
 		t_msg* msgRecibido = msg_recibir(socket_cpu);
@@ -166,9 +167,13 @@ void escucharCPU(int socket_cpu) {
 		t_PCB* pcb = list_find(lista_PCBs, (void*) _es_PCB);
 		bool _esPid(t_infosocket* a){ return a->pid == pcb->pid; }
 
-		t_VariableCompartida* varCompartida = malloc(sizeof(varCompartida));
+		t_VariableCompartida* varCompartida = malloc(sizeof(t_VariableCompartida));
 		int _buscar_VarComp(t_VariableCompartida* p){
 			return string_equals_ignore_case(p->nombre, varCompartida->nombre);
+		}
+		t_VariableSemaforo* varSemaforo = malloc(sizeof(t_VariableSemaforo));
+		int _buscar_VarSem(t_VariableSemaforo* s){
+			return string_equals_ignore_case(s->nombre, varSemaforo->nombre);
 		}
 		t_num tamanioNombre, offset = 0;
 
@@ -192,7 +197,7 @@ void escucharCPU(int socket_cpu) {
 			list_add(lista_PCBs, pcb);
 			_sacarDeCola(pcb->pid, cola_Exec, mutex_Exec);
 			cpuUsada->libre = true;
-			pthread_mutex_unlock(&mut_planificacion);
+			pthread_mutex_unlock(&cpuUsada->mutex);
 			sem_post(&sem_cantCPUs);
 			break;
 		case 0: case FIN_CPU:
@@ -206,7 +211,7 @@ void escucharCPU(int socket_cpu) {
 			list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
 			list_add(lista_PCBs, pcb);
 			sem_post(&sem_gradoMp);
-			pthread_mutex_unlock(&mut_planificacion);
+			pthread_mutex_unlock(&cpuUsada->mutex);
 			pthread_exit(NULL);
 			break;
 		case ERROR:
@@ -221,7 +226,7 @@ void escucharCPU(int socket_cpu) {
 			t_infosocket* info = list_find(lista_PCB_consola, (void*) _esPid);
 			msg_enviar_separado(ERROR, sizeof(t_num8), &pcb->pid, info->socket);
 			sem_post(&sem_gradoMp);
-			pthread_mutex_unlock(&mut_planificacion);
+			pthread_mutex_unlock(&cpuUsada->mutex);
 			break;
 		case ESCRIBIR_FD:
 			log_trace(logKernel, "Recibi ESCRIBIR_FD");
@@ -249,7 +254,7 @@ void escucharCPU(int socket_cpu) {
 			list_add(infoProcs, infP);
 
 			free(informacion);
-			sem_post(&cpuUsada->sem);
+			pthread_mutex_unlock(&cpuUsada->mutex);
 			break;
 		case GRABAR_VARIABLE_COMPARTIDA:
 			log_trace(logKernel, "Recibi GRABAR_VARIABLE_COMPARTIDA");
@@ -271,14 +276,10 @@ void escucharCPU(int socket_cpu) {
 			}else{
 				varBuscada->valor = varCompartida->valor;
 				msg_enviar_separado(GRABAR_VARIABLE_COMPARTIDA, 0, 0, socket_cpu);
-
-				int _espidproc(t_infoProceso* a){ return a->pid == pcb->pid; }
-				t_infoProceso* infP = list_remove_by_condition(infoProcs, (void*) _espidproc);
-				infP->cantOpPriv++;	//fixme: no suma si no lo saco
-				list_add(infoProcs, infP);
+				_sumarCantOpPriv(pcb->pid);
 			}
 			free(varCompartida->nombre);
-			sem_post(&cpuUsada->sem);
+			pthread_mutex_unlock(&cpuUsada->mutex);
 			break;
 		case VALOR_VARIABLE_COMPARTIDA:
 			log_trace(logKernel, "Recibi VALOR_VARIABLE_COMPARTIDA");
@@ -297,14 +298,89 @@ void escucharCPU(int socket_cpu) {
 			}else{
 				log_info(logKernel, "Valor %d", varBuscad->valor);
 				msg_enviar_separado(VALOR_VARIABLE_COMPARTIDA, sizeof(t_valor_variable), &varBuscad->valor, socket_cpu);
-
-				int _espidproc(t_infoProceso* a){ return a->pid == pcb->pid; }
-				t_infoProceso* infP = list_remove_by_condition(infoProcs, (void*) _espidproc);
-				infP->cantOpPriv++;
-				list_add(infoProcs, infP);
+				_sumarCantOpPriv(pcb->pid);
 			}
 			free(varCompartida->nombre);
-			sem_post(&cpuUsada->sem);
+			pthread_mutex_unlock(&cpuUsada->mutex);
+			break;
+
+
+		case SIGNAL:
+			log_trace(logKernel, "Recibi SIGNAL");
+
+			msg_recibir_data(socket_cpu, msgRecibido);
+			memcpy(&tamanioNombre, &msgRecibido->longitud, sizeof(t_num));
+			varSemaforo->nombre = malloc(tamanioNombre+1);
+			memcpy(varSemaforo->nombre, msgRecibido->data, tamanioNombre);
+			varSemaforo->nombre[tamanioNombre] = '\0';
+			log_info(logKernel, "Semaforo %s", varSemaforo->nombre);
+
+			t_VariableSemaforo* semBuscado = list_remove_by_condition(lista_variablesSemaforo, (void*) _buscar_VarSem);
+			if (semBuscado == NULL){
+				log_error(logKernel, "Error no encontre SEMAFORO");
+				msg_enviar_separado(ERROR, 0, 0, socket_cpu);
+			}else{
+				semBuscado->valorSemaforo++;
+				log_trace(logKernel, "Valor %d", semBuscado->valorSemaforo);
+				if(semBuscado->valorSemaforo <= 1){
+					t_num8 pidADesbloquear;
+					void* tmp = malloc(sizeof(t_num8));
+					tmp = queue_pop(semBuscado->colaBloqueados);
+					memcpy(&pidADesbloquear, tmp, sizeof(t_num8));
+					free(tmp);
+					log_trace(logKernel, "Desbloqueo pid %d", pidADesbloquear);
+
+					_sacarDeCola(pidADesbloquear, cola_Block, mutex_Block);
+					_ponerEnCola(pidADesbloquear, cola_Ready, mutex_Ready);
+					sem_post(&sem_cantColaReady);
+				}
+				list_add(lista_variablesSemaforo, semBuscado);
+				msg_enviar_separado(SIGNAL, 0, 0, socket_cpu);
+				_sumarCantOpPriv(pcb->pid);
+			}
+			free(varSemaforo->nombre);
+			pthread_mutex_unlock(&cpuUsada->mutex);
+			break;
+
+		case WAIT:
+			log_trace(logKernel, "Recibi WAIT");
+
+			msg_recibir_data(socket_cpu, msgRecibido);
+			memcpy(&tamanioNombre, &msgRecibido->longitud, sizeof(t_num));
+			varSemaforo->nombre = malloc(tamanioNombre+1);
+			memcpy(varSemaforo->nombre, msgRecibido->data, tamanioNombre);
+			varSemaforo->nombre[tamanioNombre] = '\0';
+			log_info(logKernel, "Semaforo %s", varSemaforo->nombre);
+
+			t_VariableSemaforo* semBuscad = list_remove_by_condition(lista_variablesSemaforo, (void*) _buscar_VarSem);
+			if (semBuscad == NULL){
+				log_error(logKernel, "Error no encontre SEMAFORO");
+				msg_enviar_separado(ERROR, 0, 0, socket_cpu);
+			}else{
+				semBuscad->valorSemaforo--;
+				log_trace(logKernel, "Valor %d", semBuscad->valorSemaforo);
+				if(semBuscad->valorSemaforo < 0){
+					void* tmp = malloc(sizeof(t_num8));
+					memcpy(tmp, &pcb->pid, sizeof(t_num8));
+					queue_push(semBuscad->colaBloqueados, tmp);
+					free(tmp);
+					log_trace(logKernel, "Bloqueo pid %d", pcb->pid);
+
+					_sacarDeCola(pcb->pid, cola_Ready, mutex_Ready);
+					_ponerEnCola(pcb->pid, cola_Block, mutex_Block);
+					sem_post(&sem_cantColaReady);
+
+					msg_enviar_separado(WAIT, 0, 0, socket_cpu);	//todo: enviar si bloqueo o no
+					//todo: recibo pcb
+				}else{
+					msg_enviar_separado(WAIT, 0, 0, socket_cpu);
+				}
+				list_add(lista_variablesSemaforo, semBuscad);
+
+				_sumarCantOpPriv(pcb->pid);
+			}
+			free(varSemaforo->nombre);
+			pthread_mutex_unlock(&cpuUsada->mutex);
 			break;
 		case ABRIR_ANSISOP:
 			log_trace(logKernel, "Recibi la siguiente operacion ABRIR_ANSISOP de CPU");
@@ -397,10 +473,18 @@ void escucharCPU(int socket_cpu) {
 		}
 
 		free(varCompartida);
+		free(varSemaforo);
 		msg_destruir(msgRecibido);
 	}
 }
 
+
+void _sumarCantOpPriv(t_num8 pid){
+	int _espidproc(t_infoProceso* a){ return a->pid == pid; }
+	t_infoProceso* infP = list_remove_by_condition(infoProcs, (void*) _espidproc);
+	infP->cantOpPriv++;	//fixme: no suma si no lo saco
+	list_add(infoProcs, infP);
+}
 
 typedef struct {
 	t_num8 pid;
@@ -549,7 +633,7 @@ void consolaKernel(){
 	*/
 
 	while(1){
-		char* comando = malloc(200);
+		char* comando = malloc(200);	//fixme: liberar?
 		fgets(comando, 200, stdin);
 
 		comando[strlen(comando)-1] = '\0';
@@ -607,8 +691,7 @@ void consolaKernel(){
 						" e - Cantidad de acciones alocar realizadas [cantidad de operaciones] \n"
 						" f - Cantidad de acciones alocar realizadas [bytes] \n"
 						" g - Cantidad de acciones liberar realizadas [cantidad de operaciones]  \n"
-						" h - Cantidad de acciones liberar realizadas [bytes] \n"
-						" i - Cantidad de syscalls ejecutadas \n");
+						" h - Cantidad de acciones liberar realizadas [bytes] \n");
 
 				switch(getchar()){
 				case 'a':
@@ -634,9 +717,6 @@ void consolaKernel(){
 					break;
 				case 'h':
 					printf( "Se liberaron %d bytes \n", infP->canrBytes_liberar);
-					break;
-				case 'i':
-					printf( "Cantidad de syscalls ejecutadas: %d \n", infP->cantSyscalls);
 					break;
 				default:
 					printf( "Capo que me tiraste? \n");
@@ -697,12 +777,12 @@ void consolaKernel(){
 		}else if(string_equals_ignore_case(comando, "detener")){
 
 			log_trace(logKernel, "Detengo planificacion");
-			pthread_mutex_lock(&mut_planificacion);	//fixme: ahora como hago esto
+			pthread_mutex_lock(&mut_detengo_plani);	//fixme: ahora como hago esto
 
 		}else if(string_equals_ignore_case(comando, "reanudar")){
 
 			log_trace(logKernel, "Reanudo planificacion");
-			pthread_mutex_unlock(&mut_planificacion);
+			pthread_mutex_unlock(&mut_detengo_plani);
 
 		}else if(string_equals_ignore_case(comando, "help")){
 			printf("Comandos:\n"
@@ -741,7 +821,7 @@ void terminarKernel(){			//aca libero todos
 
 	list_destroy_and_destroy_elements(lista_variablesCompartidas, free);
 	void _destruirSemaforos(t_VariableSemaforo* variable){
-		sem_destroy(&variable->semaforo);
+		queue_destroy_and_destroy_elements(variable->colaBloqueados, free);
 		free(variable);
 	}
 	list_destroy_and_destroy_elements(lista_variablesSemaforo, (void*) _destruirSemaforos);

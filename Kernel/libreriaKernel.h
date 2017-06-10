@@ -97,6 +97,7 @@ typedef struct {
 	char* nombre;
 	int valorSemaforo;
 	t_queue* colaBloqueados;
+	pthread_mutex_t mutex_colaBloqueados;
 }t_VariableSemaforo;
 t_list* lista_variablesSemaforo;
 

@@ -345,7 +345,6 @@ void ansisop_signal(t_nombre_semaforo identificador_semaforo){
 	msg_enviar_separado(SIGNAL, string_length(identificador_semaforo), identificador_semaforo, socket_kernel);
 
 	t_msg* msgRecibido = msg_recibir(socket_kernel);
-	msg_recibir_data(socket_kernel, msgRecibido);
 
 	if(msgRecibido->tipoMensaje != SIGNAL){
 		log_error(logAnsisop, "Error al hacer el signal - se recibio %d", msgRecibido->tipoMensaje);
@@ -359,13 +358,18 @@ void ansisop_wait(t_nombre_semaforo identificador_semaforo){
 	msg_enviar_separado(WAIT, string_length(identificador_semaforo), identificador_semaforo, socket_kernel);
 
 	t_msg* msgRecibido = msg_recibir(socket_kernel);
-	msg_recibir_data(socket_kernel, msgRecibido);
 
 	if(msgRecibido->tipoMensaje == WAIT){
-		flag_ultimaEjecucion = 1;
+		msg_recibir_data(socket_kernel, msgRecibido);
+		t_num valorSemaforoRecibido;
+		memcpy(&valorSemaforoRecibido, msgRecibido->data, sizeof(t_num));
+		log_trace(logAnsisop, "valorSemaforoRecibido %d", valorSemaforoRecibido);
+		int auxAsqueroso = valorSemaforoRecibido;
+		if(auxAsqueroso < 0)
+			flag_ultimaEjecucion = 1;
 		msg_destruir(msgRecibido);
 	}else{
-		log_error(logAnsisop, "Error al hacer el signal - se recibio %d", msgRecibido->tipoMensaje);
+		log_error(logAnsisop, "Error al hacer el wait - se recibio %d", msgRecibido->tipoMensaje);
 		flag_error = true;
 		msg_destruir(msgRecibido);
 	}

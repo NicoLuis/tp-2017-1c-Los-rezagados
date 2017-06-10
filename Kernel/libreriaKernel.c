@@ -35,7 +35,7 @@ void inicializarSemaforosYVariables(char** ids, char** valores, char** shared_va
 	for(i = 0; ids[i] != NULL ;i++){
 		t_VariableSemaforo* semaforo = malloc(sizeof(t_VariableSemaforo));
 		semaforo->nombre = ids[i];
-		semaforo->valorSemaforo = 0;
+		semaforo->valorSemaforo = atoi(valores[i]);
 		semaforo->colaBloqueados = queue_create();
 		list_add(lista_variablesSemaforo, semaforo);
 	}
@@ -123,14 +123,9 @@ t_PCB* recibir_pcb(int socket_cpu, t_msg* msgRecibido, bool flag_finalizado, boo
 	t_PCB* pcb = desserealizarPCB(msgRecibido->data);
 	list_remove_and_destroy_by_condition(lista_PCB_cpu, (void*) _esCPU2, free);
 	_sacarDeCola(pcb->pid, cola_Exec, mutex_Exec);
-	if(flag_finalizado){
-		log_trace(logKernel, "Finalizo PCB");
-		pcb->exitCode = 0;
-		send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
-		msg_enviar_separado(FINALIZAR_PROGRAMA, 0, 0, socket_memoria);
-		_ponerEnCola(pcb->pid, cola_Exit, mutex_Exit);
-		liberarPCB(pcb, true);
-	}else{
+	if(flag_finalizado)
+		finalizarPid(pcb->pid, 0);
+	else{
 		if(flag_bloqueo)
 			_ponerEnCola(pcb->pid, cola_Block, mutex_Block);
 		else{
@@ -195,7 +190,6 @@ void escucharCPU(int socket_cpu) {
 			}
 			list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
 			list_add(lista_PCBs, pcb);
-			_sacarDeCola(pcb->pid, cola_Exec, mutex_Exec);
 			cpuUsada->libre = true;
 			pthread_mutex_unlock(&cpuUsada->mutex);
 			sem_post(&sem_cantCPUs);
@@ -208,6 +202,12 @@ void escucharCPU(int socket_cpu) {
 			list_remove_and_destroy_by_condition(lista_PCB_cpu, (void*) _esCPU2, free);
 			_sacarDeCola(pcb->pid, cola_Exec, mutex_Exec);
 			setearExitCode(pcb->pid, SIN_DEFINICION);
+			void _sacarDeSemaforos(t_VariableSemaforo* sem){
+				t_num8 encontrado = _sacarDeCola(pcb->pid, sem->colaBloqueados, sem->mutex_colaBloqueados);
+				if(encontrado == pcb->pid)
+					sem->valorSemaforo++;
+			}
+			list_iterate(lista_variablesSemaforo, (void*) _sacarDeSemaforos);
 			list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
 			list_add(lista_PCBs, pcb);
 			sem_post(&sem_gradoMp);
@@ -322,10 +322,12 @@ void escucharCPU(int socket_cpu) {
 			}else{
 				semBuscado->valorSemaforo++;
 				log_trace(logKernel, "Valor %d", semBuscado->valorSemaforo);
-				if(semBuscado->valorSemaforo <= 1){
+				if(semBuscado->valorSemaforo <= 0){
 					t_num8 pidADesbloquear;
 					void* tmp = malloc(sizeof(t_num8));
+					pthread_mutex_lock(&semBuscado->mutex_colaBloqueados);
 					tmp = queue_pop(semBuscado->colaBloqueados);
+					pthread_mutex_unlock(&semBuscado->mutex_colaBloqueados);
 					memcpy(&pidADesbloquear, tmp, sizeof(t_num8));
 					free(tmp);
 					log_trace(logKernel, "Desbloqueo pid %d", pidADesbloquear);
@@ -358,25 +360,30 @@ void escucharCPU(int socket_cpu) {
 				msg_enviar_separado(ERROR, 0, 0, socket_cpu);
 			}else{
 				semBuscad->valorSemaforo--;
-				log_trace(logKernel, "Valor %d", semBuscad->valorSemaforo);
+				log_trace(logKernel, "Valor semaforo %s %d", semBuscad->nombre, semBuscad->valorSemaforo);
+				msg_enviar_separado(WAIT, sizeof(t_num), &semBuscad->valorSemaforo, socket_cpu);
+
 				if(semBuscad->valorSemaforo < 0){
 					void* tmp = malloc(sizeof(t_num8));
 					memcpy(tmp, &pcb->pid, sizeof(t_num8));
+					pthread_mutex_lock(&semBuscad->mutex_colaBloqueados);
 					queue_push(semBuscad->colaBloqueados, tmp);
+					pthread_mutex_unlock(&semBuscad->mutex_colaBloqueados);
 					free(tmp);
 					log_trace(logKernel, "Bloqueo pid %d", pcb->pid);
-
-					_sacarDeCola(pcb->pid, cola_Ready, mutex_Ready);
-					_ponerEnCola(pcb->pid, cola_Block, mutex_Block);
-					sem_post(&sem_cantColaReady);
-
-					msg_enviar_separado(WAIT, 0, 0, socket_cpu);	//todo: enviar si bloqueo o no
-					//todo: recibo pcb
-				}else{
-					msg_enviar_separado(WAIT, 0, 0, socket_cpu);
+					//recibo pcb
+					msg_destruir(msgRecibido);
+					msgRecibido = msg_recibir(socket_cpu);
+					msg_recibir_data(socket_cpu, msgRecibido);
+					pcb = recibir_pcb(socket_cpu, msgRecibido, 0, 1);
+					list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
+					list_add(lista_PCBs, pcb);
+					cpuUsada->libre = true;
+					pthread_mutex_unlock(&cpuUsada->mutex);
+					sem_post(&sem_cantCPUs);
 				}
-				list_add(lista_variablesSemaforo, semBuscad);
 
+				list_add(lista_variablesSemaforo, semBuscad);
 				_sumarCantOpPriv(pcb->pid);
 			}
 			free(varSemaforo->nombre);
@@ -617,12 +624,6 @@ void atender_consola(int socket_consola){
 
 
 
-
-
-
-
-
-
 void consolaKernel(){
 
 	/*
@@ -650,8 +651,9 @@ void consolaKernel(){
 					t_PCB* pcbA = list_get(lista_PCBs, i);
 					char* cola = " -- ";
 					char* exitCode;
+					int auxAsqueroso = pcbA->exitCode;
 
-					if(pcbA->exitCode > 0)
+					if(auxAsqueroso > 0)
 						exitCode = "-";
 					else
 						exitCode = string_from_format("%d", pcbA->exitCode);	//fixme: se caga en este if
@@ -741,22 +743,28 @@ void consolaKernel(){
 			}
 
 			if(nuevoGMP < gradoMultiprogramacion && nuevoGMP < valorSem){
+				log_trace(logKernel, "Waiteo gradoMP");
 				pthread_attr_t atributo;
 				pthread_attr_init(&atributo);
 				pthread_attr_setdetachstate(&atributo, PTHREAD_CREATE_DETACHED);
 				pthread_t hiloEspera;
-				while(valorSem > nuevoGMP){
+				while(valorSem > nuevoGMP){	//fixme: averiguar si  gradoMultiprogramacion-valorSem
 					pthread_create(&hiloEspera, &atributo,(void*) _esperarGradoMP, NULL);
 					sem_getvalue(&sem_gradoMp, &valorSem);
 				}
 				pthread_attr_destroy(&atributo);
 
 				gradoMultiprogramacion = nuevoGMP;
-				printf("Nuevo grado de multiprogramacion: %d\n", gradoMultiprogramacion);
+				fprintf(stderr, "Nuevo grado de multiprogramacion: %d\n", gradoMultiprogramacion);
 			}else{
-				sem_init(&sem_gradoMp, 0, nuevoGMP - valorSem);
+				log_trace(logKernel, "Posteo gradoMP");
+				while(gradoMultiprogramacion-valorSem < nuevoGMP){
+					sem_post(&sem_gradoMp);
+					sem_getvalue(&sem_gradoMp, &valorSem);
+				}
+
 				gradoMultiprogramacion = nuevoGMP;
-				printf("Nuevo grado de multiprogramacion: %d\n", gradoMultiprogramacion);
+				fprintf(stderr, "Nuevo grado de multiprogramacion: %d\n", gradoMultiprogramacion);
 			}
 
 		}else if(string_starts_with(comando, "kill ")){
@@ -858,6 +866,15 @@ void finalizarPid(t_num8 pid, int exitCode){
 		else
 			kill(cpu->pid, SIGUSR2);
 	}
+	void _sacarDeSemaforos(t_VariableSemaforo* sem){
+		t_num8 encontrado = _sacarDeCola(pid, sem->colaBloqueados, sem->mutex_colaBloqueados);
+		if(encontrado == pid)
+			sem->valorSemaforo++;
+	}
+	list_iterate(lista_variablesSemaforo, (void*) _sacarDeSemaforos);
+
+	send(socket_memoria, &pid, sizeof(t_num8), 0);
+	msg_enviar_separado(FINALIZAR_PROGRAMA, 0, 0, socket_memoria);
 	setearExitCode(pid, exitCode);
 }
 

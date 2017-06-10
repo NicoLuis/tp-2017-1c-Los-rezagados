@@ -33,7 +33,7 @@ void escucharKERNEL(void* socket_kernel) {
 	//Casteo socketKernel
 	int socketKernel = (int) socket_kernel;
 
-	uint32_t pid;
+	t_num8 pid;
 	uint32_t cantidadDePaginas;
 
 	log_info(log_memoria,"Se conecto el Kernel");
@@ -379,7 +379,7 @@ void unlockFramesYProcesos() {
 
 }
 
-void crearProcesoYAgregarAListaDeProcesos(uint32_t pid,	uint32_t cantidadDePaginas) {
+void crearProcesoYAgregarAListaDeProcesos(t_num8 pid,	uint32_t cantidadDePaginas) {
 
 	t_proceso* procesoNuevo = malloc(sizeof(t_proceso));
 	procesoNuevo->PID = pid;
@@ -391,7 +391,7 @@ void crearProcesoYAgregarAListaDeProcesos(uint32_t pid,	uint32_t cantidadDePagin
 
 }
 
-void liberarFramesDeProceso(uint32_t unPid) {
+void liberarFramesDeProceso(t_num8 unPid) {
 
 	int _soy_el_frame_buscado(t_frame* frame) {
 		return (frame->pid == unPid);
@@ -412,16 +412,13 @@ void liberarFramesDeProceso(uint32_t unPid) {
 
 }
 
-void eliminarProcesoDeListaDeProcesos(uint32_t unPid) {
-	int posicion = -1;
+void eliminarProcesoDeListaDeProcesos(t_num8 unPid) {
 
 	int _soy_el_proceso_buscado(t_proceso* proceso) {
-		posicion++;
-		return (proceso->PID == unPid);
+		return proceso->PID == unPid;
 	}
 
-	list_find(listaProcesos, (void*) _soy_el_proceso_buscado);
-	t_proceso* proceso = list_remove(listaProcesos, posicion);
+	t_proceso* proceso = list_remove_by_condition(listaProcesos, (void*) _soy_el_proceso_buscado);
 
 	//-----Retardo
 	pthread_mutex_lock(&mutexRetardo);
@@ -463,7 +460,7 @@ t_list* crearEInicializarListaDePaginas(uint32_t cantidadDePaginas) {
 	return listaDePaginas;
 }
 
-void ponerBitUsoEn1(uint32_t pid, uint8_t numero_pagina) {
+void ponerBitUsoEn1(t_num8 pid, uint8_t numero_pagina) {
 
 	t_pag* pagina = buscarPaginaEnListaDePaginas(pid, numero_pagina);
 
@@ -472,7 +469,7 @@ void ponerBitUsoEn1(uint32_t pid, uint8_t numero_pagina) {
 	}
 }
 
-int paginaInvalida(uint32_t pid, uint8_t numero_pagina) {
+int paginaInvalida(t_num8 pid, uint8_t numero_pagina) {
 
 		lockProcesos();
 
@@ -487,7 +484,7 @@ int paginaInvalida(uint32_t pid, uint8_t numero_pagina) {
 }
 
 //fixme: Hacer Funcion Hashing.
-t_pag* buscarPaginaEnListaDePaginas(uint32_t pid, uint8_t numero_pagina) {
+t_pag* buscarPaginaEnListaDePaginas(t_num8 pid, uint8_t numero_pagina) {
 
 	t_proceso* proceso = buscarProcesoEnListaProcesos(pid);
 
@@ -547,7 +544,7 @@ void enviarContenidoCPU(void* contenido_leido, uint32_t tamanioContenido,int soc
 	free(contenido_leido);
 }
 
-t_proceso* buscarProcesoEnListaProcesos(uint32_t pid) {
+t_proceso* buscarProcesoEnListaProcesos(t_num8 pid) {
 
 	int _soy_el_pid_buscado(t_proceso* proceso) {
 		return (proceso->PID == pid);
@@ -587,7 +584,7 @@ int hayFramesLibres() {
 	}
 }
 
-void cargarPaginaAMemoria(uint32_t pid, uint8_t numero_pagina,void* paginaLeida, int accion) {
+void cargarPaginaAMemoria(t_num8 pid, uint8_t numero_pagina,void* paginaLeida, int accion) {
 
 	t_frame* frame = buscarFrameLibre(pid);
 
@@ -619,7 +616,7 @@ void cargarPaginaAMemoria(uint32_t pid, uint8_t numero_pagina,void* paginaLeida,
 
 
 //fixme: Usar funcion Hashin?
-t_frame* buscarFrameLibre(uint32_t pid) {
+t_frame* buscarFrameLibre(t_num8 pid) {
 
 	int _soy_frame_libre(t_frame* frame) {
 		return (frame->pid == 0);
@@ -713,7 +710,7 @@ t_frame* buscarFrame(int numeroFrame) {
 	return list_find(listaFrames, (void*) _soy_el_frame_buscado);
 }
 
-int estaEnMemoriaReal(uint32_t pid, uint8_t numero_pagina) {
+int estaEnMemoriaReal(t_num8 pid, uint8_t numero_pagina) {
 
 	lockProcesos();
 	t_pag* pagina = buscarPaginaEnListaDePaginas(pid, numero_pagina);
@@ -735,7 +732,7 @@ t_list* crearCache() {
 	return cache;
 }
 
-t_cache* buscarEntradaCache(uint32_t pid, uint8_t numero_pagina) {
+t_cache* buscarEntradaCache(t_num8 pid, uint8_t numero_pagina) {
 
 	int _soy_la_entrada_cache_buscada(t_cache* entradaCache) {
 		return ((entradaCache->pid == pid) && (entradaCache->numPag == numero_pagina));
@@ -745,7 +742,7 @@ t_cache* buscarEntradaCache(uint32_t pid, uint8_t numero_pagina) {
 
 }
 
-int estaEnCache(uint32_t pid, uint8_t numero_pagina) {
+int estaEnCache(t_num8 pid, uint8_t numero_pagina) {
 
 	pthread_mutex_lock(&mutexCache);
 	t_cache* entradaCache = buscarEntradaCache(pid, numero_pagina);
@@ -760,7 +757,7 @@ int estaEnCache(uint32_t pid, uint8_t numero_pagina) {
 	}
 }
 
-t_cache* crearRegistroCache(uint32_t pid, uint8_t numPag, int numFrame) {
+t_cache* crearRegistroCache(t_num8 pid, uint8_t numPag, int numFrame) {
 
 	t_cache* unaEntradaCache = malloc(sizeof(t_cache));
 	unaEntradaCache->pid = pid;
@@ -785,7 +782,7 @@ int hayEspacioEnCache() {
 	return tamanioCache < cantidadEntradasCache;
 }
 
-void agregarEntradaCache(uint32_t pid, uint8_t numero_pagina, int nroFrame) {
+void agregarEntradaCache(t_num8 pid, uint8_t numero_pagina, int nroFrame) {
 
 	t_cache* nuevaEntradaCache = crearRegistroCache(pid, numero_pagina, nroFrame);
 
@@ -804,7 +801,7 @@ void agregarEntradaCache(uint32_t pid, uint8_t numero_pagina, int nroFrame) {
 	pthread_mutex_unlock(&mutexCache);
 }
 
-void* obtenerContenidoSegunCache(uint32_t pid, uint8_t numero_pagina,uint32_t offset, uint32_t tamanio_leer) {
+void* obtenerContenidoSegunCache(t_num8 pid, uint8_t numero_pagina,uint32_t offset, uint32_t tamanio_leer) {
 
 	t_cache* entradaCache = buscarEntradaCache(pid, numero_pagina);
 
@@ -820,7 +817,7 @@ void* obtenerContenidoSegunCache(uint32_t pid, uint8_t numero_pagina,uint32_t of
 
 }
 
-void escribirContenidoSegunCache(uint32_t pid, uint8_t numero_pagina,uint32_t offset, uint32_t tamanio_escritura, void* contenido_escribir) {
+void escribirContenidoSegunCache(t_num8 pid, uint8_t numero_pagina,uint32_t offset, uint32_t tamanio_escritura, void* contenido_escribir) {
 
 	t_cache* entradaCache = buscarEntradaCache(pid, numero_pagina);
 
@@ -853,7 +850,7 @@ void vaciarCache() {
 
 }
 
-void borrarEntradasCacheSegunPID(uint32_t pid) {
+void borrarEntradasCacheSegunPID(t_num8 pid) {
 
 	int _no_es_entrada_Cache_de_PID(t_cache* entradaCache) {
 		return (entradaCache->pid != pid);
@@ -1150,7 +1147,7 @@ void dumpContenidoMemoriaProceso(t_proceso* proceso, FILE* archivoDump) {
 			"\n//////////////////MEMORIA PRINCIPAL//////////////////\n");
 }
 
-void dumpProcesoParticular(int pid) {
+void dumpProcesoParticular(t_num8 pid) {
 
 	t_proceso* proceso = buscarProcesoEnListaProcesosParaDump(pid);
 
@@ -1210,7 +1207,7 @@ void flushMemoria() {
 }
 
 
-t_proceso* buscarProcesoEnListaProcesosParaDump(uint32_t pid) {
+t_proceso* buscarProcesoEnListaProcesosParaDump(t_num8 pid) {
 
 	int _soy_el_pid_buscado(t_proceso* proceso) {
 		return (proceso->PID == pid);
@@ -1229,7 +1226,7 @@ void mostrarContenidoTodosLosProcesos(){
 	}
 }
 
-void mostrarContenidoDeUnProceso(uint32_t pid){
+void mostrarContenidoDeUnProceso(t_num8 pid){
 
 	t_proceso* proceso = buscarProcesoEnListaProcesos(pid);
 	int numeroPagina = 0;
@@ -1247,7 +1244,7 @@ void mostrarContenidoDeUnProceso(uint32_t pid){
 
 }
 
-int funcionHashing(uint32_t pid, uint8_t numero_pagina,int tamanio_pagina,int cantidad_marcos){
+int funcionHashing(t_num8 pid, uint8_t numero_pagina,int tamanio_pagina,int cantidad_marcos){
 	int numero_frame_buscada;
 	numero_frame_buscada = ((pid * cantidad_marcos) + (numero_pagina * tamanio_pagina)) / cantidad_marcos;
 	return numero_frame_buscada;

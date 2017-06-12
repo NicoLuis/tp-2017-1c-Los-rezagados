@@ -144,7 +144,7 @@ t_frame* buscarFrame(int numeroFrame);
 
 int estaEnMemoriaReal(t_num8 pid, uint8_t numero_pagina);
 
-int funcionHashing(t_num8 pid, uint8_t numero_pagina,int tamanio_pagina,int cantidad_marcos);
+int funcionHashing(t_num8 pid, uint8_t);
 
 //Cache
 

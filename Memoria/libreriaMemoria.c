@@ -381,13 +381,13 @@ void unlockFramesYProcesos() {
 
 }
 
-void crearProcesoYAgregarAListaDeProcesos(t_num8 pid,	uint32_t cantidadDePaginas) {
+void crearProcesoYAgregarAListaDeProcesos(t_num8 pid,uint32_t cantidadDePaginas) {
 
 	t_proceso* procesoNuevo = malloc(sizeof(t_proceso));
 	procesoNuevo->PID = pid;
 	procesoNuevo->cantFramesAsignados = 0;
 	procesoNuevo->cantPaginas = cantidadDePaginas;
-	procesoNuevo->listaPaginas = crearEInicializarListaDePaginas(cantidadDePaginas);
+	procesoNuevo->listaPaginas = crearEInicializarListaDePaginas(cantidadDePaginas,t_num8);
 
 	list_add(listaProcesos, procesoNuevo);
 
@@ -438,7 +438,7 @@ void eliminarProcesoDeListaDeProcesos(t_num8 unPid) {
 	}
 }
 
-t_list* crearEInicializarListaDePaginas(uint32_t cantidadDePaginas) {
+t_list* crearEInicializarListaDePaginas(uint32_t cantidadDePaginas, t_num8 PID) {
 
 	//-----Retardo
 	pthread_mutex_lock(&mutexRetardo);
@@ -454,7 +454,7 @@ t_list* crearEInicializarListaDePaginas(uint32_t cantidadDePaginas) {
 		t_pag* paginaAInicializar = malloc(sizeof(t_pag));
 		paginaAInicializar->nroPag = i;
 		paginaAInicializar->bit_pres = 0;
-		paginaAInicializar->nroFrame = -1;
+		paginaAInicializar->nroFrame = funcionHashing(PID,i);
 		list_add(listaDePaginas, paginaAInicializar);
 
 		i++;
@@ -1247,9 +1247,9 @@ void mostrarContenidoDeUnProceso(t_num8 pid){
 
 }
 
-int funcionHashing(t_num8 pid, uint8_t numero_pagina,int tamanio_pagina,int cantidad_marcos){
+int funcionHashing(t_num8 pid, uint8_t numero_pagina){
 	int numero_frame_buscada;
-	numero_frame_buscada = ((pid * cantidad_marcos) + (numero_pagina * tamanio_pagina)) / cantidad_marcos;
+	numero_frame_buscada = ((pid * cantidadDeMarcos) + (numero_pagina * tamanioDeMarcos)) / cantidadDeMarcos;
 	return numero_frame_buscada;
 }
 

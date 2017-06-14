@@ -87,6 +87,7 @@ void escucharKERNEL(void* socket_kernel) {
 					tmpBuffer = malloc(tamanioDeMarcos);
 					memcpy(tmpBuffer, msg->data + i*tamanioDeMarcos, tamanioDeMarcos);
 					cargarPaginaAMemoria(pid, i, tmpBuffer, ESCRITURA_PAGINA);
+					//fixme: al llegar al frame 30 (con la config actual) rompe
 				}
 				log_info(log_memoria, "Asigne correctamente");
 		 		header = OK;
@@ -330,6 +331,7 @@ void escucharCPU(void* socket_cpu) {
 			default:
 				log_error(log_memoria,"Error");
 			}
+			msg_destruir(msg);
 
 	}
 }
@@ -430,9 +432,10 @@ void eliminarProcesoDeListaDeProcesos(t_num8 unPid) {
 		free(pagina);
 	}
 
-	list_destroy_and_destroy_elements(proceso->listaPaginas,(void*) _destruir_pagina);
-
-	free(proceso);
+	if(proceso != NULL){
+		list_destroy_and_destroy_elements(proceso->listaPaginas,(void*) _destruir_pagina);
+		free(proceso);
+	}
 }
 
 t_list* crearEInicializarListaDePaginas(uint32_t cantidadDePaginas) {

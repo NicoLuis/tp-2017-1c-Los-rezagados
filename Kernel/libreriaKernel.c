@@ -150,6 +150,9 @@ void escucharCPU(int socket_cpu) {
 	while(1){
 
 		pthread_mutex_lock(&cpuUsada->mutex);
+		pthread_mutex_lock(&mut_detengo_plani);
+		pthread_mutex_unlock(&mut_detengo_plani);
+
 		bool flag_finalizado = false;
 
 		t_msg* msgRecibido = msg_recibir(socket_cpu);
@@ -369,7 +372,6 @@ void escucharCPU(int socket_cpu) {
 					pthread_mutex_lock(&semBuscad->mutex_colaBloqueados);
 					queue_push(semBuscad->colaBloqueados, tmp);
 					pthread_mutex_unlock(&semBuscad->mutex_colaBloqueados);
-					free(tmp);
 					log_trace(logKernel, "Bloqueo pid %d", pcb->pid);
 					//recibo pcb
 					msg_destruir(msgRecibido);
@@ -651,9 +653,8 @@ void consolaKernel(){
 					t_PCB* pcbA = list_get(lista_PCBs, i);
 					char* cola = " -- ";
 					char* exitCode;
-					int auxAsqueroso = pcbA->exitCode;
 
-					if(auxAsqueroso > 0)
+					if((int)pcbA->exitCode > 0)
 						exitCode = "-";
 					else
 						exitCode = string_from_format("%d", pcbA->exitCode);	//fixme: se caga en este if
@@ -739,7 +740,9 @@ void consolaKernel(){
 					gradoMultiprogramacion, gradoMultiprogramacion-valorSem, nuevoGMP);
 
 			void _esperarGradoMP(){
+				log_trace(logKernel, "Bajo grado de MP");
 				sem_wait(&sem_gradoMp);
+				log_trace(logKernel, "Lo baje :)");
 			}
 
 			if(nuevoGMP < gradoMultiprogramacion && nuevoGMP < valorSem){
@@ -750,21 +753,39 @@ void consolaKernel(){
 				pthread_t hiloEspera;
 				while(valorSem > nuevoGMP){	//fixme: averiguar si  gradoMultiprogramacion-valorSem
 					pthread_create(&hiloEspera, &atributo,(void*) _esperarGradoMP, NULL);
-					sem_getvalue(&sem_gradoMp, &valorSem);
+					valorSem--;
 				}
 				pthread_attr_destroy(&atributo);
 
 				gradoMultiprogramacion = nuevoGMP;
 				fprintf(stderr, "Nuevo grado de multiprogramacion: %d\n", gradoMultiprogramacion);
 			}else{
-				log_trace(logKernel, "Posteo gradoMP");
-				while(gradoMultiprogramacion-valorSem < nuevoGMP){
-					sem_post(&sem_gradoMp);
-					sem_getvalue(&sem_gradoMp, &valorSem);
-				}
+				if(nuevoGMP < gradoMultiprogramacion-valorSem){
+					log_trace(logKernel, "Waiteo gradoMP_2");
+					pthread_attr_t atributo;
+					pthread_attr_init(&atributo);
+					pthread_attr_setdetachstate(&atributo, PTHREAD_CREATE_DETACHED);
+					pthread_t hiloEspera;
+					while(gradoMultiprogramacion-valorSem > nuevoGMP){
+						pthread_create(&hiloEspera, &atributo,(void*) _esperarGradoMP, NULL);
+						gradoMultiprogramacion--;
+					}
+					pthread_attr_destroy(&atributo);
 
-				gradoMultiprogramacion = nuevoGMP;
-				fprintf(stderr, "Nuevo grado de multiprogramacion: %d\n", gradoMultiprogramacion);
+					gradoMultiprogramacion = nuevoGMP;
+					fprintf(stderr, "Nuevo grado de multiprogramacion: %d\n", gradoMultiprogramacion);
+				}else{
+					log_trace(logKernel, "Posteo gradoMP");
+					while(gradoMultiprogramacion-valorSem < nuevoGMP && valorSem < nuevoGMP){
+						log_trace(logKernel, "Subo grado de MP");
+						sem_post(&sem_gradoMp);
+						sem_getvalue(&sem_gradoMp, &valorSem);
+						gradoMultiprogramacion++;
+					}
+
+					gradoMultiprogramacion = nuevoGMP;
+					fprintf(stderr, "Nuevo grado de multiprogramacion: %d\n", gradoMultiprogramacion);
+				}
 			}
 
 		}else if(string_starts_with(comando, "kill ")){
@@ -785,7 +806,7 @@ void consolaKernel(){
 		}else if(string_equals_ignore_case(comando, "detener")){
 
 			log_trace(logKernel, "Detengo planificacion");
-			pthread_mutex_lock(&mut_detengo_plani);	//fixme: ahora como hago esto
+			pthread_mutex_lock(&mut_detengo_plani);
 
 		}else if(string_equals_ignore_case(comando, "reanudar")){
 
@@ -848,7 +869,7 @@ void finalizarPid(t_num8 pid, int exitCode){
 	int _buscarPID(t_infosocket* i){
 		return i->pid == pid;
 	}
-	t_infosocket* info = list_find(lista_PCB_cpu, (void*) _buscarPID);
+	t_infosocket* info = list_remove_by_condition(lista_PCB_cpu, (void*) _buscarPID);
 	if(info == NULL){
 		log_info(logKernel, "No se encuentra cpu ejecutando pid %d", pid);
 		_sacarDeCola(pid, cola_Block, mutex_Block);
@@ -856,6 +877,7 @@ void finalizarPid(t_num8 pid, int exitCode){
 			sem_wait(&sem_cantColaReady);
 	}
 	else{
+		//fixme: cuando ejecuta y finaliza explota
 		_sacarDeCola(pid, cola_Exec, mutex_Exec);
 		int _buscarCPU(t_cpu* c){
 			return c->socket == info->socket;
@@ -865,7 +887,13 @@ void finalizarPid(t_num8 pid, int exitCode){
 			log_info(logKernel, "No se encuentra cpu ejecutando pid %d", pid);
 		else
 			kill(cpu->pid, SIGUSR2);
+		free(info);
 	}
+
+	info = list_remove_by_condition(lista_PCB_consola, (void*) _buscarPID);
+	if(info != NULL)
+		free(info);
+
 	void _sacarDeSemaforos(t_VariableSemaforo* sem){
 		t_num8 encontrado = _sacarDeCola(pid, sem->colaBloqueados, sem->mutex_colaBloqueados);
 		if(encontrado == pid)

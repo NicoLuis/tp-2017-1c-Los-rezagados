@@ -166,6 +166,7 @@ t_valor_variable leerMemoria(t_posicion puntero){
 
 	log_info(logCPU, "Valor %d", valor);
 	log_trace(logAnsisop, "Valor %d", valor);
+	msg_destruir(msgRecibido);
 	return valor;
 }
 
@@ -232,6 +233,7 @@ char* proximaInstruccion() {
 		proxInstruccion = malloc(msgRecibido->longitud);
 		memcpy(proxInstruccion, msgRecibido->data, msgRecibido->longitud);
 		proxInstruccion[msgRecibido->longitud-1] = '\0';
+		msg_destruir(msgRecibido);
 		return proxInstruccion;
 		break;
 	case STACKOVERFLOW:
@@ -242,6 +244,7 @@ char* proximaInstruccion() {
 		log_error(logCPU, "cualquiera");
 	}
 
+	msg_destruir(msgRecibido);
 	return NULL;
 }
 

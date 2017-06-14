@@ -256,9 +256,9 @@ t_valor_variable obtenerValorCompartida(t_nombre_compartida variable){
 	msg_enviar_separado(VALOR_VARIABLE_COMPARTIDA, string_length(variable), variable, socket_kernel);
 
 	t_msg* msgRecibido = msg_recibir(socket_kernel);
-	msg_recibir_data(socket_kernel, msgRecibido);
 
 	if(msgRecibido->tipoMensaje == VALOR_VARIABLE_COMPARTIDA){
+		msg_recibir_data(socket_kernel, msgRecibido);
 		t_valor_variable valor;
 		memcpy(&valor, msgRecibido->data, sizeof(t_valor_variable));
 
@@ -364,8 +364,7 @@ void ansisop_wait(t_nombre_semaforo identificador_semaforo){
 		t_num valorSemaforoRecibido;
 		memcpy(&valorSemaforoRecibido, msgRecibido->data, sizeof(t_num));
 		log_trace(logAnsisop, "valorSemaforoRecibido %d", valorSemaforoRecibido);
-		int auxAsqueroso = valorSemaforoRecibido;
-		if(auxAsqueroso < 0)
+		if((int)valorSemaforoRecibido < 0)
 			flag_ultimaEjecucion = 1;
 		msg_destruir(msgRecibido);
 	}else{

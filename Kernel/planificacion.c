@@ -52,10 +52,6 @@ void planificar(){
 		log_trace(logKernel, "Planifico proceso %d en cpu %d", pcb->pid, cpuUsada->socket);
 
 		pthread_mutex_unlock(&cpuUsada->mutex);
-
-		pthread_mutex_lock(&mut_detengo_plani);
-		pthread_mutex_unlock(&mut_detengo_plani);
-
 		pthread_mutex_lock(&cpuUsada->mutex);
 
 		free(pcbSerializado);

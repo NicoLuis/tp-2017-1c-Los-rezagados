@@ -87,7 +87,6 @@ void escucharKERNEL(void* socket_kernel) {
 					tmpBuffer = malloc(tamanioDeMarcos);
 					memcpy(tmpBuffer, msg->data + i*tamanioDeMarcos, tamanioDeMarcos);
 					cargarPaginaAMemoria(pid, i, tmpBuffer, ESCRITURA_PAGINA);
-					//fixme: al llegar al frame 30 (con la config actual) rompe
 				}
 				log_info(log_memoria, "Asigne correctamente");
 		 		header = OK;
@@ -341,7 +340,8 @@ void* reservarMemoria(int cantidad_marcos, int capacidad_marco) {
 	void * memoria = calloc(cantidad_marcos, capacidad_marco);
 	log_info(log_memoria,"Memoria reservada");
 	//fixme: Devuelvo la direccion a la memoria reserva sumandole la cantidad de frames que se predefinieron para estructuras administrativas multiplicadas por la capacidad de marco
-	return memoria + (cantidadFramesEstructurasAdministrativas * capacidad_marco);
+	//return memoria + (cantidadFramesEstructurasAdministrativas * capacidad_marco);
+	return memoria;
 }
 
 void lockProcesos() {
@@ -387,7 +387,7 @@ void crearProcesoYAgregarAListaDeProcesos(t_num8 pid,uint32_t cantidadDePaginas)
 	procesoNuevo->PID = pid;
 	procesoNuevo->cantFramesAsignados = 0;
 	procesoNuevo->cantPaginas = cantidadDePaginas;
-	procesoNuevo->listaPaginas = crearEInicializarListaDePaginas(cantidadDePaginas,t_num8);
+	procesoNuevo->listaPaginas = crearEInicializarListaDePaginas(cantidadDePaginas,pid);
 
 	list_add(listaProcesos, procesoNuevo);
 
@@ -558,7 +558,6 @@ t_proceso* buscarProcesoEnListaProcesos(t_num8 pid) {
 	if (proceso != NULL) {
 		return proceso;
 	}
-
 	else {
 		pthread_mutex_trylock(&mutexListaProcesos);
 		pthread_mutex_unlock(&mutexListaProcesos);
@@ -572,19 +571,13 @@ t_proceso* buscarProcesoEnListaProcesos(t_num8 pid) {
 	}
 }
 
-int hayFramesLibres() {
+int hayFramesLibres(int cantidad) {
 
 	int _soy_frame_libre(t_frame* frame) {
 		return (frame->pid == 0);
 	}
 
-	t_frame* frameLibre = list_find(listaFrames, (void*) _soy_frame_libre);
-
-	if (frameLibre != NULL) {
-		return 1;
-	} else {
-		return 0;
-	}
+	return cantidad <= list_count_satisfying(listaFrames, (void*) _soy_frame_libre);
 }
 
 void cargarPaginaAMemoria(t_num8 pid, uint8_t numero_pagina,void* paginaLeida, int accion) {
@@ -618,7 +611,6 @@ void cargarPaginaAMemoria(t_num8 pid, uint8_t numero_pagina,void* paginaLeida, i
 }
 
 
-//fixme: Usar funcion Hashin?
 t_frame* buscarFrameLibre(t_num8 pid) {
 
 	int _soy_frame_libre(t_frame* frame) {
@@ -626,21 +618,14 @@ t_frame* buscarFrameLibre(t_num8 pid) {
 	}
 
 	t_proceso* proceso = buscarProcesoEnListaProcesos(pid);
+	//SI HAY FRAME LIBRES Y EL PROCESO NO TIENE OCUPADOS TODOS LOS MARCOS POR PROCESO ELIJO CUALQUIER FRAME
 
-	t_frame* frameLibre;
-
-	if (hayFramesLibres(1)) {
-
-		//SI HAY FRAME LIBRES Y EL PROCESO NO TIENE OCUPADOS TODOS LOS MARCOS POR PROCESO ELIJO CUALQUIER FRAME
-
-		frameLibre = list_find(listaFrames, (void*) _soy_frame_libre);
-
+	//fixme: Usar funcion Hash no list_find
+	t_frame* frameLibre = list_find(listaFrames, (void*) _soy_frame_libre);
+	if(frameLibre != NULL){
+		frameLibre->pid = pid;
+		proceso->cantFramesAsignados++;
 	}
-
-	frameLibre->pid = pid;
-
-	proceso->cantFramesAsignados++;
-
 	return frameLibre;
 
 }
@@ -654,6 +639,8 @@ void escribirContenido(int frame, int offset, int tamanio_escribir,	void* conten
 	//------------
 
 	int desplazamiento = (frame * tamanioDeMarcos) + offset;
+
+	log_info(log_memoria, "desplazamiento %d frame %d tamanioDeMarcos %d offset %d", desplazamiento, frame, tamanioDeMarcos, offset);
 
 	pthread_mutex_lock(&mutexMemoriaReal);
 	memcpy(memoria_real + desplazamiento, contenido, tamanio_escribir);
@@ -670,7 +657,10 @@ void inicializarFrames(){
 		t_frame* frame = malloc(sizeof(t_frame));
 		frame->nroFrame = i;
 		frame->bit_modif = 0;
-		frame->pid = 0;
+		if(i < cantidadFramesEstructurasAdministrativas)
+			frame->pid = -1;	//reservado para estructuras
+		else
+			frame->pid = 0;
 		list_add(listaFrames, frame);
 	}
 
@@ -703,13 +693,13 @@ void ponerBitModificadoEn1(int nroFrame) {
 }
 
 
-//fixme: Utilizar funcion Hashing?
 t_frame* buscarFrame(int numeroFrame) {
 
 	int _soy_el_frame_buscado(t_frame* frame) {
 		return (frame->nroFrame == numeroFrame);
 	}
 
+	//fixme: Usar funcion Hash no list_find
 	return list_find(listaFrames, (void*) _soy_el_frame_buscado);
 }
 

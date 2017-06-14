@@ -110,7 +110,7 @@ void liberarFramesDeProceso(t_num8 unPid);
 
 void eliminarProcesoDeListaDeProcesos(t_num8 unPid);
 
-t_list* crearEInicializarListaDePaginas(uint32_t cantidadDePaginas);
+t_list* crearEInicializarListaDePaginas(uint32_t cantidadDePaginas, t_num8 PID);
 
 void ponerBitUsoEn1(t_num8 pid, uint8_t numero_pagina);
 
@@ -128,7 +128,7 @@ void* pedirPaginaAFS(uint32_t pid, uint8_t numero_pagina);
 
 void cargarPaginaAMemoria(t_num8 pid, uint8_t numero_pagina,void* paginaLeida, int accion);
 
-int hayFramesLibres();
+int hayFramesLibres(int);
 
 t_frame* buscarFrameLibre(t_num8 pid);
 

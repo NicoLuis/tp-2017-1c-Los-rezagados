@@ -29,6 +29,7 @@ int main(int argc, char* argv[]) {
 	//Creo archivo de log
 
 	log_memoria = log_create("memoria.log", "memoria_principal", false, LOG_LEVEL_TRACE);
+	log_trace(log_memoria, "  -----------  INICIO MEMORIA  -----------  ");
 
 
 	//Cargo archivo de configuracion
@@ -42,6 +43,7 @@ int main(int argc, char* argv[]) {
 	algoritmoReemplazo = config_get_string_value(configuracion, "REEMPLAZO_CACHE");
 	retardoMemoria = config_get_int_value(configuracion, "RETARDO_MEMORIA");
 	cantidadFramesEstructurasAdministrativas = config_get_int_value(configuracion,"CANTIDAD_FRAME_ESTTRUCTURAS_ADMINISTRATIVAS");
+		//todo: calcular las cantidadFramesEstructurasAdministrativas, no es x config
 
 	//Muestro archivo de configuracion
 

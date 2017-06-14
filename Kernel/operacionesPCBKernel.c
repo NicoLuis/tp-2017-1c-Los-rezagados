@@ -13,7 +13,9 @@ t_num8 crearPCB(int socketConsola){
 	pcb->exitCode = 1;
 	pcb->cantPagsStack = stackSize;
 	pcb->indiceStack = list_create();
+	_lockLista_PCBs();
 	list_add(lista_PCBs, pcb);
+	_unlockLista_PCBs();
 	return pcb->pid;
 }
 
@@ -23,7 +25,9 @@ void llenarIndicesPCB(int pidPCB, char* codigo){
 		return pcb->pid == pidPCB;
 	}
 
+	_lockLista_PCBs();
 	t_PCB* pcb = list_find(lista_PCBs, (void*) _buscarPCB);
+	_unlockLista_PCBs();
 	t_metadata_program* metadata = metadata_desde_literal(codigo);
 
 	pcb->pc = metadata->instruccion_inicio;
@@ -115,9 +119,11 @@ void setearExitCode(t_num8 pidPCB, int exitCode){
 		return pcb->pid == pidPCB;
 	}
 
+	_lockLista_PCBs();
 	t_PCB* pcb = list_remove_by_condition(lista_PCBs, (void*) _buscarPCB);
 	pcb->exitCode = exitCode;
 	list_add(lista_PCBs, pcb);
+	_unlockLista_PCBs();
 	_ponerEnCola(pcb->pid, cola_Exit, mutex_Exit);
 	liberarPCB(pcb, true);
 }

@@ -121,7 +121,9 @@ t_PCB* recibir_pcb(int socket_cpu, t_msg* msgRecibido, bool flag_finalizado, boo
 	}
 	log_trace(logKernel, "Recibi PCB");
 	t_PCB* pcb = desserealizarPCB(msgRecibido->data);
+	_lockLista_PCB_cpu();
 	list_remove_and_destroy_by_condition(lista_PCB_cpu, (void*) _esCPU2, free);
+	_unlockLista_PCB_cpu();
 	_sacarDeCola(pcb->pid, cola_Exec, mutex_Exec);
 	if(flag_finalizado)
 		finalizarPid(pcb->pid, 0);
@@ -145,7 +147,9 @@ void escucharCPU(int socket_cpu) {
 	bool _esCPU2(t_infosocket* in){
 		return in->socket == socket_cpu;
 	}
+	_lockLista_cpus();
 	t_cpu* cpuUsada = list_find(lista_cpus, (void*) _esCPU);
+	_unlockLista_cpus();
 
 	while(1){
 
@@ -157,12 +161,16 @@ void escucharCPU(int socket_cpu) {
 
 		t_msg* msgRecibido = msg_recibir(socket_cpu);
 
+		_lockLista_PCB_cpu();
 		t_infosocket* aux = list_find(lista_PCB_cpu, (void*) _esCPU2);
+		_unlockLista_PCB_cpu();
 		int _es_PCB(t_PCB* p){
 			return p->pid == aux->pid;
 		}
 
+		_lockLista_PCBs();
 		t_PCB* pcb = list_find(lista_PCBs, (void*) _es_PCB);
+		_unlockLista_PCBs();
 		bool _esPid(t_infosocket* a){ return a->pid == pcb->pid; }
 
 		t_VariableCompartida* varCompartida = malloc(sizeof(t_VariableCompartida));
@@ -185,14 +193,18 @@ void escucharCPU(int socket_cpu) {
 			pcb = recibir_pcb(socket_cpu, msgRecibido, flag_finalizado, 0);
 			if(flag_finalizado){
 				bool _esPid(t_infosocket* a){ return a->pid == pcb->pid; }
+				_lockLista_PCB_consola();
 				t_infosocket* info = list_find(lista_PCB_consola, (void*) _esPid);
+				_unlockLista_PCB_consola();
 				if(info == NULL)
 					log_trace(logKernel, "No se ecuentra consola asociada a pid %d", pcb->pid);
 				msg_enviar_separado(FINALIZAR_PROGRAMA, sizeof(t_num8), &info->pid, info->socket);
 				sem_post(&sem_gradoMp);
 			}
+			_lockLista_PCBs();
 			list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
 			list_add(lista_PCBs, pcb);
+			_unlockLista_PCBs();
 			cpuUsada->libre = true;
 			pthread_mutex_unlock(&cpuUsada->mutex);
 			sem_post(&sem_cantCPUs);
@@ -201,8 +213,12 @@ void escucharCPU(int socket_cpu) {
 			fprintf(stderr, "La cpu %d se ha desconectado \n", socket_cpu);
 			log_trace(logKernel, "La desconecto la cpu %d", socket_cpu);
 			//si la cpu se desconecto la saco de la lista
+			_lockLista_cpus();
 			list_remove_by_condition(lista_cpus, (void*) _esCPU);
+			_unlockLista_cpus();
+			_lockLista_PCB_cpu();
 			list_remove_and_destroy_by_condition(lista_PCB_cpu, (void*) _esCPU2, free);
+			_unlockLista_PCB_cpu();
 			_sacarDeCola(pcb->pid, cola_Exec, mutex_Exec);
 			setearExitCode(pcb->pid, SIN_DEFINICION);
 			void _sacarDeSemaforos(t_VariableSemaforo* sem){
@@ -211,8 +227,10 @@ void escucharCPU(int socket_cpu) {
 					sem->valorSemaforo++;
 			}
 			list_iterate(lista_variablesSemaforo, (void*) _sacarDeSemaforos);
+			_lockLista_PCBs();
 			list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
 			list_add(lista_PCBs, pcb);
+			_unlockLista_PCBs();
 			sem_post(&sem_gradoMp);
 			pthread_mutex_unlock(&cpuUsada->mutex);
 			pthread_exit(NULL);
@@ -222,11 +240,15 @@ void escucharCPU(int socket_cpu) {
 			msg_recibir_data(socket_cpu, msgRecibido);
 			pcb = recibir_pcb(socket_cpu, msgRecibido, 1, 0);
 			pcb->exitCode = -11;	//-11: error de sintaxis en script
+			_lockLista_PCBs();
 			list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
 			list_add(lista_PCBs, pcb);
+			_unlockLista_PCBs();
 			cpuUsada->libre = true;
 			sem_post(&sem_cantCPUs);
+			_lockLista_PCB_consola();
 			t_infosocket* info = list_find(lista_PCB_consola, (void*) _esPid);
+			_unlockLista_PCB_consola();
 			msg_enviar_separado(ERROR, sizeof(t_num8), &pcb->pid, info->socket);
 			sem_post(&sem_gradoMp);
 			pthread_mutex_unlock(&cpuUsada->mutex);
@@ -241,7 +263,9 @@ void escucharCPU(int socket_cpu) {
 
 			if(fd == 1){
 				log_trace(logKernel, "Imprimo por consola: %s", informacion);
+				_lockLista_PCB_consola();
 				t_infosocket* info = list_find(lista_PCB_consola, (void*) _esPid);
+				_unlockLista_PCB_consola();
 				if(info == NULL)
 					log_trace(logKernel, "No se ecuentra consola asociada a pid %d", pcb->pid);
 				msg_enviar_separado(IMPRIMIR_TEXTO, size, informacion, info->socket);
@@ -378,8 +402,10 @@ void escucharCPU(int socket_cpu) {
 					msgRecibido = msg_recibir(socket_cpu);
 					msg_recibir_data(socket_cpu, msgRecibido);
 					pcb = recibir_pcb(socket_cpu, msgRecibido, 0, 1);
+					_lockLista_PCBs();
 					list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
 					list_add(lista_PCBs, pcb);
+					_unlockLista_PCBs();
 					cpuUsada->libre = true;
 					pthread_mutex_unlock(&cpuUsada->mutex);
 					sem_post(&sem_cantCPUs);
@@ -512,13 +538,17 @@ void enviarScriptAMemoria(_t_hiloEspera* aux){
 		return a->pid == aux->pid;
 	}
 
+	_lockLista_PCB_consola();
 	t_infosocket* a = list_find(lista_PCB_consola, (void*) _buscarConsola);
+	_unlockLista_PCB_consola();
 	int socketConsola = a->socket;
 
 	sem_wait(&sem_gradoMp);
 	_sacarDeCola(aux->pid, cola_New, mutex_New);
 
+	_lockLista_PCBs();
 	t_PCB* pcb = list_find(lista_PCBs, (void*) _buscarPCB);
+	_unlockLista_PCBs();
 	send(socket_memoria, &aux->pid, sizeof(t_num8), 0);
 	msg_enviar_separado(INICIALIZAR_PROGRAMA, aux->size, aux->script, socket_memoria);
 	send(socket_memoria, &pcb->cantPagsStack, sizeof(t_num8), 0);
@@ -575,7 +605,9 @@ void atender_consola(int socket_consola){
 		info->pid = pidActual;
 		info->socket = socket_consola;
 
+		_lockLista_PCB_consola();
 		list_add(lista_PCB_consola, info);
+		_unlockLista_PCB_consola();
 
 		_ponerEnCola(pidActual, cola_New, mutex_New);
 
@@ -606,11 +638,15 @@ void atender_consola(int socket_consola){
 	case 0: case DESCONECTAR:
 		fprintf(stderr, "La consola %d se ha desconectado \n", socket_consola);
 		log_trace(logKernel, "Recibi DESCONECTAR de consola %d", socket_consola);
+		_lockLista_PCB_consola();
 		list_iterate(lista_PCB_consola, (void*) _finalizarPIDs);
+		_unlockLista_PCB_consola();
 
 		//si la consola se desconecto la saco de la lista
 		bool _esConsola(int socketC){ return socketC == socket_consola; }
+		_lockLista_Consolas();
 		list_remove_by_condition(lista_consolas, (void*) _esConsola);
+		_unlockLista_Consolas();
 		close(socket_consola);
 		FD_CLR(socket_consola, &fdsMaestro);
 		break;
@@ -649,6 +685,7 @@ void consolaKernel(){
 
 			if(string_starts_with(comando, "s") || string_starts_with(comando, "n")){
 				printf("   ----  PID  ----   PC  ---- CantPags ---- ExitCode ----   Cola   ----   \n");
+				_lockLista_PCBs();
 				for(i = 0; i < list_size(lista_PCBs); i++){
 					t_PCB* pcbA = list_get(lista_PCBs, i);
 					char* cola = " -- ";
@@ -673,6 +710,7 @@ void consolaKernel(){
 						printf("   ----   %d   ----   %d   ----    %d     ----     %s    ----  %s  ----   \n",
 							pcbA->pid, pcbA->pc, (pcbA->cantPagsCodigo + pcbA->cantPagsStack), exitCode, cola);
 				}
+				_unlockLista_PCBs();
 
 			}else printf("Flasheaste era s/n \n");
 
@@ -732,12 +770,13 @@ void consolaKernel(){
 
 		}else if(string_starts_with(comando, "grado mp ")){
 
-			int valorSem, nuevoGMP;
+			int valorSem, nuevoGMP, enEjecucion, i;
 			nuevoGMP = atoi(string_substring_from(comando, 9));
 			sem_getvalue(&sem_gradoMp, &valorSem);
+			enEjecucion = gradoMultiprogramacion-valorSem;
 
 			log_trace(logKernel, "Cambio grado multiprogramacion, anterior %d enEjecucion %d nuevo %d",
-					gradoMultiprogramacion, gradoMultiprogramacion-valorSem, nuevoGMP);
+					gradoMultiprogramacion, enEjecucion, nuevoGMP);
 
 			void _esperarGradoMP(){
 				log_trace(logKernel, "Bajo grado de MP");
@@ -751,24 +790,22 @@ void consolaKernel(){
 				pthread_attr_init(&atributo);
 				pthread_attr_setdetachstate(&atributo, PTHREAD_CREATE_DETACHED);
 				pthread_t hiloEspera;
-				while(valorSem > nuevoGMP){	//fixme: averiguar si  gradoMultiprogramacion-valorSem
+				for(i = 0; i < valorSem - nuevoGMP; i++){	//fixme: averiguar si  gradoMultiprogramacion-valorSem
 					pthread_create(&hiloEspera, &atributo,(void*) _esperarGradoMP, NULL);
-					valorSem--;
 				}
 				pthread_attr_destroy(&atributo);
 
 				gradoMultiprogramacion = nuevoGMP;
 				fprintf(stderr, "Nuevo grado de multiprogramacion: %d\n", gradoMultiprogramacion);
 			}else{
-				if(nuevoGMP < gradoMultiprogramacion-valorSem){
+				if(nuevoGMP < enEjecucion){
 					log_trace(logKernel, "Waiteo gradoMP_2");
 					pthread_attr_t atributo;
 					pthread_attr_init(&atributo);
 					pthread_attr_setdetachstate(&atributo, PTHREAD_CREATE_DETACHED);
 					pthread_t hiloEspera;
-					while(gradoMultiprogramacion-valorSem > nuevoGMP){
+					for(i = 0; i < enEjecucion - nuevoGMP ; i++){
 						pthread_create(&hiloEspera, &atributo,(void*) _esperarGradoMP, NULL);
-						gradoMultiprogramacion--;
 					}
 					pthread_attr_destroy(&atributo);
 
@@ -776,11 +813,9 @@ void consolaKernel(){
 					fprintf(stderr, "Nuevo grado de multiprogramacion: %d\n", gradoMultiprogramacion);
 				}else{
 					log_trace(logKernel, "Posteo gradoMP");
-					while(gradoMultiprogramacion-valorSem < nuevoGMP && valorSem < nuevoGMP){
+					for(i = 0; i < nuevoGMP - valorSem; i++){
 						log_trace(logKernel, "Subo grado de MP");
 						sem_post(&sem_gradoMp);
-						sem_getvalue(&sem_gradoMp, &valorSem);
-						gradoMultiprogramacion++;
 					}
 
 					gradoMultiprogramacion = nuevoGMP;
@@ -795,7 +830,9 @@ void consolaKernel(){
 			int _es_PCB(t_PCB* p){
 				return p->pid == pidKill;
 			}
+			_lockLista_PCBs();
 			t_PCB* pcbKill = list_find(lista_PCBs, (void*) _es_PCB);
+			_unlockLista_PCBs();
 			if(pcbKill == NULL)
 				printf( "No existe el pid %d \n", pidKill);
 			else{
@@ -869,7 +906,9 @@ void finalizarPid(t_num8 pid, int exitCode){
 	int _buscarPID(t_infosocket* i){
 		return i->pid == pid;
 	}
+	_lockLista_PCB_cpu();
 	t_infosocket* info = list_remove_by_condition(lista_PCB_cpu, (void*) _buscarPID);
+	_unlockLista_PCB_cpu();
 	if(info == NULL){
 		log_info(logKernel, "No se encuentra cpu ejecutando pid %d", pid);
 		_sacarDeCola(pid, cola_Block, mutex_Block);
@@ -882,7 +921,9 @@ void finalizarPid(t_num8 pid, int exitCode){
 		int _buscarCPU(t_cpu* c){
 			return c->socket == info->socket;
 		}
+		_lockLista_cpus();
 		t_cpu* cpu = list_find(lista_cpus, (void*) _buscarCPU);
+		_unlockLista_cpus();
 		if(cpu == NULL)
 			log_info(logKernel, "No se encuentra cpu ejecutando pid %d", pid);
 		else
@@ -904,5 +945,38 @@ void finalizarPid(t_num8 pid, int exitCode){
 	send(socket_memoria, &pid, sizeof(t_num8), 0);
 	msg_enviar_separado(FINALIZAR_PROGRAMA, 0, 0, socket_memoria);
 	setearExitCode(pid, exitCode);
+	sem_post(&sem_gradoMp);
 }
 
+
+
+void _lockLista_cpus(){
+	pthread_mutex_lock(&mutex_cpus);
+}
+void _unlockLista_cpus(){
+	pthread_mutex_unlock(&mutex_cpus);
+}
+void _lockLista_Consolas(){
+	pthread_mutex_lock(&mutex_consolas);
+}
+void _unlockLista_Consolas(){
+	pthread_mutex_unlock(&mutex_consolas);
+}
+void _lockLista_PCBs(){
+	pthread_mutex_lock(&mutex_PCBs);
+}
+void _unlockLista_PCBs(){
+	pthread_mutex_unlock(&mutex_PCBs);
+}
+void _lockLista_PCB_consola(){
+	pthread_mutex_lock(&mutex_PCB_consola);
+}
+void _unlockLista_PCB_consola(){
+	pthread_mutex_unlock(&mutex_PCB_consola);
+}
+void _lockLista_PCB_cpu(){
+	pthread_mutex_lock(&mutex_PCB_cpu);
+}
+void _unlockLista_PCB_cpu(){
+	pthread_mutex_unlock(&mutex_PCB_cpu);
+}

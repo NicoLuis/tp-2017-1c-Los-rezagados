@@ -577,7 +577,10 @@ int hayFramesLibres(int cantidad) {
 		return (frame->pid == 0);
 	}
 
-	return cantidad <= list_count_satisfying(listaFrames, (void*) _soy_frame_libre);
+	lockFrames();
+	int cantidadLibres = list_count_satisfying(listaFrames, (void*) _soy_frame_libre);
+	unlockFrames();
+	return cantidad <= cantidadLibres;
 }
 
 void cargarPaginaAMemoria(t_num8 pid, uint8_t numero_pagina,void* paginaLeida, int accion) {
@@ -621,7 +624,9 @@ t_frame* buscarFrameLibre(t_num8 pid) {
 	//SI HAY FRAME LIBRES Y EL PROCESO NO TIENE OCUPADOS TODOS LOS MARCOS POR PROCESO ELIJO CUALQUIER FRAME
 
 	//fixme: Usar funcion Hash no list_find
+	lockFrames();
 	t_frame* frameLibre = list_find(listaFrames, (void*) _soy_frame_libre);
+	unlockFrames();
 	if(frameLibre != NULL){
 		frameLibre->pid = pid;
 		proceso->cantFramesAsignados++;

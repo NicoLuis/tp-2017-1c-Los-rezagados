@@ -82,11 +82,6 @@ typedef struct{
 	uint GlobalFD;
 }t_ProcessFile;
 
-typedef struct{
-	char* File
-	
-};
-
 typedef struct {
 	char* nombre;
 	t_valor_variable valor;
@@ -146,6 +141,24 @@ t_list* lista_consolas;
 t_list* lista_PCBs;
 t_list* lista_PCB_consola;
 t_list* lista_PCB_cpu;
+
+pthread_mutex_t mutex_cpus;
+pthread_mutex_t mutex_consolas;
+pthread_mutex_t mutex_PCBs;
+pthread_mutex_t mutex_PCB_consola;
+pthread_mutex_t mutex_PCB_cpu;
+
+void _lockLista_cpus();
+void _unlockLista_cpus();
+void _lockLista_Consolas();
+void _unlockLista_Consolas();
+void _lockLista_PCBs();
+void _unlockLista_PCBs();
+void _lockLista_PCB_consola();
+void _unlockLista_PCB_consola();
+void _lockLista_PCB_cpu();
+void _unlockLista_PCB_cpu();
+
 t_num8 pid;
 int indiceGlobal;
 

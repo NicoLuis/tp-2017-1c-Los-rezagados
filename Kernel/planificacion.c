@@ -27,11 +27,15 @@ void planificar(){
 		sem_wait(&sem_cantCPUs);
 		_ponerEnCola(pidPCB, cola_Exec, mutex_Exec);
 
+		_lockLista_PCBs();
 		t_PCB* pcb = list_find(lista_PCBs, (void*) _es_PCB);
+		_unlockLista_PCBs();
 		if(pcb == NULL)
 			log_error(logKernel, "no existe el proceso con pid %d", pidPCB);
 
+		_unlockLista_cpus();
 		t_cpu* cpuUsada = list_find(lista_cpus, (void*) _cpuLibre);
+		_unlockLista_cpus();
 		cpuUsada->libre = false;
 		log_trace(logKernel, "cpuUsada %d", cpuUsada->socket);
 

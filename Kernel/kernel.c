@@ -187,7 +187,9 @@ int conectar_select(char* puerto_escucha) {
 							case 1:
 // Aca entro cuando entro una nueva consola		-----------------------------------------------------------------
 								FD_SET(socket_cliente_aceptado, &fdsMaestro);
+								_lockLista_Consolas();
 								list_add(lista_consolas, &socket_cliente_aceptado);
+								_unlockLista_Consolas();
 								log_trace(conectar_select_log, "Nueva Consola");
 
 								break;
@@ -198,7 +200,9 @@ int conectar_select(char* puerto_escucha) {
 								cpuNueva->socket = socket_cliente_aceptado;
 								recv(socket_cliente_aceptado, &cpuNueva->pid, sizeof(t_num), 0);
 								cpuNueva->libre = true;
+								_lockLista_cpus();
 								list_add(lista_cpus, cpuNueva);
+								_unlockLista_cpus();
 
 								if (pthread_create(&hilo_conexionCPU, &atributo,(void*) escucharCPU, (void*) socket_cliente_aceptado) < 0) {
 									log_error(conectar_select_log, "Error Hilo Escucha Consola");

@@ -104,8 +104,6 @@ void unlockFramesYProcesos();
 
 void crearProcesoYAgregarAListaDeProcesos(t_num8 pid,	uint32_t cantidadDePaginas);
 
-void escribirPaginaEnFS(t_num8 pid, uint8_t nroPag, void* contenido_pagina);
-
 void liberarFramesDeProceso(t_num8 unPid);
 
 void eliminarProcesoDeListaDeProcesos(t_num8 unPid);
@@ -138,13 +136,18 @@ void inicializarFrames();
 
 void terminarProceso();
 
-void ponerBitModificadoEn1(int nroFrame);
 
-t_frame* buscarFrame(int numeroFrame);
+//void ponerBitModificadoEn1(int nroFrame);
+
+void ponerBitModificadoEn1(int nroFrame,t_num8 pid,uint8_t numeroPagina);
+
+//t_frame* buscarFrame(int numeroFrame);
+
+t_frame* buscarFrame(int numeroFrame,t_num8 pid, uint8_t  numeroPagina);
 
 int estaEnMemoriaReal(t_num8 pid, uint8_t numero_pagina);
 
-int funcionHashing(t_num8 pid, uint8_t);
+int funcionHashing(t_num8 pid, uint8_t numeroPagina);
 
 //Cache
 

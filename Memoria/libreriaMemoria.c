@@ -299,7 +299,7 @@ void escucharCPU(void* socket_cpu) {
 						escribirContenido(pag->nroFrame, puntero.offset, puntero.size, contenido_escribir);
 
 						lockFrames();
-						ponerBitModificadoEn1(pag->nroFrame);
+						ponerBitModificadoEn1(pag->nroFrame,pidPeticion,pag->nroPag);
 						unlockFrames();
 
 						//ENVIO ESCRITURA OK
@@ -392,7 +392,7 @@ void crearProcesoYAgregarAListaDeProcesos(t_num8 pid,uint32_t cantidadDePaginas)
 	list_add(listaProcesos, procesoNuevo);
 
 }
-
+/*
 void liberarFramesDeProceso(t_num8 unPid) {
 
 	int _soy_el_frame_buscado(t_frame* frame) {
@@ -410,6 +410,21 @@ void liberarFramesDeProceso(t_num8 unPid) {
 		list_add(listaFrames, frame);
 
 		i++;
+	}
+
+}
+*/
+
+void liberarFramesDeProceso(t_num8 pid){
+	int numeroFrameAsignado = funcionHashing(pid,0);
+	t_frame* frameAsignado = list_get(listaFrames,numeroFrameAsignado);
+	while (frameAsignado->pid == pid){
+		list_remove(listaFrames,numeroFrameAsignado);
+		t_frame* nuevoFrameLibre;
+		nuevoFrameLibre->bit_modif = 0;
+		list_add(listaFrames,nuevoFrameLibre);
+		log_info(log_memoria,"Frame %d liberado",numeroFrameAsignado);
+		frameAsignado = list_get(listaFrames,numeroFrameAsignado++);
 	}
 
 }
@@ -613,7 +628,7 @@ void cargarPaginaAMemoria(t_num8 pid, uint8_t numero_pagina,void* paginaLeida, i
 
 }
 
-
+/*
 t_frame* buscarFrameLibre(t_num8 pid) {
 
 	int _soy_frame_libre(t_frame* frame) {
@@ -633,6 +648,26 @@ t_frame* buscarFrameLibre(t_num8 pid) {
 	}
 	return frameLibre;
 
+}
+*/
+
+t_frame* buscarFrameLibre(t_num8 pid) {
+
+	t_proceso* proceso = buscarProcesoEnListaProcesos(pid);
+	//SI HAY FRAME LIBRES Y EL PROCESO NO TIENE OCUPADOS TODOS LOS MARCOS POR PROCESO ELIJO CUALQUIER FRAME
+
+	int numeroFrameLibre = funcionHashing(pid,0);
+	t_frame* frameLibre = list_get(listaFrames,numeroFrameLibre);
+	lockFrames();
+	while(frameLibre != NULL){
+		if(frameLibre->pid == 0){
+			frameLibre->pid = pid;
+			proceso->cantFramesAsignados++;
+			unlockFrames();
+			}
+		frameLibre++;
+	}
+	return frameLibre;
 }
 
 void escribirContenido(int frame, int offset, int tamanio_escribir,	void* contenido) {
@@ -690,14 +725,27 @@ void terminarProceso(){			//aca libero todos
 	exit(1);
 }
 
+/*
 void ponerBitModificadoEn1(int nroFrame) {
 
 	t_frame* frame = buscarFrame(nroFrame);
 
 	frame->bit_modif = 1;
 }
+*/
 
+void ponerBitModificadoEn1(int nroFrame, t_num8 pid, uint8_t numeroPagina) {
 
+	int numeroFrame = funcionHashing(pid,numeroPagina);
+	t_frame* frameBuscado = list_get(listaFrames,numeroFrame);
+	while(frameBuscado->pid != pid && frameBuscado->nroFrame != nroFrame){
+		frameBuscado = list_get(listaFrames,numeroFrame++);
+	}
+
+	frameBuscado->bit_modif = 1;
+}
+
+/*
 t_frame* buscarFrame(int numeroFrame) {
 
 	int _soy_el_frame_buscado(t_frame* frame) {
@@ -706,6 +754,16 @@ t_frame* buscarFrame(int numeroFrame) {
 
 	//fixme: Usar funcion Hash no list_find
 	return list_find(listaFrames, (void*) _soy_el_frame_buscado);
+}
+*/
+
+t_frame* buscarFrame(int nroFrame,t_num8 pid, uint8_t numeroPagina){
+	int numeroFrameBuscado = funcionHashing(pid,numeroPagina);
+	t_frame* frameBuscado = list_get(listaFrames,numeroFrameBuscado);
+	while(frameBuscado->pid != pid && frameBuscado->nroFrame != nroFrame){
+		frameBuscado = list_get(listaFrames,numeroFrameBuscado++);
+	}
+	return frameBuscado;
 }
 
 int estaEnMemoriaReal(t_num8 pid, uint8_t numero_pagina) {
@@ -825,7 +883,7 @@ void escribirContenidoSegunCache(t_num8 pid, uint8_t numero_pagina,uint32_t offs
 
 	escribirContenido(entradaCache->numFrame, offset, tamanio_escritura,contenido_escribir);
 
-	ponerBitModificadoEn1(entradaCache->numFrame);
+	ponerBitModificadoEn1(entradaCache->numFrame,pid,numero_pagina);
 
 	pthread_mutex_unlock(&mutexCache);
 
@@ -1042,7 +1100,7 @@ void dumpTablaDePaginasDeProceso(t_proceso* proceso, FILE* archivoDump) {
 		t_pag* pagina = buscarPaginaEnListaDePaginas(proceso->PID, i);
 
 		if (pagina->bit_pres == 1) {
-			t_frame* frame = buscarFrame(pagina->nroFrame);
+			t_frame* frame = buscarFrame(pagina->nroFrame,proceso->PID,pagina->nroPag);
 
 			fprintf(archivoDump,
 					"      %d             %d                  %d                       %d\n",
@@ -1132,7 +1190,7 @@ void dumpContenidoMemoriaProceso(t_proceso* proceso, FILE* archivoDump) {
 	while (i < proceso->cantPaginas) {
 		t_pag* pagina = buscarPaginaEnListaDePaginas(proceso->PID, i);
 		if (pagina->bit_pres == 1) {
-			t_frame* frame = buscarFrame(pagina->nroFrame);
+			t_frame* frame = buscarFrame(pagina->nroFrame,proceso->PID,pagina->nroPag);
 			contenidoFrame = obtenerContenido(frame->nroFrame, 0,tamanioDeMarcos);
 			hexdump(contenidoFrame, tamanioDeMarcos, archivoDump);
 		}
@@ -1243,8 +1301,7 @@ void mostrarContenidoDeUnProceso(t_num8 pid){
 }
 
 int funcionHashing(t_num8 pid, uint8_t numero_pagina){
-	int numero_frame_buscada;
-	numero_frame_buscada = ((pid * cantidadDeMarcos) + (numero_pagina * tamanioDeMarcos)) / cantidadDeMarcos;
+	int numero_frame_buscada = ((pid * cantidadDeMarcos) + (numero_pagina * tamanioDeMarcos)) / cantidadDeMarcos;
 	return numero_frame_buscada;
 }
 

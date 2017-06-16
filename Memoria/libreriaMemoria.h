@@ -122,8 +122,6 @@ void enviarContenidoCPU(void* contenido_leido, uint32_t tamanioContenido,int soc
 
 t_proceso* buscarProcesoEnListaProcesos(t_num8 pid);
 
-void* pedirPaginaAFS(uint32_t pid, uint8_t numero_pagina);
-
 void cargarPaginaAMemoria(t_num8 pid, uint8_t numero_pagina,void* paginaLeida, int accion);
 
 int hayFramesLibres(int);
@@ -135,7 +133,6 @@ void escribirContenido(int frame, int offset, int tamanio_escribir,	void* conten
 void inicializarFrames();
 
 void terminarProceso();
-
 
 //void ponerBitModificadoEn1(int nroFrame);
 

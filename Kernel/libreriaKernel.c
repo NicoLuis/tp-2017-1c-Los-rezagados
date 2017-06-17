@@ -11,6 +11,9 @@
 #include "operacionesPCBKernel.h"
 #include "planificacion.h"
 
+
+t_puntero reservarMemoriaHeap(int cantBytes, t_PCB* pcb);	//si, pinto ponerlo aca
+
 void mostrarArchivoConfig() {
 
 	printf("El puerto del Programa es: %d\n", puertoPrograma);
@@ -198,7 +201,7 @@ void escucharCPU(int socket_cpu) {
 
 		switch(msgRecibido->tipoMensaje){
 		case FINALIZAR_PROGRAMA:
-			log_trace(logKernel, "Finalizo programa");
+			log_trace(logKernel, "Recibi FINALIZAR_PROGRAMA de CPU");
 			flag_finalizado = true;
 			//no break
 		case ENVIO_PCB:		// si me devuelve el PCB es porque fue la ultima instruccion
@@ -253,7 +256,7 @@ void escucharCPU(int socket_cpu) {
 			pthread_exit(NULL);
 			break;
 		case ERROR:
-			log_trace(logKernel, "Recibi ERROR");
+			log_trace(logKernel, "Recibi ERROR de CPU");
 			//msg_recibir_data(socket_cpu, msgRecibido);
 			pcb = recibir_pcb(socket_cpu, msgRecibido, 1, 0);
 			pcb->exitCode = SINTAXIS_SCRIPT;
@@ -271,7 +274,7 @@ void escucharCPU(int socket_cpu) {
 			pthread_mutex_unlock(&cpuUsada->mutex);
 			break;
 		case ESCRIBIR_FD:
-			log_trace(logKernel, "Recibi ESCRIBIR_FD");
+			log_trace(logKernel, "Recibi ESCRIBIR_FD de CPU");
 			//msg_recibir_data(socket_cpu, msgRecibido);
 			int size = msgRecibido->longitud - sizeof(t_puntero), fd;
 			void* informacion = malloc(size);
@@ -301,7 +304,7 @@ void escucharCPU(int socket_cpu) {
 			pthread_mutex_unlock(&cpuUsada->mutex);
 			break;
 		case GRABAR_VARIABLE_COMPARTIDA:
-			log_trace(logKernel, "Recibi GRABAR_VARIABLE_COMPARTIDA");
+			log_trace(logKernel, "Recibi GRABAR_VARIABLE_COMPARTIDA de CPU");
 
 			//msg_recibir_data(socket_cpu, msgRecibido);
 			memcpy(&tamanioNombre, msgRecibido->data, sizeof(t_num));
@@ -326,7 +329,7 @@ void escucharCPU(int socket_cpu) {
 			pthread_mutex_unlock(&cpuUsada->mutex);
 			break;
 		case VALOR_VARIABLE_COMPARTIDA:
-			log_trace(logKernel, "Recibi VALOR_VARIABLE_COMPARTIDA");
+			log_trace(logKernel, "Recibi VALOR_VARIABLE_COMPARTIDA de CPU");
 
 			//msg_recibir_data(socket_cpu, msgRecibido);
 			memcpy(&tamanioNombre, &msgRecibido->longitud, sizeof(t_num));
@@ -350,7 +353,7 @@ void escucharCPU(int socket_cpu) {
 
 
 		case SIGNAL:
-			log_trace(logKernel, "Recibi SIGNAL");
+			log_trace(logKernel, "Recibi SIGNAL de CPU");
 
 			//msg_recibir_data(socket_cpu, msgRecibido);
 			memcpy(&tamanioNombre, &msgRecibido->longitud, sizeof(t_num));
@@ -389,7 +392,7 @@ void escucharCPU(int socket_cpu) {
 			break;
 
 		case WAIT:
-			log_trace(logKernel, "Recibi WAIT");
+			log_trace(logKernel, "Recibi WAIT de CPU");
 
 			//msg_recibir_data(socket_cpu, msgRecibido);
 			memcpy(&tamanioNombre, &msgRecibido->longitud, sizeof(t_num));
@@ -435,6 +438,17 @@ void escucharCPU(int socket_cpu) {
 			}
 			free(varSemaforo->nombre);
 			pthread_mutex_unlock(&cpuUsada->mutex);
+			break;
+		case ASIGNACION_MEMORIA:
+			log_trace(logKernel, "Recibi ASIGNACION_MEMORIA de CPU");
+			int cantBytes;
+			memcpy(&cantBytes, msgRecibido->data, msgRecibido->longitud);
+			log_trace(logKernel, "ASIGNACION_MEMORIA %d bytes", cantBytes);
+
+			t_puntero direccion = reservarMemoriaHeap(cantBytes, pcb);
+			if((int)direccion > 0)
+				msg_enviar_separado(ASIGNACION_MEMORIA, sizeof(t_puntero), &direccion, socket_cpu);
+
 			break;
 		case ABRIR_ANSISOP:
 			log_trace(logKernel, "Recibi la siguiente operacion ABRIR_ANSISOP de CPU");
@@ -537,7 +551,7 @@ void _sumarCantOpPriv(t_num8 pid){
 	_lockLista_infoProc();
 	int _espidproc(t_infoProceso* a){ return a->pid == pid; }
 	t_infoProceso* infP = list_remove_by_condition(infoProcs, (void*) _espidproc);
-	infP->cantOpPriv++;	//fixme: no suma si no lo saco
+	infP->cantOpPriv++;
 	list_add(infoProcs, infP);
 	_unlockLista_infoProc();
 }
@@ -723,16 +737,16 @@ void consolaKernel(){
 					if((int)pcbA->exitCode > 0)
 						exitCode = "-";
 					else
-						exitCode = string_from_format("%d", pcbA->exitCode);	//fixme: se caga en este if
+						exitCode = string_from_format("%d", pcbA->exitCode);
 					if(_estaEnCola(pcbA->pid, cola_New, mutex_New))
 						cola = "NEW";
-					if(_estaEnCola(pcbA->pid, cola_Ready, mutex_Ready))
+					else if(_estaEnCola(pcbA->pid, cola_Ready, mutex_Ready))
 						cola = "READY";
-					if(_estaEnCola(pcbA->pid, cola_Exec, mutex_Exec))
+					else if(_estaEnCola(pcbA->pid, cola_Exec, mutex_Exec))
 						cola = "EXEC";
-					if(_estaEnCola(pcbA->pid, cola_Block, mutex_Block))
+					else if(_estaEnCola(pcbA->pid, cola_Block, mutex_Block))
 						cola = "BLOCK";
-					if(_estaEnCola(pcbA->pid, cola_Exit, mutex_Exit))
+					else if(_estaEnCola(pcbA->pid, cola_Exit, mutex_Exit))
 						cola = "EXIT";
 
 					if(string_starts_with(comando, "s") || !string_equals_ignore_case(cola, " -- "))
@@ -821,7 +835,7 @@ void consolaKernel(){
 				pthread_attr_init(&atributo);
 				pthread_attr_setdetachstate(&atributo, PTHREAD_CREATE_DETACHED);
 				pthread_t hiloEspera;
-				for(i = 0; i < valorSem - nuevoGMP; i++){	//fixme: averiguar si  gradoMultiprogramacion-valorSem
+				for(i = 0; i < valorSem - nuevoGMP; i++){
 					pthread_create(&hiloEspera, &atributo,(void*) _esperarGradoMP, NULL);
 				}
 				pthread_attr_destroy(&atributo);
@@ -975,8 +989,6 @@ void finalizarPid(t_num8 pid, int exitCode){
 	sem_post(&sem_gradoMp);
 }
 
-
-
 void _lockLista_cpus(){
 	pthread_mutex_lock(&mutex_cpus);
 }
@@ -1013,3 +1025,141 @@ void _lockLista_infoProc(){
 void _unlockLista_infoProc(){
 	pthread_mutex_unlock(&mutex_infoProcs);
 }
+
+
+
+
+
+void* _serializarPunteroYMetadata(t_posicion puntero, t_HeapMetadata metadata){
+	int offset = 0, tmpsize;
+	void* buffer = malloc(sizeof(t_posicion) + sizeof(t_HeapMetadata));
+
+	memcpy(buffer + offset, &puntero.pagina, tmpsize = sizeof(t_num));
+	offset += tmpsize;
+	memcpy(buffer + offset, &puntero.offset, tmpsize = sizeof(t_num));
+	offset += tmpsize;
+	memcpy(buffer + offset, &puntero.size, tmpsize = sizeof(t_num));
+	offset += tmpsize;
+	memcpy(buffer + offset, &metadata.size, tmpsize = sizeof(t_num));
+	offset += tmpsize;
+	memcpy(buffer + offset, &metadata.isFree, tmpsize = sizeof(bool));
+	offset += tmpsize;
+
+	return buffer;
+}
+
+void _asignarNuevaPag(t_PCB* pcb){
+	int _esHeap(t_heap* h){
+		return h->pid == pcb->pid;
+	}
+
+	log_trace(logKernel, "Asigno nueva pagina a proceso %d", pcb->pid);
+	send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
+	msg_enviar_separado(ASIGNACION_MEMORIA, 0, 0, socket_memoria);
+	t_msg* msgRecibido = msg_recibir(socket_memoria);
+	if(msgRecibido->tipoMensaje != ASIGNACION_MEMORIA)
+		log_error(logKernel, "No recibi ASIGNACION_MEMORIA sino %d", msgRecibido->tipoMensaje);
+	//msg_recibir_data(socket_memoria, msgRecibido);
+	msg_destruir(msgRecibido);
+
+	t_heap* nuevaHeap = malloc(sizeof(t_heap));
+	nuevaHeap->pid = pcb->pid;
+	nuevaHeap->nroPag = list_count_satisfying(tabla_heap, (void*) _esHeap);
+	nuevaHeap->espacioLibre = tamanioPag - sizeof(t_HeapMetadata);
+
+	t_posicion puntero;
+	puntero.pagina = pcb->cantPagsCodigo + pcb->cantPagsStack + nuevaHeap->nroPag;
+	puntero.offset = tamanioPag - nuevaHeap->espacioLibre;
+	puntero.size = sizeof(t_HeapMetadata) + 0;
+
+	t_HeapMetadata metadata;
+	metadata.size = nuevaHeap->espacioLibre;
+	metadata.isFree = true;
+
+	void* buffer = _serializarPunteroYMetadata(puntero, metadata);
+	buffer = realloc(buffer, sizeof(t_posicion) + sizeof(t_HeapMetadata));
+	memcpy(buffer, &metadata, sizeof(t_HeapMetadata));
+
+	send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
+	msg_enviar_separado(ESCRITURA_PAGINA, sizeof(t_posicion) + sizeof(t_HeapMetadata), buffer, socket_memoria);
+	msgRecibido = msg_recibir(socket_memoria);
+	if(msgRecibido->tipoMensaje != ESCRITURA_PAGINA)
+		log_error(logKernel, "No recibi ESCRITURA_PAGINA sino %d", msgRecibido->tipoMensaje);
+	//msg_recibir_data(socket_memoria, msgRecibido);
+	msg_destruir(msgRecibido);
+
+	list_add(tabla_heap, nuevaHeap);
+}
+
+t_puntero reservarMemoriaHeap(int cantBytes, t_PCB* pcb){
+	int _esHeap(t_heap* h){
+		return h->pid == pcb->pid;
+	}
+	bool _maxPag(t_heap* h1, t_heap* h2){
+		return h1->nroPag >= h2->nroPag;
+	}
+
+	if(cantBytes > tamanioPag - sizeof(t_HeapMetadata)*2){
+		log_warning(logKernel, "Se quiere asignar mas que tamanio de pagina");
+		finalizarPid(pcb->pid, MAS_MEMORIA_TAMANIO_PAG);
+		return -1;
+	}
+
+	if( list_count_satisfying(tabla_heap, (void*)_esHeap) == 0 )
+		_asignarNuevaPag(pcb);
+
+	t_list* listAux = list_filter(tabla_heap, (void*) _esHeap);	//fixme: ver si explota por no tener 2 elementeos
+	list_sort(tabla_heap, (void*) _maxPag);
+	t_heap* heapActual = list_get(listAux, 0);
+	if(cantBytes + sizeof(t_HeapMetadata) > heapActual->espacioLibre)
+		_asignarNuevaPag(pcb);
+
+	heapActual->espacioLibre = heapActual->espacioLibre - sizeof(t_HeapMetadata) - cantBytes;
+
+	t_posicion puntero;
+	puntero.pagina = pcb->cantPagsCodigo + pcb->cantPagsStack + heapActual->nroPag;
+	puntero.offset = tamanioPag - heapActual->espacioLibre;
+	puntero.size = sizeof(t_HeapMetadata) + cantBytes;
+
+	t_HeapMetadata metadata;
+	metadata.size = heapActual->espacioLibre - sizeof(t_HeapMetadata) - cantBytes;
+	metadata.isFree = true;
+
+	//todo: settear cantBytes y false en anterior
+
+	void* buffer = _serializarPunteroYMetadata(puntero, metadata);
+	send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
+	msg_enviar_separado(ESCRITURA_PAGINA, sizeof(t_posicion) + sizeof(t_HeapMetadata), buffer, socket_memoria);
+	free(buffer);
+
+	t_msg* msgRecibido = msg_recibir(socket_memoria);
+	if(msgRecibido->tipoMensaje != ESCRITURA_PAGINA)
+		log_error(logKernel, "No recibi ESCRITURA_PAGINA sino %d", msgRecibido->tipoMensaje);
+	//msg_recibir_data(socket_memoria, msgRecibido);
+	msg_destruir(msgRecibido);
+
+	list_destroy_and_destroy_elements(listAux, free);
+	return puntero.pagina * tamanioPag + puntero.offset;
+}
+
+/*		me exploto la cabeza
+t_puntero liberarMemoriaHeap(t_puntero posicion, t_PCB* pcb){
+	int _esHeap(t_heap* h){
+		return h->pid == pcb->pid;
+	}
+
+
+	t_posicion puntero;
+	puntero.pagina = posicion / tamanioPag;
+	puntero.offset = posicion % tamanioPag - sizeof(t_HeapMetadata);
+	puntero.size = 0;
+
+	t_HeapMetadata metadata;
+
+	void* buffer = _serializarPunteroYMetadata(puntero, metadata);
+	send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
+
+	msg_enviar_separado(ESCRITURA_PAGINA, sizeof(t_posicion) + sizeof(t_HeapMetadata), buffer, socket_memoria);
+
+
+}*/

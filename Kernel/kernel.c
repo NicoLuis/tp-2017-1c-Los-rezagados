@@ -34,6 +34,7 @@ int main(int argc, char* argv[]) {
 	lista_PCB_consola = list_create();
 	lista_PCB_cpu = list_create();
 	infoProcs = list_create();
+	tabla_heap = list_create();
 	pid = 0;
 	indiceGlobal = 0;
 	cola_New = queue_create();

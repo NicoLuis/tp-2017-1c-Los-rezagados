@@ -99,11 +99,10 @@ t_list* lista_variablesSemaforo;
 
 typedef struct {
 	int nroPag;
-	int pid;
+	t_num8 pid;
 	int espacioLibre;
 }t_heap;
 t_list* tabla_heap;
-// todo: "En el caso que el tamaño disponible en una página no sea suficiente para almacenar el valor requerido, se pedirá una nueva tabla a la Memoria."	?????
 
 typedef struct HeapMetadata {
 	t_num size;

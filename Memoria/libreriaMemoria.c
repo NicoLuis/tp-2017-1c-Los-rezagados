@@ -98,6 +98,12 @@ void escucharKERNEL(void* socket_kernel) {
 			}
 			break;
 
+		case ASIGNACION_MEMORIA:
+			log_info(log_memoria,"Asigno memoria a proceso %d", pid);
+
+				//todo
+
+			break;
 
 		case FINALIZAR_PROGRAMA:
 			log_info(log_memoria,"Finalizando proceso %d", pid);

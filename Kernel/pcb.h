@@ -25,6 +25,7 @@ typedef struct {
 	t_list* indiceStack;		//Lista de t_Stack
 	t_num exitCode;
 	t_num sp;	//Posición del Stack
+	t_num cantRafagas;
 }t_PCB;
 
 typedef struct {

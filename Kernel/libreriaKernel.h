@@ -45,6 +45,7 @@
 #define COMANDO_FINALIZAR -7
 #define MAS_MEMORIA_TAMANIO_PAG -8
 #define CANT_PAGS_INSUFICIENTES -9
+#define SINTAXIS_SCRIPT -11
 #define SIN_DEFINICION -20
 
 //////////////////////// CAPA FS ////////////////////////////
@@ -116,7 +117,7 @@ typedef struct {
 
 typedef struct {
 	int socket;
-	t_num pid;
+	t_num pidProcesoCPU;
 	pthread_mutex_t mutex;
 	bool libre;
 }t_cpu;
@@ -134,6 +135,7 @@ typedef struct {
 	int canrBytes_liberar;
 }t_infoProceso;
 t_list* infoProcs;
+pthread_mutex_t mutex_infoProcs;
 
 
 t_list* lista_cpus;
@@ -158,6 +160,8 @@ void _lockLista_PCB_consola();
 void _unlockLista_PCB_consola();
 void _lockLista_PCB_cpu();
 void _unlockLista_PCB_cpu();
+void _lockLista_infoProc();
+void _unlockLista_infoProc();
 
 t_num8 pid;
 int indiceGlobal;

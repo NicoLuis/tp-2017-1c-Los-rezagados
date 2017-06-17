@@ -47,12 +47,7 @@ void planificar(){
 		uint32_t size = tamanioTotalPCB(pcb);
 		void* pcbSerializado = serializarPCB(pcb);
 		msg_enviar_separado(ENVIO_PCB, size, pcbSerializado, cpuUsada->socket);
-		log_trace(logKernel, "ENVIO_PCB");
 
-		int _proc(t_infoProceso* a){
-			return a->pid == pcb->pid;
-		}
-		//t_infoProceso* infoProc = list_find(infoProcs, (void*) _proc);
 		log_trace(logKernel, "Planifico proceso %d en cpu %d", pcb->pid, cpuUsada->socket);
 
 		pthread_mutex_unlock(&cpuUsada->mutex);

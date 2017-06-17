@@ -125,9 +125,10 @@ t_PCB* recibir_pcb(int socket_cpu, t_msg* msgRecibido, bool flag_finalizado, boo
 	list_remove_and_destroy_by_condition(lista_PCB_cpu, (void*) _esCPU2, free);
 	_unlockLista_PCB_cpu();
 	_sacarDeCola(pcb->pid, cola_Exec, mutex_Exec);
-	if(flag_finalizado)
-		finalizarPid(pcb->pid, 0);
-	else{
+	if(flag_finalizado){
+		if((int)pcb->exitCode > 0)
+			finalizarPid(pcb->pid, 0);
+	}else{
 		if(flag_bloqueo)
 			_ponerEnCola(pcb->pid, cola_Block, mutex_Block);
 		else{
@@ -135,6 +136,14 @@ t_PCB* recibir_pcb(int socket_cpu, t_msg* msgRecibido, bool flag_finalizado, boo
 			sem_post(&sem_cantColaReady);
 		}
 	}
+
+	_lockLista_infoProc();
+	int _espidproc(t_infoProceso* a){ return a->pid == pcb->pid; }
+	t_infoProceso* infP = list_remove_by_condition(infoProcs, (void*) _espidproc);
+	infP->cantRafagas = pcb->cantRafagas;
+	list_add(infoProcs, infP);
+	_unlockLista_infoProc();
+
 	return pcb;
 }
 
@@ -160,10 +169,14 @@ void escucharCPU(int socket_cpu) {
 		bool flag_finalizado = false;
 
 		t_msg* msgRecibido = msg_recibir(socket_cpu);
+		if(msgRecibido->longitud > 0)
+			if(msg_recibir_data(socket_cpu, msgRecibido) <= 0)
+				msgRecibido->tipoMensaje = 0;
 
 		_lockLista_PCB_cpu();
 		t_infosocket* aux = list_find(lista_PCB_cpu, (void*) _esCPU2);
 		_unlockLista_PCB_cpu();
+
 		int _es_PCB(t_PCB* p){
 			return p->pid == aux->pid;
 		}
@@ -189,17 +202,21 @@ void escucharCPU(int socket_cpu) {
 			flag_finalizado = true;
 			//no break
 		case ENVIO_PCB:		// si me devuelve el PCB es porque fue la ultima instruccion
-			msg_recibir_data(socket_cpu, msgRecibido);
+			//msg_recibir_data(socket_cpu, msgRecibido);
 			pcb = recibir_pcb(socket_cpu, msgRecibido, flag_finalizado, 0);
 			if(flag_finalizado){
 				bool _esPid(t_infosocket* a){ return a->pid == pcb->pid; }
 				_lockLista_PCB_consola();
-				t_infosocket* info = list_find(lista_PCB_consola, (void*) _esPid);
+				t_infosocket* info = list_remove_by_condition(lista_PCB_consola, (void*) _esPid);
 				_unlockLista_PCB_consola();
+				_lockLista_PCB_cpu();
+				list_remove_and_destroy_by_condition(lista_PCB_cpu, (void*) _esPid, free);
+				_unlockLista_PCB_cpu();
 				if(info == NULL)
-					log_trace(logKernel, "No se ecuentra consola asociada a pid %d", pcb->pid);
+					log_trace(logKernel, "No se encuentra consola asociada a pid %d", pcb->pid);
 				msg_enviar_separado(FINALIZAR_PROGRAMA, sizeof(t_num8), &info->pid, info->socket);
 				sem_post(&sem_gradoMp);
+				free(info);
 			}
 			_lockLista_PCBs();
 			list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
@@ -237,9 +254,9 @@ void escucharCPU(int socket_cpu) {
 			break;
 		case ERROR:
 			log_trace(logKernel, "Recibi ERROR");
-			msg_recibir_data(socket_cpu, msgRecibido);
+			//msg_recibir_data(socket_cpu, msgRecibido);
 			pcb = recibir_pcb(socket_cpu, msgRecibido, 1, 0);
-			pcb->exitCode = -11;	//-11: error de sintaxis en script
+			pcb->exitCode = SINTAXIS_SCRIPT;
 			_lockLista_PCBs();
 			list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
 			list_add(lista_PCBs, pcb);
@@ -255,7 +272,7 @@ void escucharCPU(int socket_cpu) {
 			break;
 		case ESCRIBIR_FD:
 			log_trace(logKernel, "Recibi ESCRIBIR_FD");
-			msg_recibir_data(socket_cpu, msgRecibido);
+			//msg_recibir_data(socket_cpu, msgRecibido);
 			int size = msgRecibido->longitud - sizeof(t_puntero), fd;
 			void* informacion = malloc(size);
 			memcpy(&fd, msgRecibido->data, sizeof(t_puntero));
@@ -286,7 +303,7 @@ void escucharCPU(int socket_cpu) {
 		case GRABAR_VARIABLE_COMPARTIDA:
 			log_trace(logKernel, "Recibi GRABAR_VARIABLE_COMPARTIDA");
 
-			msg_recibir_data(socket_cpu, msgRecibido);
+			//msg_recibir_data(socket_cpu, msgRecibido);
 			memcpy(&tamanioNombre, msgRecibido->data, sizeof(t_num));
 			offset += sizeof(t_num);
 			varCompartida->nombre = malloc(tamanioNombre+1);
@@ -311,7 +328,7 @@ void escucharCPU(int socket_cpu) {
 		case VALOR_VARIABLE_COMPARTIDA:
 			log_trace(logKernel, "Recibi VALOR_VARIABLE_COMPARTIDA");
 
-			msg_recibir_data(socket_cpu, msgRecibido);
+			//msg_recibir_data(socket_cpu, msgRecibido);
 			memcpy(&tamanioNombre, &msgRecibido->longitud, sizeof(t_num));
 			varCompartida->nombre = malloc(tamanioNombre+1);
 			memcpy(varCompartida->nombre, msgRecibido->data, tamanioNombre);
@@ -335,7 +352,7 @@ void escucharCPU(int socket_cpu) {
 		case SIGNAL:
 			log_trace(logKernel, "Recibi SIGNAL");
 
-			msg_recibir_data(socket_cpu, msgRecibido);
+			//msg_recibir_data(socket_cpu, msgRecibido);
 			memcpy(&tamanioNombre, &msgRecibido->longitud, sizeof(t_num));
 			varSemaforo->nombre = malloc(tamanioNombre+1);
 			memcpy(varSemaforo->nombre, msgRecibido->data, tamanioNombre);
@@ -374,7 +391,7 @@ void escucharCPU(int socket_cpu) {
 		case WAIT:
 			log_trace(logKernel, "Recibi WAIT");
 
-			msg_recibir_data(socket_cpu, msgRecibido);
+			//msg_recibir_data(socket_cpu, msgRecibido);
 			memcpy(&tamanioNombre, &msgRecibido->longitud, sizeof(t_num));
 			varSemaforo->nombre = malloc(tamanioNombre+1);
 			memcpy(varSemaforo->nombre, msgRecibido->data, tamanioNombre);
@@ -400,15 +417,17 @@ void escucharCPU(int socket_cpu) {
 					//recibo pcb
 					msg_destruir(msgRecibido);
 					msgRecibido = msg_recibir(socket_cpu);
-					msg_recibir_data(socket_cpu, msgRecibido);
-					pcb = recibir_pcb(socket_cpu, msgRecibido, 0, 1);
-					_lockLista_PCBs();
-					list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
-					list_add(lista_PCBs, pcb);
-					_unlockLista_PCBs();
-					cpuUsada->libre = true;
-					pthread_mutex_unlock(&cpuUsada->mutex);
-					sem_post(&sem_cantCPUs);
+					if(msg_recibir_data(socket_cpu, msgRecibido) > 0){
+						pcb = recibir_pcb(socket_cpu, msgRecibido, 0, 1);
+						_lockLista_PCBs();
+						list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
+						list_add(lista_PCBs, pcb);
+						_unlockLista_PCBs();
+						cpuUsada->libre = true;
+						pthread_mutex_unlock(&cpuUsada->mutex);
+						sem_post(&sem_cantCPUs);
+					}else
+						log_warning(logKernel, "No recibi nada");
 				}
 
 				list_add(lista_variablesSemaforo, semBuscad);
@@ -419,7 +438,7 @@ void escucharCPU(int socket_cpu) {
 			break;
 		case ABRIR_ANSISOP:
 			log_trace(logKernel, "Recibi la siguiente operacion ABRIR_ANSISOP de CPU");
-			msg_recibir_data(socket_cpu, msgRecibido);
+			//msg_recibir_data(socket_cpu, msgRecibido);
 			//t_num longitud_msj = 0;
 			t_direccion_archivo pathArchivo;
 			t_num longitudPath;
@@ -515,10 +534,12 @@ void escucharCPU(int socket_cpu) {
 
 
 void _sumarCantOpPriv(t_num8 pid){
+	_lockLista_infoProc();
 	int _espidproc(t_infoProceso* a){ return a->pid == pid; }
 	t_infoProceso* infP = list_remove_by_condition(infoProcs, (void*) _espidproc);
 	infP->cantOpPriv++;	//fixme: no suma si no lo saco
 	list_add(infoProcs, infP);
+	_unlockLista_infoProc();
 }
 
 typedef struct {
@@ -564,7 +585,9 @@ void enviarScriptAMemoria(_t_hiloEspera* aux){
 		t_infoProceso* infP = malloc(sizeof(t_infoProceso));
 		bzero(infP, sizeof(t_infoProceso));
 		infP->pid = aux->pid;
+		_lockLista_infoProc();
 		list_add(infoProcs, infP);
+		_unlockLista_infoProc();
 		_ponerEnCola(aux->pid, cola_Ready, mutex_Ready);
 		sem_post(&sem_cantColaReady);
 		break;
@@ -583,17 +606,22 @@ void enviarScriptAMemoria(_t_hiloEspera* aux){
 void atender_consola(int socket_consola){
 
 	t_msg* msgRecibido = msg_recibir(socket_consola);
+	if(msgRecibido->longitud > 0)
+		if(msg_recibir_data(socket_consola, msgRecibido) <= 0)
+			msgRecibido->tipoMensaje = 0;
 
 	void* script;	//si lo declaro adentro del switch se queja
 	void _finalizarPIDs(t_infosocket* i){
 		if(i->socket == socket_consola)
 			finalizarPid(i->pid, DESCONEXION_CONSOLA);
 	}
+
+
 	switch(msgRecibido->tipoMensaje){
 
 	case ENVIO_CODIGO:
 		log_trace(logKernel, "Recibi script de consola %d", socket_consola);
-		msg_recibir_data(socket_consola, msgRecibido);
+		//msg_recibir_data(socket_consola, msgRecibido);
 		pid++;
 		script = malloc(msgRecibido->longitud);
 		memcpy(script, msgRecibido->data, msgRecibido->longitud);
@@ -628,10 +656,11 @@ void atender_consola(int socket_consola){
 		free(script);
 		break;
 	case FINALIZAR_PROGRAMA:
-		msg_recibir_data(socket_consola, msgRecibido);
+		//msg_recibir_data(socket_consola, msgRecibido);
+		log_trace(logKernel, "Recibi FINALIZAR_PROGRAMA de consola %d", socket_consola);
 		t_num8 pidAFinalizar;
 		memcpy(&pidAFinalizar, msgRecibido->data, sizeof(t_num8));
-		log_trace(logKernel, "Recibi FINALIZAR_PROGRAMA de consola %d - pid %d", socket_consola, pidAFinalizar);
+		log_trace(logKernel, "FINALIZAR_PROGRAMA pid %d", pidAFinalizar);
 		finalizarPid(pidAFinalizar, COMANDO_FINALIZAR);
 		break;
 
@@ -719,7 +748,9 @@ void consolaKernel(){
 			int pidPCB = atoi(string_substring_from(comando, 13));
 
 			int _espid(t_infoProceso* a){ return a->pid == pidPCB; }
+			_lockLista_infoProc();
 			t_infoProceso* infP = list_find(infoProcs, (void*) _espid);
+			_unlockLista_infoProc();
 			if(infP == NULL)
 				printf( "No existe el pid %d \n", pidPCB);
 			else{
@@ -736,7 +767,7 @@ void consolaKernel(){
 
 				switch(getchar()){
 				case 'a':
-					printf( "Cantidad de rafagas ejecutadas: %d \n", infP->cantRafagas);	//todo: le preguto a cpu cuantas lleva?
+					printf( "Cantidad de rafagas ejecutadas: %d \n", infP->cantRafagas);
 					break;
 				case 'b':
 					printf( "Cantidad de operaciones privilegiadas que ejecutó: %d \n", infP->cantOpPriv);
@@ -906,8 +937,9 @@ void finalizarPid(t_num8 pid, int exitCode){
 	int _buscarPID(t_infosocket* i){
 		return i->pid == pid;
 	}
+	t_infosocket* info;
 	_lockLista_PCB_cpu();
-	t_infosocket* info = list_remove_by_condition(lista_PCB_cpu, (void*) _buscarPID);
+	info = list_find(lista_PCB_cpu, (void*) _buscarPID);
 	_unlockLista_PCB_cpu();
 	if(info == NULL){
 		log_info(logKernel, "No se encuentra cpu ejecutando pid %d", pid);
@@ -927,13 +959,8 @@ void finalizarPid(t_num8 pid, int exitCode){
 		if(cpu == NULL)
 			log_info(logKernel, "No se encuentra cpu ejecutando pid %d", pid);
 		else
-			kill(cpu->pid, SIGUSR2);
-		free(info);
+			kill(cpu->pidProcesoCPU, SIGUSR2);
 	}
-
-	info = list_remove_by_condition(lista_PCB_consola, (void*) _buscarPID);
-	if(info != NULL)
-		free(info);
 
 	void _sacarDeSemaforos(t_VariableSemaforo* sem){
 		t_num8 encontrado = _sacarDeCola(pid, sem->colaBloqueados, sem->mutex_colaBloqueados);
@@ -979,4 +1006,10 @@ void _lockLista_PCB_cpu(){
 }
 void _unlockLista_PCB_cpu(){
 	pthread_mutex_unlock(&mutex_PCB_cpu);
+}
+void _lockLista_infoProc(){
+	pthread_mutex_lock(&mutex_infoProcs);
+}
+void _unlockLista_infoProc(){
+	pthread_mutex_unlock(&mutex_infoProcs);
 }

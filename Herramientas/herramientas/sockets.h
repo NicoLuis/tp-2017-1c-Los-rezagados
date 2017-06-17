@@ -62,7 +62,7 @@ void msg_destruir(t_msg* msg);
 void msg_enviar_separado(uint8_t tipoMensaje, t_num longitud, void* data, int socketTo);
 void msg_enviar(t_msg* msg, int socketTo);
 t_msg* msg_recibir(int socketFrom);
-void msg_recibir_data(int socketFrom, t_msg* msg);
+int msg_recibir_data(int socketFrom, t_msg* msg);
 
 
 

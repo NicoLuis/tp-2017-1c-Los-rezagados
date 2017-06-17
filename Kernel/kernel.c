@@ -198,7 +198,7 @@ int conectar_select(char* puerto_escucha) {
 
 								cpuNueva = malloc(sizeof(t_cpu));
 								cpuNueva->socket = socket_cliente_aceptado;
-								recv(socket_cliente_aceptado, &cpuNueva->pid, sizeof(t_num), 0);
+								recv(socket_cliente_aceptado, &cpuNueva->pidProcesoCPU, sizeof(t_num), 0);
 								cpuNueva->libre = true;
 								_lockLista_cpus();
 								list_add(lista_cpus, cpuNueva);

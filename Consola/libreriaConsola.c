@@ -62,7 +62,7 @@ void leerComando(char* comando){
 		t_programa* prog = list_find(lista_programas, (void*) _esPid);
 		if(prog != NULL){
 			msg_enviar_separado(FINALIZAR_PROGRAMA, sizeof(t_num8), &pidAFinalizar, socket_kernel);
-			finalizarPrograma(prog, 0);
+			//finalizarPrograma(prog, 0);
 		}
 		else
 			fprintf(stderr, "El pid %d no pertenece a esta consola\n", pidAFinalizar);
@@ -108,16 +108,18 @@ void escucharKernel(){
 
 		case OK:
 			log_trace(logConsola, "Recibi OK");
-			msg_recibir_data(socket_kernel, msgRecibido);
-			memcpy(&pidProg, msgRecibido->data, sizeof(t_num8));
-			log_trace(logConsola, "El pid es %d", pidProg);
+			if(msg_recibir_data(socket_kernel, msgRecibido) > 0){
+				memcpy(&pidProg, msgRecibido->data, sizeof(t_num8));
+				log_trace(logConsola, "El pid es %d", pidProg);
 
-			programa = list_find(lista_programas, (void*) _programaSinPid);
-			if(programa == NULL)
-				log_trace(logConsola, "No se encuentra programa sin pid");
-			programa->pid = pidProg;
+				programa = list_find(lista_programas, (void*) _programaSinPid);
+				if(programa == NULL)
+					log_trace(logConsola, "No se encuentra programa sin pid");
+				programa->pid = pidProg;
 
-			fprintf(stderr, "El pid es %d\n", pidProg);
+				fprintf(stderr, "El pid es %d\n", pidProg);
+			}else
+				log_warning(logConsola, "No recibi nada");
 			break;
 		case MARCOS_INSUFICIENTES:
 			log_trace(logConsola, "Recibi MARCOS_INSUFICIENTES");
@@ -126,13 +128,15 @@ void escucharKernel(){
 			break;
 		case FINALIZAR_PROGRAMA:
 			log_trace(logConsola, "Recibi FINALIZAR_PROGRAMA");
-			msg_recibir_data(socket_kernel, msgRecibido);
-			memcpy(&pidProg, msgRecibido->data, sizeof(t_num8));
-			log_trace(logConsola, "El pid a finalizar es %d", pidProg);
+			if(msg_recibir_data(socket_kernel, msgRecibido) > 0){
+				memcpy(&pidProg, msgRecibido->data, sizeof(t_num8));
+				log_trace(logConsola, "El pid a finalizar es %d", pidProg);
 
-			programa = list_find(lista_programas, (void*) _esPrograma);
-			programa->horaFin = temporal_get_string_time();
-			finalizarPrograma(programa, 1);
+				programa = list_find(lista_programas, (void*) _esPrograma);
+				programa->horaFin = temporal_get_string_time();
+				finalizarPrograma(programa, 1);
+			}else
+				log_warning(logConsola, "No recibi nada");
 			break;
 		case 0:
 			fprintf(stderr, "El kernel se ha desconectado \n");
@@ -144,23 +148,27 @@ void escucharKernel(){
 			break;
 		case ERROR:
 			log_trace(logConsola, "Recibi ERROR");
-			msg_recibir_data(socket_kernel, msgRecibido);
-			memcpy(&pidProg, msgRecibido->data, sizeof(t_num8));
-			log_trace(logConsola, "El pid %d no pudo terminar su ejecucion", pidProg);
-			fprintf(stderr, "El pid %d no pudo terminar su ejecucion \n", pidProg);
+			if(msg_recibir_data(socket_kernel, msgRecibido) > 0){
+				memcpy(&pidProg, msgRecibido->data, sizeof(t_num8));
+				log_trace(logConsola, "El pid %d no pudo terminar su ejecucion", pidProg);
+				fprintf(stderr, "El pid %d no pudo terminar su ejecucion \n", pidProg);
 
-			programa = list_find(lista_programas, (void*) _esPrograma);
-			programa->horaFin = temporal_get_string_time();
-			//finalizarPrograma(programa);
+				programa = list_find(lista_programas, (void*) _esPrograma);
+				programa->horaFin = temporal_get_string_time();
+				//finalizarPrograma(programa);
+			}else
+				log_warning(logConsola, "No recibi nada");
 			break;
 		case IMPRIMIR_TEXTO:
 			log_trace(logConsola, "Recibi IMPRIMIR_TEXTO");
-			msg_recibir_data(socket_kernel, msgRecibido);
-			char* texto = malloc(msgRecibido->longitud);
-			memcpy(texto, msgRecibido->data, msgRecibido->longitud);
-			fprintf(stderr, "%s\n", texto);
-			programa = list_find(lista_programas, (void*) _esPrograma);
-			programa->cantImpresionesPantalla++;
+			if(msg_recibir_data(socket_kernel, msgRecibido) > 0){
+				char* texto = malloc(msgRecibido->longitud);
+				memcpy(texto, msgRecibido->data, msgRecibido->longitud);
+				fprintf(stderr, "%s\n", texto);
+				programa = list_find(lista_programas, (void*) _esPrograma);
+				programa->cantImpresionesPantalla++;
+			}else
+				log_warning(logConsola, "No recibi nada");
 			break;
 		}
 

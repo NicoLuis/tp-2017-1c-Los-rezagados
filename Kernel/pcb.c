@@ -78,7 +78,7 @@ int tamanioTotalPCB(t_PCB* pcb){
 	int tamanioIndiceEtiquetas =
 			sizeof(t_size) + pcb->indiceEtiquetas.size;
 
-	return sizeof(t_num8) + sizeof(t_num) * 6 +
+	return sizeof(t_num8) + sizeof(t_num) * 7 +
 		tamanioIndiceCodigo + tamanioIndiceEtiquetas + tamanioIndiceStack(pcb->indiceStack);
 }
 
@@ -98,6 +98,8 @@ void *serializarPCB(t_PCB* pcb){
 	memcpy(buffer + offset, &pcb->exitCode, tmpsize = sizeof(t_num));
 		offset += tmpsize;
 	memcpy(buffer + offset, &pcb->sp, tmpsize = sizeof(t_num));
+		offset += tmpsize;
+	memcpy(buffer + offset, &pcb->cantRafagas, tmpsize = sizeof(t_num));
 		offset += tmpsize;
 
 	memcpy(buffer + offset, &pcb->indiceCodigo.size, tmpsize = sizeof(t_size));
@@ -198,6 +200,8 @@ t_PCB *desserealizarPCB(void* buffer){
 	memcpy(&pcb->exitCode, buffer + offset, tmpsize = sizeof(t_num));
 		offset += tmpsize;
 	memcpy(&pcb->sp, buffer + offset, tmpsize = sizeof(t_num));
+		offset += tmpsize;
+	memcpy(&pcb->cantRafagas, buffer + offset, tmpsize = sizeof(t_num));
 		offset += tmpsize;
 
 	memcpy(&pcb->indiceCodigo.size, buffer + offset, tmpsize = sizeof(t_size));

@@ -50,7 +50,7 @@
 //////////////////////// CAPA FS ////////////////////////////
 
 typedef struct{
-	uint indice; //fd??
+	t_descriptor_archivo indice; //fd??
 	char* bandera;
 	uint referenciaGlobalTable;
 }t_entrada_proceso;
@@ -65,7 +65,7 @@ typedef struct{
 t_list* lista_tabla_de_procesos;
 
 typedef struct{
-	uint indiceGlobalTable;
+	t_descriptor_archivo indiceGlobalTable;
 	char* FilePath;
 	uint Open;
 }t_entrada_GlobalFile;
@@ -81,11 +81,6 @@ typedef struct{
 	char Flags[2];
 	uint GlobalFD;
 }t_ProcessFile;
-
-typedef struct{
-	char* File
-	
-};
 
 typedef struct {
 	char* nombre;

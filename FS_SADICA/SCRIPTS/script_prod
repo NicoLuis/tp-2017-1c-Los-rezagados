@@ -1,0 +1,12 @@
+#!/usr/bin/ansisop
+begin	
+	:etiqueta
+	
+	wait SEM2
+		!Global = !Global +1
+	signal SEM3
+	
+	#Ciclar indefinidamente
+	goto etiqueta
+
+end

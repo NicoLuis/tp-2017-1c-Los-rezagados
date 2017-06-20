@@ -83,6 +83,7 @@ void ejecutar(){
 		if(quantumRestante <= 0 && string_equals_ignore_case(algoritmo, "RR"))
 			flag_ultimaEjecucion = 1;
 		ejecutarInstruccion();
+		pcb->cantRafagas++;
 	}
 	liberarPCB(pcb, 0);
 	pcb = NULL;
@@ -150,11 +151,13 @@ t_valor_variable leerMemoria(t_posicion puntero){
 	free(buffer);
 
 	t_msg* msgRecibido = msg_recibir(socket_memoria);
-	msg_recibir_data(socket_memoria, msgRecibido);
 
 	switch(msgRecibido->tipoMensaje){
 	case LECTURA_PAGINA:
-		memcpy(&valor, msgRecibido->data, sizeof(t_valor_variable));
+		if(msg_recibir_data(socket_memoria, msgRecibido) > 0)
+			memcpy(&valor, msgRecibido->data, sizeof(t_valor_variable));
+		else
+			log_warning(logCPU, "No recibi nada");
 		break;
 	case 0:
 		log_error(logCPU, "Se desconecto Memoria");
@@ -166,6 +169,7 @@ t_valor_variable leerMemoria(t_posicion puntero){
 
 	log_info(logCPU, "Valor %d", valor);
 	log_trace(logAnsisop, "Valor %d", valor);
+	msg_destruir(msgRecibido);
 	return valor;
 }
 
@@ -227,12 +231,15 @@ char* proximaInstruccion() {
 
 	switch(msgRecibido->tipoMensaje){
 	case LECTURA_PAGINA:
-		msg_recibir_data(socket_memoria, msgRecibido);
-		log_info(logCPU, "Recibo contenido");
-		proxInstruccion = malloc(msgRecibido->longitud);
-		memcpy(proxInstruccion, msgRecibido->data, msgRecibido->longitud);
-		proxInstruccion[msgRecibido->longitud-1] = '\0';
-		return proxInstruccion;
+		if(msg_recibir_data(socket_memoria, msgRecibido) > 0){
+			log_info(logCPU, "Recibo contenido");
+			proxInstruccion = malloc(msgRecibido->longitud);
+			memcpy(proxInstruccion, msgRecibido->data, msgRecibido->longitud);
+			proxInstruccion[msgRecibido->longitud-1] = '\0';
+			msg_destruir(msgRecibido);
+			return proxInstruccion;
+		}else
+			log_warning(logCPU, "No recibi nada");
 		break;
 	case STACKOVERFLOW:
 		log_error(logCPU, "Pagina invalida"); break;
@@ -242,6 +249,7 @@ char* proximaInstruccion() {
 		log_error(logCPU, "cualquiera");
 	}
 
+	msg_destruir(msgRecibido);
 	return NULL;
 }
 

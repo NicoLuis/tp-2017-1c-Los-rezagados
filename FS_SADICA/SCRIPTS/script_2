@@ -1,0 +1,9 @@
+#!/usr/bin/ansisop
+begin
+	wait SEM1
+	!UnaVar =  !UnaVar + 5
+	prints n !UnaVar
+	!Global =  !UnaVar + 1000
+	prints n !Global
+	signal SEM1
+end

@@ -148,6 +148,8 @@ int main(int argc, char* argv[]) {
 			log_trace(logCPU, "Recibi verdura %d", msgRecibido->tipoMensaje);
 		}
 
+		msg_destruir(msgRecibido);
+
 		if(flag_ultimaEjecucionTotal)
 			finalizarCPU();
 

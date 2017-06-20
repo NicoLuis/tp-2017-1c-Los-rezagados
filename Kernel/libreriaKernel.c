@@ -11,6 +11,9 @@
 #include "operacionesPCBKernel.h"
 #include "planificacion.h"
 
+
+t_puntero reservarMemoriaHeap(int cantBytes, t_PCB* pcb);	//si, pinto ponerlo aca
+
 void mostrarArchivoConfig() {
 
 	printf("El puerto del Programa es: %d\n", puertoPrograma);
@@ -121,11 +124,14 @@ t_PCB* recibir_pcb(int socket_cpu, t_msg* msgRecibido, bool flag_finalizado, boo
 	}
 	log_trace(logKernel, "Recibi PCB");
 	t_PCB* pcb = desserealizarPCB(msgRecibido->data);
+	_lockLista_PCB_cpu();
 	list_remove_and_destroy_by_condition(lista_PCB_cpu, (void*) _esCPU2, free);
+	_unlockLista_PCB_cpu();
 	_sacarDeCola(pcb->pid, cola_Exec, mutex_Exec);
-	if(flag_finalizado)
-		finalizarPid(pcb->pid, 0);
-	else{
+	if(flag_finalizado){
+		if((int)pcb->exitCode > 0)
+			finalizarPid(pcb->pid, 0);
+	}else{
 		if(flag_bloqueo)
 			_ponerEnCola(pcb->pid, cola_Block, mutex_Block);
 		else{
@@ -133,6 +139,14 @@ t_PCB* recibir_pcb(int socket_cpu, t_msg* msgRecibido, bool flag_finalizado, boo
 			sem_post(&sem_cantColaReady);
 		}
 	}
+
+	_lockLista_infoProc();
+	int _espidproc(t_infoProceso* a){ return a->pid == pcb->pid; }
+	t_infoProceso* infP = list_remove_by_condition(infoProcs, (void*) _espidproc);
+	infP->cantRafagas = pcb->cantRafagas;
+	list_add(infoProcs, infP);
+	_unlockLista_infoProc();
+
 	return pcb;
 }
 
@@ -145,21 +159,34 @@ void escucharCPU(int socket_cpu) {
 	bool _esCPU2(t_infosocket* in){
 		return in->socket == socket_cpu;
 	}
+	_lockLista_cpus();
 	t_cpu* cpuUsada = list_find(lista_cpus, (void*) _esCPU);
+	_unlockLista_cpus();
 
 	while(1){
 
 		pthread_mutex_lock(&cpuUsada->mutex);
+		pthread_mutex_lock(&mut_detengo_plani);
+		pthread_mutex_unlock(&mut_detengo_plani);
+
 		bool flag_finalizado = false;
 
 		t_msg* msgRecibido = msg_recibir(socket_cpu);
+		if(msgRecibido->longitud > 0)
+			if(msg_recibir_data(socket_cpu, msgRecibido) <= 0)
+				msgRecibido->tipoMensaje = 0;
 
+		_lockLista_PCB_cpu();
 		t_infosocket* aux = list_find(lista_PCB_cpu, (void*) _esCPU2);
+		_unlockLista_PCB_cpu();
+
 		int _es_PCB(t_PCB* p){
 			return p->pid == aux->pid;
 		}
 
+		_lockLista_PCBs();
 		t_PCB* pcb = list_find(lista_PCBs, (void*) _es_PCB);
+		_unlockLista_PCBs();
 		bool _esPid(t_infosocket* a){ return a->pid == pcb->pid; }
 
 		t_VariableCompartida* varCompartida = malloc(sizeof(t_VariableCompartida));
@@ -213,22 +240,30 @@ void escucharCPU(int socket_cpu) {
 
 		switch(msgRecibido->tipoMensaje){
 		case FINALIZAR_PROGRAMA:
-			log_trace(logKernel, "Finalizo programa");
+			log_trace(logKernel, "Recibi FINALIZAR_PROGRAMA de CPU");
 			flag_finalizado = true;
 			//no break
 		case ENVIO_PCB:		// si me devuelve el PCB es porque fue la ultima instruccion
-			msg_recibir_data(socket_cpu, msgRecibido);
+			//msg_recibir_data(socket_cpu, msgRecibido);
 			pcb = recibir_pcb(socket_cpu, msgRecibido, flag_finalizado, 0);
 			if(flag_finalizado){
 				bool _esPid(t_infosocket* a){ return a->pid == pcb->pid; }
-				t_infosocket* info = list_find(lista_PCB_consola, (void*) _esPid);
+				_lockLista_PCB_consola();
+				t_infosocket* info = list_remove_by_condition(lista_PCB_consola, (void*) _esPid);
+				_unlockLista_PCB_consola();
+				_lockLista_PCB_cpu();
+				list_remove_and_destroy_by_condition(lista_PCB_cpu, (void*) _esPid, free);
+				_unlockLista_PCB_cpu();
 				if(info == NULL)
-					log_trace(logKernel, "No se ecuentra consola asociada a pid %d", pcb->pid);
+					log_trace(logKernel, "No se encuentra consola asociada a pid %d", pcb->pid);
 				msg_enviar_separado(FINALIZAR_PROGRAMA, sizeof(t_num8), &info->pid, info->socket);
 				sem_post(&sem_gradoMp);
+				free(info);
 			}
+			_lockLista_PCBs();
 			list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
 			list_add(lista_PCBs, pcb);
+			_unlockLista_PCBs();
 			cpuUsada->libre = true;
 			pthread_mutex_unlock(&cpuUsada->mutex);
 			sem_post(&sem_cantCPUs);
@@ -237,8 +272,12 @@ void escucharCPU(int socket_cpu) {
 			fprintf(stderr, "La cpu %d se ha desconectado \n", socket_cpu);
 			log_trace(logKernel, "La desconecto la cpu %d", socket_cpu);
 			//si la cpu se desconecto la saco de la lista
+			_lockLista_cpus();
 			list_remove_by_condition(lista_cpus, (void*) _esCPU);
+			_unlockLista_cpus();
+			_lockLista_PCB_cpu();
 			list_remove_and_destroy_by_condition(lista_PCB_cpu, (void*) _esCPU2, free);
+			_unlockLista_PCB_cpu();
 			_sacarDeCola(pcb->pid, cola_Exec, mutex_Exec);
 			setearExitCode(pcb->pid, SIN_DEFINICION);
 			void _sacarDeSemaforos(t_VariableSemaforo* sem){
@@ -247,29 +286,35 @@ void escucharCPU(int socket_cpu) {
 					sem->valorSemaforo++;
 			}
 			list_iterate(lista_variablesSemaforo, (void*) _sacarDeSemaforos);
+			_lockLista_PCBs();
 			list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
 			list_add(lista_PCBs, pcb);
+			_unlockLista_PCBs();
 			sem_post(&sem_gradoMp);
 			pthread_mutex_unlock(&cpuUsada->mutex);
 			pthread_exit(NULL);
 			break;
 		case ERROR:
-			log_trace(logKernel, "Recibi ERROR");
-			msg_recibir_data(socket_cpu, msgRecibido);
+			log_trace(logKernel, "Recibi ERROR de CPU");
+			//msg_recibir_data(socket_cpu, msgRecibido);
 			pcb = recibir_pcb(socket_cpu, msgRecibido, 1, 0);
-			pcb->exitCode = -11;	//-11: error de sintaxis en script
+			pcb->exitCode = SINTAXIS_SCRIPT;
+			_lockLista_PCBs();
 			list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
 			list_add(lista_PCBs, pcb);
+			_unlockLista_PCBs();
 			cpuUsada->libre = true;
 			sem_post(&sem_cantCPUs);
+			_lockLista_PCB_consola();
 			t_infosocket* info = list_find(lista_PCB_consola, (void*) _esPid);
+			_unlockLista_PCB_consola();
 			msg_enviar_separado(ERROR, sizeof(t_num8), &pcb->pid, info->socket);
 			sem_post(&sem_gradoMp);
 			pthread_mutex_unlock(&cpuUsada->mutex);
 			break;
 		case ESCRIBIR_FD:
-			log_trace(logKernel, "Recibi ESCRIBIR_FD");
-			msg_recibir_data(socket_cpu, msgRecibido);
+			log_trace(logKernel, "Recibi ESCRIBIR_FD de CPU");
+			//msg_recibir_data(socket_cpu, msgRecibido);
 			int size = msgRecibido->longitud - sizeof(t_puntero), fd;
 			void* informacion = malloc(size);
 			memcpy(&fd, msgRecibido->data, sizeof(t_puntero));
@@ -277,7 +322,9 @@ void escucharCPU(int socket_cpu) {
 
 			if(fd == 1){
 				log_trace(logKernel, "Imprimo por consola: %s", informacion);
+				_lockLista_PCB_consola();
 				t_infosocket* info = list_find(lista_PCB_consola, (void*) _esPid);
+				_unlockLista_PCB_consola();
 				if(info == NULL)
 					log_trace(logKernel, "No se ecuentra consola asociada a pid %d", pcb->pid);
 				msg_enviar_separado(IMPRIMIR_TEXTO, size, informacion, info->socket);
@@ -296,9 +343,9 @@ void escucharCPU(int socket_cpu) {
 			pthread_mutex_unlock(&cpuUsada->mutex);
 			break;
 		case GRABAR_VARIABLE_COMPARTIDA:
-			log_trace(logKernel, "Recibi GRABAR_VARIABLE_COMPARTIDA");
+			log_trace(logKernel, "Recibi GRABAR_VARIABLE_COMPARTIDA de CPU");
 
-			msg_recibir_data(socket_cpu, msgRecibido);
+			//msg_recibir_data(socket_cpu, msgRecibido);
 			memcpy(&tamanioNombre, msgRecibido->data, sizeof(t_num));
 			offset += sizeof(t_num);
 			varCompartida->nombre = malloc(tamanioNombre+1);
@@ -321,9 +368,9 @@ void escucharCPU(int socket_cpu) {
 			pthread_mutex_unlock(&cpuUsada->mutex);
 			break;
 		case VALOR_VARIABLE_COMPARTIDA:
-			log_trace(logKernel, "Recibi VALOR_VARIABLE_COMPARTIDA");
+			log_trace(logKernel, "Recibi VALOR_VARIABLE_COMPARTIDA de CPU");
 
-			msg_recibir_data(socket_cpu, msgRecibido);
+			//msg_recibir_data(socket_cpu, msgRecibido);
 			memcpy(&tamanioNombre, &msgRecibido->longitud, sizeof(t_num));
 			varCompartida->nombre = malloc(tamanioNombre+1);
 			memcpy(varCompartida->nombre, msgRecibido->data, tamanioNombre);
@@ -345,9 +392,9 @@ void escucharCPU(int socket_cpu) {
 
 
 		case SIGNAL:
-			log_trace(logKernel, "Recibi SIGNAL");
+			log_trace(logKernel, "Recibi SIGNAL de CPU");
 
-			msg_recibir_data(socket_cpu, msgRecibido);
+			//msg_recibir_data(socket_cpu, msgRecibido);
 			memcpy(&tamanioNombre, &msgRecibido->longitud, sizeof(t_num));
 			varSemaforo->nombre = malloc(tamanioNombre+1);
 			memcpy(varSemaforo->nombre, msgRecibido->data, tamanioNombre);
@@ -384,9 +431,9 @@ void escucharCPU(int socket_cpu) {
 			break;
 
 		case WAIT:
-			log_trace(logKernel, "Recibi WAIT");
+			log_trace(logKernel, "Recibi WAIT de CPU");
 
-			msg_recibir_data(socket_cpu, msgRecibido);
+			//msg_recibir_data(socket_cpu, msgRecibido);
 			memcpy(&tamanioNombre, &msgRecibido->longitud, sizeof(t_num));
 			varSemaforo->nombre = malloc(tamanioNombre+1);
 			memcpy(varSemaforo->nombre, msgRecibido->data, tamanioNombre);
@@ -408,18 +455,21 @@ void escucharCPU(int socket_cpu) {
 					pthread_mutex_lock(&semBuscad->mutex_colaBloqueados);
 					queue_push(semBuscad->colaBloqueados, tmp);
 					pthread_mutex_unlock(&semBuscad->mutex_colaBloqueados);
-					free(tmp);
 					log_trace(logKernel, "Bloqueo pid %d", pcb->pid);
 					//recibo pcb
 					msg_destruir(msgRecibido);
 					msgRecibido = msg_recibir(socket_cpu);
-					msg_recibir_data(socket_cpu, msgRecibido);
-					pcb = recibir_pcb(socket_cpu, msgRecibido, 0, 1);
-					list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
-					list_add(lista_PCBs, pcb);
-					cpuUsada->libre = true;
-					pthread_mutex_unlock(&cpuUsada->mutex);
-					sem_post(&sem_cantCPUs);
+					if(msg_recibir_data(socket_cpu, msgRecibido) > 0){
+						pcb = recibir_pcb(socket_cpu, msgRecibido, 0, 1);
+						_lockLista_PCBs();
+						list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
+						list_add(lista_PCBs, pcb);
+						_unlockLista_PCBs();
+						cpuUsada->libre = true;
+						pthread_mutex_unlock(&cpuUsada->mutex);
+						sem_post(&sem_cantCPUs);
+					}else
+						log_warning(logKernel, "No recibi nada");
 				}
 
 				list_add(lista_variablesSemaforo, semBuscad);
@@ -428,9 +478,20 @@ void escucharCPU(int socket_cpu) {
 			free(varSemaforo->nombre);
 			pthread_mutex_unlock(&cpuUsada->mutex);
 			break;
+		case ASIGNACION_MEMORIA:
+			log_trace(logKernel, "Recibi ASIGNACION_MEMORIA de CPU");
+			int cantBytes;
+			memcpy(&cantBytes, msgRecibido->data, msgRecibido->longitud);
+			log_trace(logKernel, "ASIGNACION_MEMORIA %d bytes", cantBytes);
+
+			t_puntero direccion = reservarMemoriaHeap(cantBytes, pcb);
+			if((int)direccion > 0)
+				msg_enviar_separado(ASIGNACION_MEMORIA, sizeof(t_puntero), &direccion, socket_cpu);
+
+			break;
 		case ABRIR_ANSISOP:
 			log_trace(logKernel, "Recibi la siguiente operacion ABRIR_ANSISOP de CPU");
-			msg_recibir_data(socket_cpu, msgRecibido);
+			//msg_recibir_data(socket_cpu, msgRecibido);
 			//t_num longitud_msj = 0;
 			t_direccion_archivo pathArchivo;
 			t_num longitudPath;
@@ -583,10 +644,12 @@ void escucharCPU(int socket_cpu) {
 
 
 void _sumarCantOpPriv(t_num8 pid){
+	_lockLista_infoProc();
 	int _espidproc(t_infoProceso* a){ return a->pid == pid; }
 	t_infoProceso* infP = list_remove_by_condition(infoProcs, (void*) _espidproc);
-	infP->cantOpPriv++;	//fixme: no suma si no lo saco
+	infP->cantOpPriv++;
 	list_add(infoProcs, infP);
+	_unlockLista_infoProc();
 }
 
 typedef struct {
@@ -606,13 +669,17 @@ void enviarScriptAMemoria(_t_hiloEspera* aux){
 		return a->pid == aux->pid;
 	}
 
+	_lockLista_PCB_consola();
 	t_infosocket* a = list_find(lista_PCB_consola, (void*) _buscarConsola);
+	_unlockLista_PCB_consola();
 	int socketConsola = a->socket;
 
 	sem_wait(&sem_gradoMp);
 	_sacarDeCola(aux->pid, cola_New, mutex_New);
 
+	_lockLista_PCBs();
 	t_PCB* pcb = list_find(lista_PCBs, (void*) _buscarPCB);
+	_unlockLista_PCBs();
 	send(socket_memoria, &aux->pid, sizeof(t_num8), 0);
 	msg_enviar_separado(INICIALIZAR_PROGRAMA, aux->size, aux->script, socket_memoria);
 	send(socket_memoria, &pcb->cantPagsStack, sizeof(t_num8), 0);
@@ -628,7 +695,9 @@ void enviarScriptAMemoria(_t_hiloEspera* aux){
 		t_infoProceso* infP = malloc(sizeof(t_infoProceso));
 		bzero(infP, sizeof(t_infoProceso));
 		infP->pid = aux->pid;
+		_lockLista_infoProc();
 		list_add(infoProcs, infP);
+		_unlockLista_infoProc();
 		_ponerEnCola(aux->pid, cola_Ready, mutex_Ready);
 		sem_post(&sem_cantColaReady);
 		break;
@@ -647,17 +716,22 @@ void enviarScriptAMemoria(_t_hiloEspera* aux){
 void atender_consola(int socket_consola){
 
 	t_msg* msgRecibido = msg_recibir(socket_consola);
+	if(msgRecibido->longitud > 0)
+		if(msg_recibir_data(socket_consola, msgRecibido) <= 0)
+			msgRecibido->tipoMensaje = 0;
 
 	void* script;	//si lo declaro adentro del switch se queja
 	void _finalizarPIDs(t_infosocket* i){
 		if(i->socket == socket_consola)
 			finalizarPid(i->pid, DESCONEXION_CONSOLA);
 	}
+
+
 	switch(msgRecibido->tipoMensaje){
 
 	case ENVIO_CODIGO:
 		log_trace(logKernel, "Recibi script de consola %d", socket_consola);
-		msg_recibir_data(socket_consola, msgRecibido);
+		//msg_recibir_data(socket_consola, msgRecibido);
 		pid++;
 		script = malloc(msgRecibido->longitud);
 		memcpy(script, msgRecibido->data, msgRecibido->longitud);
@@ -669,7 +743,9 @@ void atender_consola(int socket_consola){
 		info->pid = pidActual;
 		info->socket = socket_consola;
 
+		_lockLista_PCB_consola();
 		list_add(lista_PCB_consola, info);
+		_unlockLista_PCB_consola();
 
 		_ponerEnCola(pidActual, cola_New, mutex_New);
 
@@ -690,21 +766,26 @@ void atender_consola(int socket_consola){
 		free(script);
 		break;
 	case FINALIZAR_PROGRAMA:
-		msg_recibir_data(socket_consola, msgRecibido);
+		//msg_recibir_data(socket_consola, msgRecibido);
+		log_trace(logKernel, "Recibi FINALIZAR_PROGRAMA de consola %d", socket_consola);
 		t_num8 pidAFinalizar;
 		memcpy(&pidAFinalizar, msgRecibido->data, sizeof(t_num8));
-		log_trace(logKernel, "Recibi FINALIZAR_PROGRAMA de consola %d - pid %d", socket_consola, pidAFinalizar);
+		log_trace(logKernel, "FINALIZAR_PROGRAMA pid %d", pidAFinalizar);
 		finalizarPid(pidAFinalizar, COMANDO_FINALIZAR);
 		break;
 
 	case 0: case DESCONECTAR:
 		fprintf(stderr, "La consola %d se ha desconectado \n", socket_consola);
 		log_trace(logKernel, "Recibi DESCONECTAR de consola %d", socket_consola);
+		_lockLista_PCB_consola();
 		list_iterate(lista_PCB_consola, (void*) _finalizarPIDs);
+		_unlockLista_PCB_consola();
 
 		//si la consola se desconecto la saco de la lista
 		bool _esConsola(int socketC){ return socketC == socket_consola; }
+		_lockLista_Consolas();
 		list_remove_by_condition(lista_consolas, (void*) _esConsola);
+		_unlockLista_Consolas();
 		close(socket_consola);
 		FD_CLR(socket_consola, &fdsMaestro);
 		break;
@@ -743,31 +824,32 @@ void consolaKernel(){
 
 			if(string_starts_with(comando, "s") || string_starts_with(comando, "n")){
 				printf("   ----  PID  ----   PC  ---- CantPags ---- ExitCode ----   Cola   ----   \n");
+				_lockLista_PCBs();
 				for(i = 0; i < list_size(lista_PCBs); i++){
 					t_PCB* pcbA = list_get(lista_PCBs, i);
 					char* cola = " -- ";
 					char* exitCode;
-					int auxAsqueroso = pcbA->exitCode;
 
-					if(auxAsqueroso > 0)
+					if((int)pcbA->exitCode > 0)
 						exitCode = "-";
 					else
-						exitCode = string_from_format("%d", pcbA->exitCode);	//fixme: se caga en este if
+						exitCode = string_from_format("%d", pcbA->exitCode);
 					if(_estaEnCola(pcbA->pid, cola_New, mutex_New))
 						cola = "NEW";
-					if(_estaEnCola(pcbA->pid, cola_Ready, mutex_Ready))
+					else if(_estaEnCola(pcbA->pid, cola_Ready, mutex_Ready))
 						cola = "READY";
-					if(_estaEnCola(pcbA->pid, cola_Exec, mutex_Exec))
+					else if(_estaEnCola(pcbA->pid, cola_Exec, mutex_Exec))
 						cola = "EXEC";
-					if(_estaEnCola(pcbA->pid, cola_Block, mutex_Block))
+					else if(_estaEnCola(pcbA->pid, cola_Block, mutex_Block))
 						cola = "BLOCK";
-					if(_estaEnCola(pcbA->pid, cola_Exit, mutex_Exit))
+					else if(_estaEnCola(pcbA->pid, cola_Exit, mutex_Exit))
 						cola = "EXIT";
 
 					if(string_starts_with(comando, "s") || !string_equals_ignore_case(cola, " -- "))
 						printf("   ----   %d   ----   %d   ----    %d     ----     %s    ----  %s  ----   \n",
 							pcbA->pid, pcbA->pc, (pcbA->cantPagsCodigo + pcbA->cantPagsStack), exitCode, cola);
 				}
+				_unlockLista_PCBs();
 
 			}else printf("Flasheaste era s/n \n");
 
@@ -776,7 +858,9 @@ void consolaKernel(){
 			int pidPCB = atoi(string_substring_from(comando, 13));
 
 			int _espid(t_infoProceso* a){ return a->pid == pidPCB; }
+			_lockLista_infoProc();
 			t_infoProceso* infP = list_find(infoProcs, (void*) _espid);
+			_unlockLista_infoProc();
 			if(infP == NULL)
 				printf( "No existe el pid %d \n", pidPCB);
 			else{
@@ -793,7 +877,7 @@ void consolaKernel(){
 
 				switch(getchar()){
 				case 'a':
-					printf( "Cantidad de rafagas ejecutadas: %d \n", infP->cantRafagas);	//todo: le preguto a cpu cuantas lleva?
+					printf( "Cantidad de rafagas ejecutadas: %d \n", infP->cantRafagas);
 					break;
 				case 'b':
 					printf( "Cantidad de operaciones privilegiadas que ejecutó: %d \n", infP->cantOpPriv);
@@ -827,15 +911,18 @@ void consolaKernel(){
 
 		}else if(string_starts_with(comando, "grado mp ")){
 
-			int valorSem, nuevoGMP;
+			int valorSem, nuevoGMP, enEjecucion, i;
 			nuevoGMP = atoi(string_substring_from(comando, 9));
 			sem_getvalue(&sem_gradoMp, &valorSem);
+			enEjecucion = gradoMultiprogramacion-valorSem;
 
 			log_trace(logKernel, "Cambio grado multiprogramacion, anterior %d enEjecucion %d nuevo %d",
-					gradoMultiprogramacion, gradoMultiprogramacion-valorSem, nuevoGMP);
+					gradoMultiprogramacion, enEjecucion, nuevoGMP);
 
 			void _esperarGradoMP(){
+				log_trace(logKernel, "Bajo grado de MP");
 				sem_wait(&sem_gradoMp);
+				log_trace(logKernel, "Lo baje :)");
 			}
 
 			if(nuevoGMP < gradoMultiprogramacion && nuevoGMP < valorSem){
@@ -844,23 +931,37 @@ void consolaKernel(){
 				pthread_attr_init(&atributo);
 				pthread_attr_setdetachstate(&atributo, PTHREAD_CREATE_DETACHED);
 				pthread_t hiloEspera;
-				while(valorSem > nuevoGMP){	//fixme: averiguar si  gradoMultiprogramacion-valorSem
+				for(i = 0; i < valorSem - nuevoGMP; i++){
 					pthread_create(&hiloEspera, &atributo,(void*) _esperarGradoMP, NULL);
-					sem_getvalue(&sem_gradoMp, &valorSem);
 				}
 				pthread_attr_destroy(&atributo);
 
 				gradoMultiprogramacion = nuevoGMP;
 				fprintf(stderr, "Nuevo grado de multiprogramacion: %d\n", gradoMultiprogramacion);
 			}else{
-				log_trace(logKernel, "Posteo gradoMP");
-				while(gradoMultiprogramacion-valorSem < nuevoGMP){
-					sem_post(&sem_gradoMp);
-					sem_getvalue(&sem_gradoMp, &valorSem);
-				}
+				if(nuevoGMP < enEjecucion){
+					log_trace(logKernel, "Waiteo gradoMP_2");
+					pthread_attr_t atributo;
+					pthread_attr_init(&atributo);
+					pthread_attr_setdetachstate(&atributo, PTHREAD_CREATE_DETACHED);
+					pthread_t hiloEspera;
+					for(i = 0; i < enEjecucion - nuevoGMP ; i++){
+						pthread_create(&hiloEspera, &atributo,(void*) _esperarGradoMP, NULL);
+					}
+					pthread_attr_destroy(&atributo);
 
-				gradoMultiprogramacion = nuevoGMP;
-				fprintf(stderr, "Nuevo grado de multiprogramacion: %d\n", gradoMultiprogramacion);
+					gradoMultiprogramacion = nuevoGMP;
+					fprintf(stderr, "Nuevo grado de multiprogramacion: %d\n", gradoMultiprogramacion);
+				}else{
+					log_trace(logKernel, "Posteo gradoMP");
+					for(i = 0; i < nuevoGMP - valorSem; i++){
+						log_trace(logKernel, "Subo grado de MP");
+						sem_post(&sem_gradoMp);
+					}
+
+					gradoMultiprogramacion = nuevoGMP;
+					fprintf(stderr, "Nuevo grado de multiprogramacion: %d\n", gradoMultiprogramacion);
+				}
 			}
 
 		}else if(string_starts_with(comando, "kill ")){
@@ -870,7 +971,9 @@ void consolaKernel(){
 			int _es_PCB(t_PCB* p){
 				return p->pid == pidKill;
 			}
+			_lockLista_PCBs();
 			t_PCB* pcbKill = list_find(lista_PCBs, (void*) _es_PCB);
+			_unlockLista_PCBs();
 			if(pcbKill == NULL)
 				printf( "No existe el pid %d \n", pidKill);
 			else{
@@ -881,7 +984,7 @@ void consolaKernel(){
 		}else if(string_equals_ignore_case(comando, "detener")){
 
 			log_trace(logKernel, "Detengo planificacion");
-			pthread_mutex_lock(&mut_detengo_plani);	//fixme: ahora como hago esto
+			pthread_mutex_lock(&mut_detengo_plani);
 
 		}else if(string_equals_ignore_case(comando, "reanudar")){
 
@@ -944,7 +1047,10 @@ void finalizarPid(t_num8 pid, int exitCode){
 	int _buscarPID(t_infosocket* i){
 		return i->pid == pid;
 	}
-	t_infosocket* info = list_find(lista_PCB_cpu, (void*) _buscarPID);
+	t_infosocket* info;
+	_lockLista_PCB_cpu();
+	info = list_find(lista_PCB_cpu, (void*) _buscarPID);
+	_unlockLista_PCB_cpu();
 	if(info == NULL){
 		log_info(logKernel, "No se encuentra cpu ejecutando pid %d", pid);
 		_sacarDeCola(pid, cola_Block, mutex_Block);
@@ -952,16 +1058,20 @@ void finalizarPid(t_num8 pid, int exitCode){
 			sem_wait(&sem_cantColaReady);
 	}
 	else{
+		//fixme: cuando ejecuta y finaliza explota
 		_sacarDeCola(pid, cola_Exec, mutex_Exec);
 		int _buscarCPU(t_cpu* c){
 			return c->socket == info->socket;
 		}
+		_lockLista_cpus();
 		t_cpu* cpu = list_find(lista_cpus, (void*) _buscarCPU);
+		_unlockLista_cpus();
 		if(cpu == NULL)
 			log_info(logKernel, "No se encuentra cpu ejecutando pid %d", pid);
 		else
-			kill(cpu->pid, SIGUSR2);
+			kill(cpu->pidProcesoCPU, SIGUSR2);
 	}
+
 	void _sacarDeSemaforos(t_VariableSemaforo* sem){
 		t_num8 encontrado = _sacarDeCola(pid, sem->colaBloqueados, sem->mutex_colaBloqueados);
 		if(encontrado == pid)
@@ -972,5 +1082,180 @@ void finalizarPid(t_num8 pid, int exitCode){
 	send(socket_memoria, &pid, sizeof(t_num8), 0);
 	msg_enviar_separado(FINALIZAR_PROGRAMA, 0, 0, socket_memoria);
 	setearExitCode(pid, exitCode);
+	sem_post(&sem_gradoMp);
 }
 
+void _lockLista_cpus(){
+	pthread_mutex_lock(&mutex_cpus);
+}
+void _unlockLista_cpus(){
+	pthread_mutex_unlock(&mutex_cpus);
+}
+void _lockLista_Consolas(){
+	pthread_mutex_lock(&mutex_consolas);
+}
+void _unlockLista_Consolas(){
+	pthread_mutex_unlock(&mutex_consolas);
+}
+void _lockLista_PCBs(){
+	pthread_mutex_lock(&mutex_PCBs);
+}
+void _unlockLista_PCBs(){
+	pthread_mutex_unlock(&mutex_PCBs);
+}
+void _lockLista_PCB_consola(){
+	pthread_mutex_lock(&mutex_PCB_consola);
+}
+void _unlockLista_PCB_consola(){
+	pthread_mutex_unlock(&mutex_PCB_consola);
+}
+void _lockLista_PCB_cpu(){
+	pthread_mutex_lock(&mutex_PCB_cpu);
+}
+void _unlockLista_PCB_cpu(){
+	pthread_mutex_unlock(&mutex_PCB_cpu);
+}
+void _lockLista_infoProc(){
+	pthread_mutex_lock(&mutex_infoProcs);
+}
+void _unlockLista_infoProc(){
+	pthread_mutex_unlock(&mutex_infoProcs);
+}
+
+
+
+
+
+void* _serializarPunteroYMetadata(t_posicion puntero, t_HeapMetadata metadata){
+	int offset = 0, tmpsize;
+	void* buffer = malloc(sizeof(t_posicion) + sizeof(t_HeapMetadata));
+
+	memcpy(buffer + offset, &puntero.pagina, tmpsize = sizeof(t_num));
+	offset += tmpsize;
+	memcpy(buffer + offset, &puntero.offset, tmpsize = sizeof(t_num));
+	offset += tmpsize;
+	memcpy(buffer + offset, &puntero.size, tmpsize = sizeof(t_num));
+	offset += tmpsize;
+	memcpy(buffer + offset, &metadata.size, tmpsize = sizeof(t_num));
+	offset += tmpsize;
+	memcpy(buffer + offset, &metadata.isFree, tmpsize = sizeof(bool));
+	offset += tmpsize;
+
+	return buffer;
+}
+
+void _asignarNuevaPag(t_PCB* pcb){
+	int _esHeap(t_heap* h){
+		return h->pid == pcb->pid;
+	}
+
+	log_trace(logKernel, "Asigno nueva pagina a proceso %d", pcb->pid);
+	send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
+	msg_enviar_separado(ASIGNACION_MEMORIA, 0, 0, socket_memoria);
+	t_msg* msgRecibido = msg_recibir(socket_memoria);
+	if(msgRecibido->tipoMensaje != ASIGNACION_MEMORIA)
+		log_error(logKernel, "No recibi ASIGNACION_MEMORIA sino %d", msgRecibido->tipoMensaje);
+	//msg_recibir_data(socket_memoria, msgRecibido);
+	msg_destruir(msgRecibido);
+
+	t_heap* nuevaHeap = malloc(sizeof(t_heap));
+	nuevaHeap->pid = pcb->pid;
+	nuevaHeap->nroPag = list_count_satisfying(tabla_heap, (void*) _esHeap);
+	nuevaHeap->espacioLibre = tamanioPag - sizeof(t_HeapMetadata);
+
+	t_posicion puntero;
+	puntero.pagina = pcb->cantPagsCodigo + pcb->cantPagsStack + nuevaHeap->nroPag;
+	puntero.offset = tamanioPag - nuevaHeap->espacioLibre;
+	puntero.size = sizeof(t_HeapMetadata) + 0;
+
+	t_HeapMetadata metadata;
+	metadata.size = nuevaHeap->espacioLibre;
+	metadata.isFree = true;
+
+	void* buffer = _serializarPunteroYMetadata(puntero, metadata);
+	buffer = realloc(buffer, sizeof(t_posicion) + sizeof(t_HeapMetadata));
+	memcpy(buffer, &metadata, sizeof(t_HeapMetadata));
+
+	send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
+	msg_enviar_separado(ESCRITURA_PAGINA, sizeof(t_posicion) + sizeof(t_HeapMetadata), buffer, socket_memoria);
+	msgRecibido = msg_recibir(socket_memoria);
+	if(msgRecibido->tipoMensaje != ESCRITURA_PAGINA)
+		log_error(logKernel, "No recibi ESCRITURA_PAGINA sino %d", msgRecibido->tipoMensaje);
+	//msg_recibir_data(socket_memoria, msgRecibido);
+	msg_destruir(msgRecibido);
+
+	list_add(tabla_heap, nuevaHeap);
+}
+
+t_puntero reservarMemoriaHeap(int cantBytes, t_PCB* pcb){
+	int _esHeap(t_heap* h){
+		return h->pid == pcb->pid;
+	}
+	bool _maxPag(t_heap* h1, t_heap* h2){
+		return h1->nroPag >= h2->nroPag;
+	}
+
+	if(cantBytes > tamanioPag - sizeof(t_HeapMetadata)*2){
+		log_warning(logKernel, "Se quiere asignar mas que tamanio de pagina");
+		finalizarPid(pcb->pid, MAS_MEMORIA_TAMANIO_PAG);
+		return -1;
+	}
+
+	if( list_count_satisfying(tabla_heap, (void*)_esHeap) == 0 )
+		_asignarNuevaPag(pcb);
+
+	t_list* listAux = list_filter(tabla_heap, (void*) _esHeap);	//fixme: ver si explota por no tener 2 elementeos
+	list_sort(tabla_heap, (void*) _maxPag);
+	t_heap* heapActual = list_get(listAux, 0);
+	if(cantBytes + sizeof(t_HeapMetadata) > heapActual->espacioLibre)
+		_asignarNuevaPag(pcb);
+
+	heapActual->espacioLibre = heapActual->espacioLibre - sizeof(t_HeapMetadata) - cantBytes;
+
+	t_posicion puntero;
+	puntero.pagina = pcb->cantPagsCodigo + pcb->cantPagsStack + heapActual->nroPag;
+	puntero.offset = tamanioPag - heapActual->espacioLibre;
+	puntero.size = sizeof(t_HeapMetadata) + cantBytes;
+
+	t_HeapMetadata metadata;
+	metadata.size = heapActual->espacioLibre - sizeof(t_HeapMetadata) - cantBytes;
+	metadata.isFree = true;
+
+	//todo: settear cantBytes y false en anterior
+
+	void* buffer = _serializarPunteroYMetadata(puntero, metadata);
+	send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
+	msg_enviar_separado(ESCRITURA_PAGINA, sizeof(t_posicion) + sizeof(t_HeapMetadata), buffer, socket_memoria);
+	free(buffer);
+
+	t_msg* msgRecibido = msg_recibir(socket_memoria);
+	if(msgRecibido->tipoMensaje != ESCRITURA_PAGINA)
+		log_error(logKernel, "No recibi ESCRITURA_PAGINA sino %d", msgRecibido->tipoMensaje);
+	//msg_recibir_data(socket_memoria, msgRecibido);
+	msg_destruir(msgRecibido);
+
+	list_destroy_and_destroy_elements(listAux, free);
+	return puntero.pagina * tamanioPag + puntero.offset;
+}
+
+/*		me exploto la cabeza
+t_puntero liberarMemoriaHeap(t_puntero posicion, t_PCB* pcb){
+	int _esHeap(t_heap* h){
+		return h->pid == pcb->pid;
+	}
+
+
+	t_posicion puntero;
+	puntero.pagina = posicion / tamanioPag;
+	puntero.offset = posicion % tamanioPag - sizeof(t_HeapMetadata);
+	puntero.size = 0;
+
+	t_HeapMetadata metadata;
+
+	void* buffer = _serializarPunteroYMetadata(puntero, metadata);
+	send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
+
+	msg_enviar_separado(ESCRITURA_PAGINA, sizeof(t_posicion) + sizeof(t_HeapMetadata), buffer, socket_memoria);
+
+
+}*/

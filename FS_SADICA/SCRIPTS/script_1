@@ -1,0 +1,54 @@
+#!/usr/bin/ansisop
+
+function imprimir
+        prints n $0+8
+end
+
+begin
+    variables f,  A,  g, w, c
+    c = 98
+    A = 0
+    w = 7+A
+    prints n w
+    jnz w Siguiente 
+:Proximo
+	
+    f = 8	  
+	:Siguiente	
+    g <- doble w
+    imprimir A
+	prints n g
+    prints l    Hola Mundo!
+    
+    sumar1 c
+
+    varCompartida
+    
+    sinParam
+    
+end
+
+function sinParam
+	prints l Bye
+end
+
+#Devolver el doble del
+#primer parametro
+function doble
+    variables f
+    f = $0 + $0
+    return f
+end
+
+function sumar1
+	$0 = 1 + $0
+    prints n  $0
+end
+
+function varCompartida
+	prints n !UnaVar
+	!UnaVar = 77
+	prints n !UnaVar
+end
+
+

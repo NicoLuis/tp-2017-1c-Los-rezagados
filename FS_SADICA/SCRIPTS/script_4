@@ -1,0 +1,4 @@
+begin
+	!UnaVar = 0
+	!Global = 100
+end

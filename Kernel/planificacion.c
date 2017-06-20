@@ -27,11 +27,15 @@ void planificar(){
 		sem_wait(&sem_cantCPUs);
 		_ponerEnCola(pidPCB, cola_Exec, mutex_Exec);
 
+		_lockLista_PCBs();
 		t_PCB* pcb = list_find(lista_PCBs, (void*) _es_PCB);
+		_unlockLista_PCBs();
 		if(pcb == NULL)
 			log_error(logKernel, "no existe el proceso con pid %d", pidPCB);
 
+		_unlockLista_cpus();
 		t_cpu* cpuUsada = list_find(lista_cpus, (void*) _cpuLibre);
+		_unlockLista_cpus();
 		cpuUsada->libre = false;
 		log_trace(logKernel, "cpuUsada %d", cpuUsada->socket);
 
@@ -43,19 +47,10 @@ void planificar(){
 		uint32_t size = tamanioTotalPCB(pcb);
 		void* pcbSerializado = serializarPCB(pcb);
 		msg_enviar_separado(ENVIO_PCB, size, pcbSerializado, cpuUsada->socket);
-		log_trace(logKernel, "ENVIO_PCB");
 
-		int _proc(t_infoProceso* a){
-			return a->pid == pcb->pid;
-		}
-		//t_infoProceso* infoProc = list_find(infoProcs, (void*) _proc);
 		log_trace(logKernel, "Planifico proceso %d en cpu %d", pcb->pid, cpuUsada->socket);
 
 		pthread_mutex_unlock(&cpuUsada->mutex);
-
-		pthread_mutex_lock(&mut_detengo_plani);
-		pthread_mutex_unlock(&mut_detengo_plani);
-
 		pthread_mutex_lock(&cpuUsada->mutex);
 
 		free(pcbSerializado);

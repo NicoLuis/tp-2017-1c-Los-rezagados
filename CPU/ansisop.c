@@ -9,8 +9,6 @@
 #include "pcb.h"
 
 
-#define INICIOSTACK (pcb->cantPagsCodigo * tamanioPagina)
-
 t_puntero definirVariable(t_nombre_variable identificador_variable){
 
 	log_trace(logAnsisop, "Definir variable %c", identificador_variable);
@@ -39,7 +37,7 @@ t_puntero definirVariable(t_nombre_variable identificador_variable){
 	else
 		list_add(stackActual->vars, metadata);
 
-	t_puntero retorno = metadata->posicionMemoria.pagina * tamanioPagina + metadata->posicionMemoria.offset - INICIOSTACK;
+	t_puntero retorno = metadata->posicionMemoria.pagina * tamanioPagina + metadata->posicionMemoria.offset;
 	log_trace(logAnsisop, "Puntero variable %c: %d", identificador_variable, retorno);
 	return retorno;
 }
@@ -49,10 +47,9 @@ t_valor_variable dereferenciar(t_puntero direccion_variable){
 	if(direccion_variable >= 0){
 		log_trace(logAnsisop, "Dereferenciar direccion variable %d", direccion_variable);
 
-		int offsetTotal = INICIOSTACK + direccion_variable;
 		t_posicion puntero;
-		puntero.pagina = offsetTotal / tamanioPagina;
-		puntero.offset = offsetTotal % tamanioPagina;
+		puntero.pagina = direccion_variable / tamanioPagina;
+		puntero.offset = direccion_variable % tamanioPagina;
 		puntero.size = sizeof(t_valor_variable);
 
 		return leerMemoria(puntero);
@@ -77,7 +74,7 @@ t_puntero obtenerPosicionVariable(t_nombre_variable identificador_variable){
 		for(i = 0; i < list_size(stackActual->args); i++){
 			t_StackMetadata* aux = list_get(stackActual->args, i);
 			if(aux->id == identificador_variable){
-				retorno = aux->posicionMemoria.pagina * tamanioPagina + aux->posicionMemoria.offset - INICIOSTACK;
+				retorno = aux->posicionMemoria.pagina * tamanioPagina + aux->posicionMemoria.offset;
 				log_trace(logAnsisop, "Puntero variable %c: %d", identificador_variable, retorno);
 				return retorno;
 			}
@@ -88,7 +85,7 @@ t_puntero obtenerPosicionVariable(t_nombre_variable identificador_variable){
 		for(i = 0; i < list_size(stackActual->vars); i++){
 			t_StackMetadata* aux = list_get(stackActual->vars, i);
 			if(aux->id == identificador_variable){
-				retorno = aux->posicionMemoria.pagina * tamanioPagina + aux->posicionMemoria.offset - INICIOSTACK;
+				retorno = aux->posicionMemoria.pagina * tamanioPagina + aux->posicionMemoria.offset;
 				log_trace(logAnsisop, "Puntero variable %c: %d", identificador_variable, retorno);
 				return retorno;
 			}
@@ -104,10 +101,9 @@ void asignar(t_puntero direccion_variable, t_valor_variable valor){
 	if(direccion_variable >= 0){
 		log_trace(logAnsisop, "Asigno valor %d en direccion variable %d", valor, direccion_variable);
 
-		int offsetTotal = INICIOSTACK + direccion_variable;
 		t_posicion puntero;
-		puntero.pagina = offsetTotal / tamanioPagina;
-		puntero.offset = offsetTotal % tamanioPagina;
+		puntero.pagina = direccion_variable / tamanioPagina;
+		puntero.offset = direccion_variable % tamanioPagina;
 		puntero.size = sizeof(t_valor_variable);
 
 		escribirMemoria(puntero, valor);
@@ -152,8 +148,6 @@ void llamarSinRetorno(t_nombre_etiqueta etiqueta){
 void llamarConRetorno(t_nombre_etiqueta etiqueta, t_puntero donde_retornar){
 
 	log_trace(logAnsisop, "Llamar con retorno %s en %d", etiqueta, donde_retornar);
-
-	donde_retornar += INICIOSTACK;
 
 	t_Stack* stackActual = malloc(sizeof(t_Stack));
 	stackActual->args = list_create();
@@ -256,9 +250,9 @@ t_valor_variable obtenerValorCompartida(t_nombre_compartida variable){
 	msg_enviar_separado(VALOR_VARIABLE_COMPARTIDA, string_length(variable), variable, socket_kernel);
 
 	t_msg* msgRecibido = msg_recibir(socket_kernel);
-	msg_recibir_data(socket_kernel, msgRecibido);
 
 	if(msgRecibido->tipoMensaje == VALOR_VARIABLE_COMPARTIDA){
+		msg_recibir_data(socket_kernel, msgRecibido);
 		t_valor_variable valor;
 		memcpy(&valor, msgRecibido->data, sizeof(t_valor_variable));
 
@@ -382,18 +376,42 @@ void leer(t_descriptor_archivo descriptor_archivo, t_puntero informacion, t_valo
 
 }
 
-void liberar(t_puntero puntero){
-
-}
-
 void moverCursor(t_descriptor_archivo descriptor_archivo, t_valor_variable posicion){
 
 }
 
-t_puntero reservar(t_valor_variable espacio){
 
-	return 0;
+
+t_puntero reservar(t_valor_variable espacio){
+	log_trace(logAnsisop, "Reservo %d bytes", espacio);
+	msg_enviar_separado(ASIGNACION_MEMORIA, sizeof(t_valor_variable), &espacio, socket_kernel);
+	t_puntero direccion = -1;
+	t_msg* msgRecibido = msg_recibir(socket_kernel);
+
+	if(msgRecibido->tipoMensaje == ASIGNACION_MEMORIA)
+		memcpy(&direccion, msgRecibido->data, msgRecibido->longitud);
+	else{
+		log_error(logAnsisop, "Error al reservar memoria - se recibio %d", msgRecibido->tipoMensaje);
+		flag_error = true;
+	}
+	msg_destruir(msgRecibido);
+	return direccion;
 }
+
+void liberar(t_puntero puntero){
+	log_trace(logAnsisop, "Libero posicion %d", puntero);
+	msg_enviar_separado(LIBERAR, sizeof(t_puntero), &puntero, socket_kernel);
+	t_msg* msgRecibido = msg_recibir(socket_kernel);
+
+	if(msgRecibido->tipoMensaje == LIBERAR)
+		log_error(logAnsisop, "Se libero correctamente");
+	else{
+		log_error(logAnsisop, "Error al reservar memoria - se recibio %d", msgRecibido->tipoMensaje);
+		flag_error = true;
+	}
+	msg_destruir(msgRecibido);
+}
+
 void ansisop_signal(t_nombre_semaforo identificador_semaforo){
 	log_trace(logAnsisop, "Signal semaforo %s", identificador_semaforo);
 	msg_enviar_separado(SIGNAL, string_length(identificador_semaforo), identificador_semaforo, socket_kernel);
@@ -418,8 +436,7 @@ void ansisop_wait(t_nombre_semaforo identificador_semaforo){
 		t_num valorSemaforoRecibido;
 		memcpy(&valorSemaforoRecibido, msgRecibido->data, sizeof(t_num));
 		log_trace(logAnsisop, "valorSemaforoRecibido %d", valorSemaforoRecibido);
-		int auxAsqueroso = valorSemaforoRecibido;
-		if(auxAsqueroso < 0)
+		if((int)valorSemaforoRecibido < 0)
 			flag_ultimaEjecucion = 1;
 		msg_destruir(msgRecibido);
 	}else{

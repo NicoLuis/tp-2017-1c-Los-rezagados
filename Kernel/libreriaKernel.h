@@ -45,6 +45,7 @@
 #define COMANDO_FINALIZAR -7
 #define MAS_MEMORIA_TAMANIO_PAG -8
 #define CANT_PAGS_INSUFICIENTES -9
+#define SINTAXIS_SCRIPT -11
 #define SIN_DEFINICION -20
 
 //////////////////////// CAPA FS ////////////////////////////
@@ -98,11 +99,10 @@ t_list* lista_variablesSemaforo;
 
 typedef struct {
 	int nroPag;
-	int pid;
+	t_num8 pid;
 	int espacioLibre;
 }t_heap;
 t_list* tabla_heap;
-// todo: "En el caso que el tamaño disponible en una página no sea suficiente para almacenar el valor requerido, se pedirá una nueva tabla a la Memoria."	?????
 
 typedef struct HeapMetadata {
 	t_num size;
@@ -116,7 +116,7 @@ typedef struct {
 
 typedef struct {
 	int socket;
-	t_num pid;
+	t_num pidProcesoCPU;
 	pthread_mutex_t mutex;
 	bool libre;
 }t_cpu;
@@ -134,6 +134,7 @@ typedef struct {
 	int canrBytes_liberar;
 }t_infoProceso;
 t_list* infoProcs;
+pthread_mutex_t mutex_infoProcs;
 
 
 t_list* lista_cpus;
@@ -141,6 +142,26 @@ t_list* lista_consolas;
 t_list* lista_PCBs;
 t_list* lista_PCB_consola;
 t_list* lista_PCB_cpu;
+
+pthread_mutex_t mutex_cpus;
+pthread_mutex_t mutex_consolas;
+pthread_mutex_t mutex_PCBs;
+pthread_mutex_t mutex_PCB_consola;
+pthread_mutex_t mutex_PCB_cpu;
+
+void _lockLista_cpus();
+void _unlockLista_cpus();
+void _lockLista_Consolas();
+void _unlockLista_Consolas();
+void _lockLista_PCBs();
+void _unlockLista_PCBs();
+void _lockLista_PCB_consola();
+void _unlockLista_PCB_consola();
+void _lockLista_PCB_cpu();
+void _unlockLista_PCB_cpu();
+void _lockLista_infoProc();
+void _unlockLista_infoProc();
+
 t_num8 pid;
 int indiceGlobal;
 

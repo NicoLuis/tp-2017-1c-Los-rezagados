@@ -11,8 +11,8 @@
 #include "libreriaKernel.h"
 #include "pcb.h"
 
-t_num8 crearPCB(int);
-void llenarIndicesPCB(int, char*);
+t_num8 crearPCB(int, char*);
+void llenarIndicesPCB(t_PCB*, char*);
 void setearExitCode(t_num8, int);
 t_num8 _sacarDeCola(t_num8 pid, t_queue* cola, pthread_mutex_t mutex);
 void _ponerEnCola(t_num8 pid, t_queue* cola, pthread_mutex_t mutex);

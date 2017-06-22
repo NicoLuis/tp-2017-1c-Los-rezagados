@@ -111,7 +111,7 @@ typedef struct HeapMetadata {
 
 typedef struct {
 	int socket;
-	t_num8 pid;
+	t_num8 pidPCB;
 }t_infosocket;
 
 typedef struct {

@@ -63,28 +63,31 @@ void finalizarCPU(){
 }
 
 void ultimaEjecTotal(){
+	log_info(logCPU, "Signal ultimaEjecucionTotal");
 	ultimaEjec();
-	flag_ultimaEjecucionTotal = true;
+	flag_ultimaEjecucionTotal = 1;
 }
 
 void ultimaEjec(){
 	log_info(logCPU, "Signal ultimaEjecucion");
-	flag_finalizado = true;
-	flag_ultimaEjecucion = true;
+	flag_finalizado = 1;
+	flag_ultimaEjecucion = 1;
 }
 
 
 void ejecutar(){
 	int quantumRestante = quantum;
-	flag_finalizado = 0;
-	flag_ultimaEjecucion = 0;
-	while(!flag_ultimaEjecucion){
+
+	do{
 		quantumRestante--;
 		if(quantumRestante <= 0 && string_equals_ignore_case(algoritmo, "RR"))
 			flag_ultimaEjecucion = 1;
 		ejecutarInstruccion();
 		pcb->cantRafagas++;
-	}
+	} while(!flag_ultimaEjecucion);
+
+	flag_finalizado = 0;
+	flag_ultimaEjecucion = 0;
 	liberarPCB(pcb, 0);
 	pcb = NULL;
 }
@@ -97,11 +100,11 @@ void ejecutarInstruccion(){
 	if (instruccion != NULL) {
 		log_trace(logCPU, "Instruccion recibida: %s", instruccion);
 		log_trace(logAnsisop, "\t\t%s", instruccion);
-		pcb->pc += 1;
+		pcb->pc++;
 		analizadorLinea(instruccion, &functions, &kernel_functions);
 	} else {
 		log_error(logCPU, "No se pudo recibir la instruccion");
-		return;
+		flag_error = 1;
 	}
 
 	if(flag_error){

@@ -40,7 +40,7 @@ void planificar(){
 		log_trace(logKernel, "cpuUsada %d", cpuUsada->socket);
 
 		t_infosocket* info = malloc(sizeof(t_infosocket));
-		info->pid = pcb->pid;
+		info->pidPCB = pcb->pid;
 		info->socket = cpuUsada->socket;
 		list_add(lista_PCB_cpu, info);
 

@@ -87,7 +87,6 @@ void escucharKERNEL(void* socket_kernel) {
 					tmpBuffer = malloc(tamanioDeMarcos);
 					memcpy(tmpBuffer, msg->data + i*tamanioDeMarcos, tamanioDeMarcos);
 					cargarPaginaAMemoria(pid, i, tmpBuffer, ESCRITURA_PAGINA);
-					log_info(log_memoria, "i4 %d", i);
 				}
 				log_info(log_memoria, "Asigne correctamente");
 		 		header = OK;
@@ -667,7 +666,6 @@ t_frame* buscarFrameLibre(t_num8 pid) {
 	t_frame* frameLibre = list_get(listaFrames, numeroFrameLibre);
 	lockFrames();
 	while(frameLibre != NULL){
-		log_info(log_memoria, "numeroFrameLibre %d", numeroFrameLibre);
 		if(frameLibre->pid == 0){
 			log_info(log_memoria, "es 0");
 			frameLibre->pid = pid;

@@ -7,13 +7,14 @@
 
 #include "operacionesPCBKernel.h"
 
-t_num8 crearPCB(int socketConsola){
+t_num8 crearPCB(int socketConsola, char* script){
 	t_PCB* pcb = malloc(sizeof(t_PCB));
 	pcb->pid = pid;
 	pcb->exitCode = 1;
 	pcb->cantRafagas = 0;
 	pcb->cantPagsStack = stackSize;
 	pcb->indiceStack = list_create();
+	llenarIndicesPCB(pcb->pid, script);
 	_lockLista_PCBs();
 	list_add(lista_PCBs, pcb);
 	_unlockLista_PCBs();
@@ -21,14 +22,8 @@ t_num8 crearPCB(int socketConsola){
 }
 
 
-void llenarIndicesPCB(int pidPCB, char* codigo){
-	bool _buscarPCB(t_PCB* pcb){
-		return pcb->pid == pidPCB;
-	}
+void llenarIndicesPCB(t_PCB* pcb, char* codigo){
 
-	_lockLista_PCBs();
-	t_PCB* pcb = list_find(lista_PCBs, (void*) _buscarPCB);
-	_unlockLista_PCBs();
 	t_metadata_program* metadata = metadata_desde_literal(codigo);
 
 	pcb->pc = metadata->instruccion_inicio;
@@ -40,8 +35,6 @@ void llenarIndicesPCB(int pidPCB, char* codigo){
 	pcb->indiceCodigo.bloqueSerializado = malloc(metadata->instrucciones_size * sizeof(t_intructions));
 	memcpy(&pcb->indiceCodigo.size, &metadata->instrucciones_size, sizeof(t_size));
 	memcpy(pcb->indiceCodigo.bloqueSerializado, metadata->instrucciones_serializado, metadata->instrucciones_size * sizeof(t_intructions));
-
-	log_trace(logKernel, "metadata->instrucciones_size %d", metadata->instrucciones_size);
 
 	t_Stack* entradaStack = malloc(sizeof(t_Stack));
 	entradaStack->args = list_create();

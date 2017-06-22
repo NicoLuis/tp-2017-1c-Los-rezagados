@@ -373,10 +373,12 @@ void escribir(t_descriptor_archivo descriptor_archivo, void* informacion, t_valo
 }
 
 void leer(t_descriptor_archivo descriptor_archivo, t_puntero informacion, t_valor_variable tamanio){
+	log_trace(logAnsisop, "Leer fd %d en %d size %d", descriptor_archivo, informacion, tamanio);
 
 }
 
 void moverCursor(t_descriptor_archivo descriptor_archivo, t_valor_variable posicion){
+	log_trace(logAnsisop, "Mover Cursor fd %d posicion %d", descriptor_archivo,posicion );
 
 }
 

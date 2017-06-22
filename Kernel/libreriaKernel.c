@@ -199,6 +199,45 @@ void escucharCPU(int socket_cpu) {
 		}
 		t_num tamanioNombre, offset = 0;
 
+//-------------- VARIABLES EMPLEADAS PARA BORRAR Y CERRAR --------------------
+
+		u_int32_t fdRecibido;
+		t_num pidRecibido;
+
+		t_tabla_proceso* TablaProceso = malloc(sizeof(t_tabla_proceso));
+		t_entrada_proceso* entradaProcesoBuscado = malloc(sizeof(t_entrada_proceso));
+		t_entrada_GlobalFile* entradaGlobalBuscada = malloc(sizeof(t_entrada_GlobalFile));
+		int _esFD(t_entrada_proceso *entradaP){return entradaP->indice == entradaProcesoBuscado->indice;}
+		int _esIndiceGlobal(t_entrada_GlobalFile *entradaG){return entradaG->indiceGlobalTable == entradaGlobalBuscada->indiceGlobalTable;}
+		int _buscarPid(t_tabla_proceso* tabla){ return pidRecibido == tabla->pid; }
+		int _buscarFD(t_entrada_proceso* entradaP){ return fdRecibido == entradaP->indice; }
+		int _buscarPorIndice(t_entrada_GlobalFile* entradaGlobal){return entradaGlobal->indiceGlobalTable == entradaProcesoBuscado->referenciaGlobalTable;}
+
+		void _recibirYBuscar(){
+			msg_recibir_data(socket_cpu, msgRecibido);
+
+			memcpy(&fdRecibido, msgRecibido->data, sizeof(u_int32_t));
+			memcpy(&pidRecibido,msgRecibido->data + sizeof(u_int32_t),sizeof(t_num8));
+
+			TablaProceso = list_find(lista_tabla_de_procesos, (void*) _buscarPid); //tabla proceso es una lista
+
+			if(TablaProceso == NULL){
+				log_trace(logKernel, "no existe la tabla de este proceso");
+
+				// terminar??
+			} else {
+				entradaProcesoBuscado = list_find(TablaProceso->lista_entradas_de_proceso, (void*) _buscarFD); //tabla proceso es una lista
+				if(entradaProcesoBuscado == NULL){
+					log_trace(logKernel, "no existe entrada de la tabla proceso que tenga a FD");
+					// hacer algo??
+				} else {
+					entradaGlobalBuscada = list_remove_by_condition(lista_tabla_global, (void*) _buscarPorIndice);
+				}
+			}
+		}
+
+//-------------------------------------------------------------------------------
+
 		switch(msgRecibido->tipoMensaje){
 
 
@@ -499,7 +538,7 @@ void escucharCPU(int socket_cpu) {
 			int _buscarPath(t_entrada_GlobalFile* a){ return string_equals_ignore_case(a->FilePath,pathArchivo); }
 			t_entrada_GlobalFile* entradaGlobalOld = list_find(lista_tabla_global, (void*) _buscarPath);
 
-			uint indiceActualGlobal;
+			t_descriptor_archivo indiceActualGlobal;
 
 			if(entradaGlobalOld == NULL){
 				// si es nulo significa qe se abre el archivo por primera vez
@@ -554,6 +593,7 @@ void escucharCPU(int socket_cpu) {
 
 				list_add(tablaProceso->lista_entradas_de_proceso, entradaProcesoNew);
 
+
 			} else {
 				// defino indice de tabla
 
@@ -562,13 +602,69 @@ void escucharCPU(int socket_cpu) {
 				list_add(tablaProceso->lista_entradas_de_proceso, entradaProcesoNew);
 			}
 
-		}
+			// le mando a cpu el fd asignado
+			msg_enviar_separado(ABRIR_ANSISOP, sizeof(t_descriptor_archivo), &entradaProcesoNew->indice, socket_cpu);
 
+			free(pathArchivo);
+			free(entradaProcesoNew);
+			free(entradaGlobalNew);
+
+			break;
+
+		case BORRAR_ANSISOP:
+
+			log_trace(logKernel, "Recibi la siguiente operacion BORRAR_ANSISOP de CPU");
+
+			_recibirYBuscar();
+
+			if(entradaGlobalBuscada == NULL){
+				log_trace(logKernel, "no existe la entrada buscada");
+			}else{
+				if(entradaGlobalBuscada->Open == 1){
+					msg_enviar_separado(BORRAR, string_length(entradaGlobalBuscada->FilePath), entradaGlobalBuscada->FilePath, socket_fs);
+					list_remove_by_condition(lista_tabla_global, (void*) _esIndiceGlobal);
+					list_remove_by_condition(TablaProceso->lista_entradas_de_proceso, (void*) _esFD);
+					msg_enviar_separado(BORRAR,0,0,socket_cpu);
+				}else{
+					log_trace(logKernel, "el archivo esta siendo usado por otros procesos, no se puede borrar");
+					msg_enviar_separado(ERROR,0,0,socket_cpu);
+				}
+			}
+			break;
+
+		case CERRAR_ANSISOP:
+
+			log_trace(logKernel, "Recibi la siguiente operacion CERRAR_ANSISOP de CPU");
+
+			_recibirYBuscar();
+
+			if(entradaGlobalBuscada == NULL){
+				log_trace(logKernel, "no existe la entrada buscada");
+			}else{
+				entradaGlobalBuscada->Open --;
+
+				//int _esFD(t_entrada_proceso *entradaP){return entradaP->indice == entradaProcesoBuscado->indice;}
+				list_remove_by_condition(TablaProceso->lista_entradas_de_proceso, (void*) _esFD);
+				if(entradaGlobalBuscada->Open == 0){
+					// sacar esta entrada de la tabla global
+					//int _esIndiceGlobal(t_entrada_GlobalFile *entradaG){return entradaG->indiceGlobalTable == entradaGlobalBuscada->indiceGlobalTable;}
+					list_remove_by_condition(lista_tabla_global, (void*) _esIndiceGlobal);
+				}
+
+				list_add(lista_tabla_global, entradaGlobalBuscada);
+			}
+		break;
+		} //end while
+
+		free(TablaProceso);
+		free(entradaProcesoBuscado);
+		free(entradaGlobalBuscada);
 		free(varCompartida);
 		free(varSemaforo);
 		msg_destruir(msgRecibido);
 	}
 }
+
 
 
 void _sumarCantOpPriv(t_num8 pid){

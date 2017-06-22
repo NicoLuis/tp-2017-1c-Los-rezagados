@@ -270,6 +270,8 @@ t_valor_variable obtenerValorCompartida(t_nombre_compartida variable){
 
 t_descriptor_archivo abrir(t_direccion_archivo direccion, t_banderas flags){
 	
+	u_int fd = 0;
+
 	log_trace(logAnsisop, "abrir el siguiente archivo ubicado en: %s", direccion);
 	int longitud_buffer = sizeof(t_num) + string_length(direccion) + sizeof(t_banderas) + sizeof(t_num8);
 	void* buffer = malloc(longitud_buffer);
@@ -285,18 +287,70 @@ t_descriptor_archivo abrir(t_direccion_archivo direccion, t_banderas flags){
 		}
 	msg_enviar_separado(ABRIR_ANSISOP, longitud_buffer, buffer, socket_kernel);
 
+	t_msg* msgRecibido = msg_recibir(socket_kernel);
+
+		if(msgRecibido->tipoMensaje == ABRIR_ANSISOP){
+			msg_recibir_data(socket_kernel, msgRecibido);
+			memcpy(&fd, msgRecibido->data, sizeof(t_descriptor_archivo));
+			//fd = msgRecibido->data; //se recibe del kernel el fd que se asigno al proceso que abrio un archivo
+			log_trace(logAnsisop, "Se asigno el fd correctamente");
+			msg_destruir(msgRecibido);
+		}
+
+	free (buffer);
+	return fd;
+}
+
+void mandarMsgaKernel(int tipoMensaje, t_descriptor_archivo fd){
 
 
+	int longitud_buffer = sizeof(u_int32_t) + sizeof(t_num8);
+	void* buffer = malloc(longitud_buffer);
 
+	memcpy(buffer, &fd, sizeof(u_int32_t));
+	memcpy(buffer+ sizeof(u_int32_t),&pcb->pid,sizeof(t_num8));
+	msg_enviar_separado(tipoMensaje, longitud_buffer, &buffer, socket_kernel);
 
-	return 0;
+	free(buffer);
+
 }
 
 void borrar(t_descriptor_archivo direccion){
 
+	log_trace(logAnsisop, "borrar el siguiente archivo ubicado en el siguiente file descriptor: %s", direccion);
+
+
+	mandarMsgaKernel(BORRAR_ANSISOP,direccion);
+
+	/*log_trace(logAnsisop, "borrar el siguiente archivo ubicado en el siguiente file descriptor: %s", direccion);
+
+	int longitud_buffer = sizeof(u_int32_t) + sizeof(t_num8);
+	void* buffer = malloc(longitud_buffer);
+
+	memcpy(buffer, &direccion, sizeof(u_int32_t));
+	memcpy(buffer+ sizeof(u_int32_t),&pcb->pid,sizeof(t_num8));
+
+	msg_enviar_separado(BORRAR_ANSISOP, longitud_buffer, &buffer, socket_kernel);
+
+	free(buffer);*/
+
+
+
+
+	t_msg* msgRecibido = msg_recibir(socket_kernel);
+
+	if(msgRecibido->tipoMensaje == BORRAR)
+		log_trace(logAnsisop, "Escribio bien");
+	else
+		log_error(logAnsisop, "Error al escribir");
+
+	msg_destruir(msgRecibido);
 }
 
 void cerrar(t_descriptor_archivo descriptor_archivo){
+
+	mandarMsgaKernel(CERRAR_ANSISOP,descriptor_archivo);
+
 
 }
 

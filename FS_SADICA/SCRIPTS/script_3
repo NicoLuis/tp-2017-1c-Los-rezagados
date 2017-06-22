@@ -1,8 +1,5 @@
 begin
 	variables a
-	a = 20
-	prints n a
-	prints n !UnaVar
-	!UnaVar = 77
-	prints n !UnaVar
+	abrir LC /unPath/unArchivo a
+	borrar a
 end

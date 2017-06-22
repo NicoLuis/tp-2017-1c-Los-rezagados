@@ -200,12 +200,14 @@ void escucharCPU(int socket_cpu) {
 		t_num tamanioNombre, offset = 0;
 
 		switch(msgRecibido->tipoMensaje){
+
+
+
 		case FINALIZAR_PROGRAMA:
 			log_trace(logKernel, "Recibi FINALIZAR_PROGRAMA de CPU");
 			flag_finalizado = true;
 			//no break
 		case ENVIO_PCB:		// si me devuelve el PCB es porque fue la ultima instruccion
-			//msg_recibir_data(socket_cpu, msgRecibido);
 			pcb = recibir_pcb(socket_cpu, msgRecibido, flag_finalizado, 0);
 			if(flag_finalizado){
 				bool _esPid(t_infosocket* a){ return a->pid == pcb->pid; }
@@ -229,6 +231,10 @@ void escucharCPU(int socket_cpu) {
 			pthread_mutex_unlock(&cpuUsada->mutex);
 			sem_post(&sem_cantCPUs);
 			break;
+
+
+
+
 		case 0: case FIN_CPU:
 			fprintf(stderr, "La cpu %d se ha desconectado \n", socket_cpu);
 			log_trace(logKernel, "La desconecto la cpu %d", socket_cpu);
@@ -255,9 +261,12 @@ void escucharCPU(int socket_cpu) {
 			pthread_mutex_unlock(&cpuUsada->mutex);
 			pthread_exit(NULL);
 			break;
+
+
+
+
 		case ERROR:
 			log_trace(logKernel, "Recibi ERROR de CPU");
-			//msg_recibir_data(socket_cpu, msgRecibido);
 			pcb = recibir_pcb(socket_cpu, msgRecibido, 1, 0);
 			pcb->exitCode = SINTAXIS_SCRIPT;
 			_lockLista_PCBs();
@@ -273,9 +282,12 @@ void escucharCPU(int socket_cpu) {
 			sem_post(&sem_gradoMp);
 			pthread_mutex_unlock(&cpuUsada->mutex);
 			break;
+
+
+
+
 		case ESCRIBIR_FD:
 			log_trace(logKernel, "Recibi ESCRIBIR_FD de CPU");
-			//msg_recibir_data(socket_cpu, msgRecibido);
 			int size = msgRecibido->longitud - sizeof(t_puntero), fd;
 			void* informacion = malloc(size);
 			memcpy(&fd, msgRecibido->data, sizeof(t_puntero));
@@ -303,10 +315,12 @@ void escucharCPU(int socket_cpu) {
 			free(informacion);
 			pthread_mutex_unlock(&cpuUsada->mutex);
 			break;
+
+
+
+
 		case GRABAR_VARIABLE_COMPARTIDA:
 			log_trace(logKernel, "Recibi GRABAR_VARIABLE_COMPARTIDA de CPU");
-
-			//msg_recibir_data(socket_cpu, msgRecibido);
 			memcpy(&tamanioNombre, msgRecibido->data, sizeof(t_num));
 			offset += sizeof(t_num);
 			varCompartida->nombre = malloc(tamanioNombre+1);
@@ -328,10 +342,12 @@ void escucharCPU(int socket_cpu) {
 			free(varCompartida->nombre);
 			pthread_mutex_unlock(&cpuUsada->mutex);
 			break;
+
+
+
+
 		case VALOR_VARIABLE_COMPARTIDA:
 			log_trace(logKernel, "Recibi VALOR_VARIABLE_COMPARTIDA de CPU");
-
-			//msg_recibir_data(socket_cpu, msgRecibido);
 			memcpy(&tamanioNombre, &msgRecibido->longitud, sizeof(t_num));
 			varCompartida->nombre = malloc(tamanioNombre+1);
 			memcpy(varCompartida->nombre, msgRecibido->data, tamanioNombre);
@@ -352,10 +368,10 @@ void escucharCPU(int socket_cpu) {
 			break;
 
 
+
+
 		case SIGNAL:
 			log_trace(logKernel, "Recibi SIGNAL de CPU");
-
-			//msg_recibir_data(socket_cpu, msgRecibido);
 			memcpy(&tamanioNombre, &msgRecibido->longitud, sizeof(t_num));
 			varSemaforo->nombre = malloc(tamanioNombre+1);
 			memcpy(varSemaforo->nombre, msgRecibido->data, tamanioNombre);
@@ -391,10 +407,11 @@ void escucharCPU(int socket_cpu) {
 			pthread_mutex_unlock(&cpuUsada->mutex);
 			break;
 
+
+
+
 		case WAIT:
 			log_trace(logKernel, "Recibi WAIT de CPU");
-
-			//msg_recibir_data(socket_cpu, msgRecibido);
 			memcpy(&tamanioNombre, &msgRecibido->longitud, sizeof(t_num));
 			varSemaforo->nombre = malloc(tamanioNombre+1);
 			memcpy(varSemaforo->nombre, msgRecibido->data, tamanioNombre);
@@ -439,6 +456,10 @@ void escucharCPU(int socket_cpu) {
 			free(varSemaforo->nombre);
 			pthread_mutex_unlock(&cpuUsada->mutex);
 			break;
+
+
+
+
 		case ASIGNACION_MEMORIA:
 			log_trace(logKernel, "Recibi ASIGNACION_MEMORIA de CPU");
 			int cantBytes;
@@ -450,9 +471,12 @@ void escucharCPU(int socket_cpu) {
 				msg_enviar_separado(ASIGNACION_MEMORIA, sizeof(t_puntero), &direccion, socket_cpu);
 
 			break;
+
+
+
+
 		case ABRIR_ANSISOP:
 			log_trace(logKernel, "Recibi la siguiente operacion ABRIR_ANSISOP de CPU");
-			//msg_recibir_data(socket_cpu, msgRecibido);
 			//t_num longitud_msj = 0;
 			t_direccion_archivo pathArchivo;
 			t_num longitudPath;

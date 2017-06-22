@@ -103,7 +103,7 @@ int main(int argc, char* argv[]) {
 		log_info(logCPU, "La Memoria se ha desconectado");
 	bufferMemoria[bytesRecibidos] = '\0';
 
-	if (!strcmp("Conexion aceptada", bufferMemoria))
+	if (!strcmp("Conexion Aceptada", bufferMemoria))
 		log_trace(logCPU, "Me conecte correctamente a la Memoria");
 
 	if(recv(socket_memoria, &tamanioPagina, sizeof(t_num), 0) <= 0)

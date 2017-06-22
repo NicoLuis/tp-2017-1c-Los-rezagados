@@ -26,6 +26,7 @@
 #include <signal.h>
 
 //Archivo de Configuracion
+t_config* configuracion;
 char* ipKernel;
 int puertoKernel;
 char* ipMemoria;

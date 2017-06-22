@@ -58,6 +58,7 @@ void finalizarCPU(){
 
 	log_destroy(logCPU);
 	log_destroy(logAnsisop);
+	config_destroy(configuracion);
 
 	exit(1);
 }

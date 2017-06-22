@@ -289,14 +289,17 @@ t_descriptor_archivo abrir(t_direccion_archivo direccion, t_banderas flags){
 
 	t_msg* msgRecibido = msg_recibir(socket_kernel);
 
-		if(msgRecibido->tipoMensaje == ABRIR_ANSISOP){
-			msg_recibir_data(socket_kernel, msgRecibido);
-			memcpy(&fd, msgRecibido->data, sizeof(t_descriptor_archivo));
-			//fd = msgRecibido->data; //se recibe del kernel el fd que se asigno al proceso que abrio un archivo
-			log_trace(logAnsisop, "Se asigno el fd correctamente");
-			msg_destruir(msgRecibido);
-		}
+	if(msgRecibido->tipoMensaje == ABRIR_ANSISOP){
+		msg_recibir_data(socket_kernel, msgRecibido);
+		memcpy(&fd, msgRecibido->data, sizeof(t_descriptor_archivo));
+		//fd = msgRecibido->data; //se recibe del kernel el fd que se asigno al proceso que abrio un archivo
+		log_trace(logAnsisop, "Se asigno el fd correctamente");
+	}else{
+		log_error(logAnsisop, "Error - se recibio %d", msgRecibido->tipoMensaje);
+		flag_error = 1;
+	}
 
+	msg_destruir(msgRecibido);
 	free (buffer);
 	return fd;
 }
@@ -366,8 +369,10 @@ void escribir(t_descriptor_archivo descriptor_archivo, void* informacion, t_valo
 
 	if(msgRecibido->tipoMensaje == ESCRIBIR_FD)
 		log_trace(logAnsisop, "Escribio bien");
-	else
+	else{
 		log_error(logAnsisop, "Error al escribir");
+		flag_error = 1;
+	}
 
 	msg_destruir(msgRecibido);
 }

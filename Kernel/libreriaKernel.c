@@ -533,11 +533,6 @@ void escucharCPU(int socket_cpu) {
 			memcpy(&flags, msgRecibido->data + sizeof(t_num) + longitudPath, sizeof(t_banderas));
 			memcpy(&pid, msgRecibido->data + sizeof(t_num) + longitudPath + sizeof(t_banderas),sizeof(t_num8));
 
-//-------------- seteo variables de la tabla global --------------
-
-			t_entrada_GlobalFile * entradaGlobalNew = malloc(sizeof(t_entrada_GlobalFile));
-
-
 //-------------- busco si ya tengo este path en la tabla global ---------
 
 			int _buscarPath(t_entrada_GlobalFile* a){ return string_equals_ignore_case(a->FilePath,pathArchivo); }
@@ -547,6 +542,7 @@ void escucharCPU(int socket_cpu) {
 
 			if(entradaGlobalOld == NULL){
 				// si es nulo significa qe se abre el archivo por primera vez
+				t_entrada_GlobalFile * entradaGlobalNew = malloc(sizeof(t_entrada_GlobalFile));
 				memcpy(entradaGlobalNew->FilePath, pathArchivo, longitudPath+1);
 
 				//entradaGlobalNew->FilePath = pathArchivo;
@@ -554,23 +550,22 @@ void escucharCPU(int socket_cpu) {
 				entradaGlobalNew->indiceGlobalTable = indiceGlobal;
 				indiceGlobal++;
 				indiceActualGlobal = indiceGlobal;
-				list_add(lista_tabla_global,entradaGlobalNew);
+				list_add(lista_tabla_global, entradaGlobalNew);
 			} else {
 				// de lo contrario este se encuentra abierto y un proceso esta qeriendo abrirlo
 				list_remove_by_condition(lista_tabla_global, (void*) _buscarPath);
 				entradaGlobalOld->Open++;
-				indiceActualGlobal= entradaGlobalOld->Open;
-				list_add(lista_tabla_global,entradaGlobalOld);
+				indiceActualGlobal = entradaGlobalOld->Open;	//fixme le seteas la cant de veces q se abrio?
+				list_add(lista_tabla_global, entradaGlobalOld);
 			}
 
 //-------------- seteo variable necesarias para la tabla de procesos ------------------------------
 
 			t_entrada_proceso *entradaProcesoNew = malloc(sizeof(t_entrada_proceso));
 
-			entradaProcesoNew->bandera =string_new();
+			entradaProcesoNew->bandera = string_new();
 
 			//considero el caso qe venga con + de 2 flags
-
 			if(flags.lectura){
 				entradaProcesoNew->bandera = "r";
 			}
@@ -579,7 +574,7 @@ void escucharCPU(int socket_cpu) {
 			}
 			if(flags.creacion){ //si lo crea entoncs puede leer y escribir
 				string_append(&entradaProcesoNew->bandera,"c");
-				msg_enviar_separado(CREAR_ARCHIVO, longitudPath, pathArchivo, socket_fs);//
+				msg_enviar_separado(CREAR_ARCHIVO, longitudPath, pathArchivo, socket_fs);
 				//crear archivo en fs
 			}
 
@@ -589,21 +584,21 @@ void escucharCPU(int socket_cpu) {
 
 			int _espid(t_tabla_proceso* a){ return a->pid == pid; }
 			t_tabla_proceso* tablaProceso = list_find(lista_tabla_de_procesos, (void*) _esPid);
+			//fixme en q momento se crea una tablaProceso y se agrega a la lista?
 
-			// si la tabla del proceso no tiene entradas entoncs agrego una entrada nueva
 			if(tablaProceso == NULL){
-				entradaProcesoNew->indice = 3; // inicio indice en 3
-				tablaProceso->indiceMax = 3;
+				//fixme significa q no existe la tabla buscada
+			}else{
+				// si la tabla del proceso no tiene entradas entoncs agrego una entrada nueva
+				if(list_size(tablaProceso->lista_entradas_de_proceso) == 0){
+					entradaProcesoNew->indice = 3; // inicio indice en 3
+					tablaProceso->indiceMax = 3;
+				}else{
+					// defino indice de tabla
+					entradaProcesoNew->indice = tablaProceso->indiceMax + 1;
+					tablaProceso->indiceMax++;
+				}
 				// en este momento ya estan cargados los flags, el indice y la referencia a tabla global
-
-				list_add(tablaProceso->lista_entradas_de_proceso, entradaProcesoNew);
-
-
-			} else {
-				// defino indice de tabla
-
-				entradaProcesoNew->indice = tablaProceso->indiceMax + 1;
-				tablaProceso->indiceMax++;
 				list_add(tablaProceso->lista_entradas_de_proceso, entradaProcesoNew);
 			}
 
@@ -611,8 +606,7 @@ void escucharCPU(int socket_cpu) {
 			msg_enviar_separado(ABRIR_ANSISOP, sizeof(t_descriptor_archivo), &entradaProcesoNew->indice, socket_cpu);
 
 			free(pathArchivo);
-			free(entradaProcesoNew);
-			free(entradaGlobalNew);
+			//free(entradaProcesoNew); fixme las cosas q agrego a una lista no se liberan (recien cuando lo saco lo libero)
 
 			break;
 
@@ -768,6 +762,7 @@ void atender_consola(int socket_consola){
 		script = malloc(msgRecibido->longitud);
 		memcpy(script, msgRecibido->data, msgRecibido->longitud);
 		log_info(logKernel, "\n%s", script);
+
 		t_num8 pidActual = crearPCB(socket_consola, script);
 
 		_lockLista_PCB_consola();

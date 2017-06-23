@@ -42,6 +42,7 @@ void escucharKERNEL(void* socket_kernel) {
 			pthread_exit(NULL);
 			break;
 		case VALIDAR_ARCHIVO:
+			log_info(logFS, "Validar archivo");
 			path = malloc(msgRecibido->longitud);
 			memcpy(path, msgRecibido->data, msgRecibido->longitud);
 			path[msgRecibido->longitud] = '\0';
@@ -57,6 +58,7 @@ void escucharKERNEL(void* socket_kernel) {
 			free(path);
 			break;
 		case CREAR_ARCHIVO:
+			log_info(logFS, "Crear archivo");
 			path = malloc(msgRecibido->longitud);
 			memcpy(path, msgRecibido->data, msgRecibido->longitud);
 			path[msgRecibido->longitud] = '\0';
@@ -67,6 +69,7 @@ void escucharKERNEL(void* socket_kernel) {
 			free(path);
 			break;
 		case BORRAR:
+			log_info(logFS, "Borrar archivo");
 			path = malloc(msgRecibido->longitud);
 			memcpy(path, msgRecibido->data, msgRecibido->longitud);
 			path[msgRecibido->longitud] = '\0';
@@ -77,6 +80,7 @@ void escucharKERNEL(void* socket_kernel) {
 			free(path);
 			break;
 		case OBTENER_DATOS:
+			log_info(logFS, "Obtener datos archivo");
 			tmpsize = msgRecibido->longitud - sizeof(t_num)*2;
 			path = malloc(tmpsize);
 			memcpy(path, msgRecibido->data, tmpsize);
@@ -93,6 +97,7 @@ void escucharKERNEL(void* socket_kernel) {
 
 			break;
 		case GUARDAR_DATOS:
+			log_info(logFS, "Guardar datos archivo");
 
 			memcpy(&tmpsize, msgRecibido->data, sizeof(t_num));
 			tmpoffset += sizeof(t_num);
@@ -166,6 +171,7 @@ void leerBitMap(){		//fixme: con q numero arranc bloques 0 o 1?	considero 1
 	}
 
 	data = mmap((caddr_t)0, sbuf.st_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+	//fixme no actualiza archivo bitmap.bin como deberia
 	if (data == MAP_FAILED) {
 		perror("Fallo el mmap del bitmap");
 		exit(1);
@@ -176,15 +182,17 @@ void leerBitMap(){		//fixme: con q numero arranc bloques 0 o 1?	considero 1
 }
 
 void crearArchivo(void* path){
-	int nroBloque;
+	int nroBloque, i;
 	char* rutaMetadata = string_new();
 	string_append(&rutaMetadata, puntoMontaje);
+	string_append(&rutaMetadata, "/Archivos");
 	string_append(&rutaMetadata, path);
 	log_info(logFS, "rutaMetadata %s", rutaMetadata);
 
-	for(nroBloque = 0; nroBloque < bitMap->size; nroBloque++){
-		if(!bitarray_test_bit(bitMap, nroBloque)){
-			bitarray_set_bit(bitMap, nroBloque);
+	for(i = 0; i < bitMap->size; i++){
+		if(!bitarray_test_bit(bitMap, i)){
+			bitarray_set_bit(bitMap, i);
+			nroBloque = i;
 			break;
 		}
 	}
@@ -204,6 +212,7 @@ void borrarArchivo(void* path){
 	int i;
 	char* rutaMetadata = string_new();
 	string_append(&rutaMetadata, puntoMontaje);
+	string_append(&rutaMetadata, "/Archivos");
 	string_append(&rutaMetadata, path);
 	log_info(logFS, "rutaMetadata %s", rutaMetadata);
 
@@ -234,6 +243,7 @@ char* leerBloquesArchivo(void* path, int offset, int size){
 	int i, tmpoffset = 0;
 	char* rutaMetadata = string_new();
 	string_append(&rutaMetadata, puntoMontaje);
+	string_append(&rutaMetadata, "/Archivos");
 	string_append(&rutaMetadata, path);
 	log_info(logFS, "rutaMetadata %s", rutaMetadata);
 
@@ -273,6 +283,7 @@ void escribirBloquesArchivo(void* path, int offset, int size, char* buffer){
 	int i, tmpoffset = 0;
 	char* rutaMetadata = string_new();
 	string_append(&rutaMetadata, puntoMontaje);
+	string_append(&rutaMetadata, "/Archivos");
 	string_append(&rutaMetadata, path);
 	log_info(logFS, "rutaMetadata %s", rutaMetadata);
 

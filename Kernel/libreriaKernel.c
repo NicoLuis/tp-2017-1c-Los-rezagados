@@ -577,12 +577,15 @@ void escucharCPU(int socket_cpu) {
 
 			//considero el caso qe venga con + de 2 flags
 			if(flags.lectura){
+				log_trace(logKernel, "r");
 				string_append(&entradaProcesoNew->bandera,"r");
 			}
 			if(flags.escritura){
+				log_trace(logKernel, "w");
 				string_append(&entradaProcesoNew->bandera,"w");
 			}
 			if(flags.creacion){ //si lo crea entoncs puede leer y escribir
+				log_trace(logKernel, "c");
 				string_append(&entradaProcesoNew->bandera,"c");
 				msg_enviar_separado(CREAR_ARCHIVO, longitudPath, pathArchivo, socket_fs);
 				//crear archivo en fs

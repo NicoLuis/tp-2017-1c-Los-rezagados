@@ -26,7 +26,8 @@ void escucharKERNEL(void* socket_kernel) {
 		// lo unico q esta haciendo es mostrar lo que se recibio
 		t_msg* msgRecibido = msg_recibir(socketKernel);
 		msg_recibir_data(socketKernel, msgRecibido);
-		void* path, *buffer;
+		char* path;
+		void* buffer;
 		int tmpsize = 0, tmpoffset = 0;
 		t_num offset, size;
 
@@ -43,6 +44,7 @@ void escucharKERNEL(void* socket_kernel) {
 		case VALIDAR_ARCHIVO:
 			path = malloc(msgRecibido->longitud);
 			memcpy(path, msgRecibido->data, msgRecibido->longitud);
+			path[msgRecibido->longitud] = '\0';
 			log_info(logFS, "Path: %s", path);
 
 			bool existe = false;
@@ -57,6 +59,7 @@ void escucharKERNEL(void* socket_kernel) {
 		case CREAR_ARCHIVO:
 			path = malloc(msgRecibido->longitud);
 			memcpy(path, msgRecibido->data, msgRecibido->longitud);
+			path[msgRecibido->longitud] = '\0';
 			log_info(logFS, "Path: %s", path);
 
 			crearArchivo(path);
@@ -66,6 +69,7 @@ void escucharKERNEL(void* socket_kernel) {
 		case BORRAR:
 			path = malloc(msgRecibido->longitud);
 			memcpy(path, msgRecibido->data, msgRecibido->longitud);
+			path[msgRecibido->longitud] = '\0';
 			log_info(logFS, "Path: %s", path);
 
 			borrarArchivo(path);
@@ -76,6 +80,7 @@ void escucharKERNEL(void* socket_kernel) {
 			tmpsize = msgRecibido->longitud - sizeof(t_num)*2;
 			path = malloc(tmpsize);
 			memcpy(path, msgRecibido->data, tmpsize);
+			path[tmpsize] = '\0';
 			tmpoffset += tmpsize;
 			memcpy(&offset, msgRecibido->data + tmpoffset, sizeof(t_num));
 			tmpoffset += sizeof(t_num);
@@ -93,6 +98,7 @@ void escucharKERNEL(void* socket_kernel) {
 			tmpoffset += sizeof(t_num);
 			path = malloc(tmpsize);
 			memcpy(path, msgRecibido->data + tmpoffset, tmpsize);
+			path[tmpsize] = '\0';
 			tmpoffset += tmpsize;
 			memcpy(&offset, msgRecibido->data + tmpoffset, sizeof(t_num));
 			tmpoffset += sizeof(t_num);

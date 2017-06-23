@@ -312,12 +312,12 @@ t_descriptor_archivo abrir(t_direccion_archivo direccion, t_banderas flags){
 void mandarMsgaKernel(int tipoMensaje, t_descriptor_archivo fd){
 
 
-	int longitud_buffer = sizeof(u_int32_t) + sizeof(t_num8);
+	int longitud_buffer = sizeof(t_descriptor_archivo) + sizeof(t_num8);
 	void* buffer = malloc(longitud_buffer);
 
-	memcpy(buffer, &fd, sizeof(u_int32_t));
-	memcpy(buffer+ sizeof(u_int32_t),&pcb->pid,sizeof(t_num8));
-	msg_enviar_separado(tipoMensaje, longitud_buffer, &buffer, socket_kernel);
+	memcpy(buffer, &fd, sizeof(t_descriptor_archivo));
+	memcpy(buffer + sizeof(t_descriptor_archivo), &pcb->pid, sizeof(t_num8));
+	msg_enviar_separado(tipoMensaje, longitud_buffer, buffer, socket_kernel);
 
 	free(buffer);
 
@@ -327,38 +327,23 @@ void borrar(t_descriptor_archivo direccion){
 
 	log_trace(logAnsisop, "borrar el siguiente archivo ubicado en el siguiente file descriptor: %d", direccion);
 
-
-	mandarMsgaKernel(BORRAR_ANSISOP,direccion);
-
-	/*log_trace(logAnsisop, "borrar el siguiente archivo ubicado en el siguiente file descriptor: %s", direccion);
-
-	int longitud_buffer = sizeof(u_int32_t) + sizeof(t_num8);
-	void* buffer = malloc(longitud_buffer);
-
-	memcpy(buffer, &direccion, sizeof(u_int32_t));
-	memcpy(buffer+ sizeof(u_int32_t),&pcb->pid,sizeof(t_num8));
-
-	msg_enviar_separado(BORRAR_ANSISOP, longitud_buffer, &buffer, socket_kernel);
-
-	free(buffer);*/
-
-
-
+	mandarMsgaKernel(BORRAR_ANSISOP, direccion);
 
 	t_msg* msgRecibido = msg_recibir(socket_kernel);
 
 	if(msgRecibido->tipoMensaje == BORRAR)
-		log_trace(logAnsisop, "Escribio bien");
+		log_trace(logAnsisop, "Borro correctamente");
 	else
-		log_error(logAnsisop, "Error al escribir");
+		log_error(logAnsisop, "Error al borrar");
 
 	msg_destruir(msgRecibido);
 }
 
 void cerrar(t_descriptor_archivo descriptor_archivo){
 
-	mandarMsgaKernel(CERRAR_ANSISOP,descriptor_archivo);
+	mandarMsgaKernel(CERRAR_ANSISOP, descriptor_archivo);
 
+	//todo recibir confirmacion
 
 }
 

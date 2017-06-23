@@ -211,8 +211,8 @@ void escucharCPU(int socket_cpu) {
 
 //-------------- VARIABLES EMPLEADAS PARA BORRAR Y CERRAR --------------------
 
-		u_int32_t fdRecibido;
-		t_num pidRecibido;
+		t_descriptor_archivo fdRecibido;
+		t_num8 pidRecibido;
 
 		t_tabla_proceso* TablaProceso = malloc(sizeof(t_tabla_proceso));
 		t_entrada_proceso* entradaProcesoBuscado = malloc(sizeof(t_entrada_proceso));
@@ -224,10 +224,12 @@ void escucharCPU(int socket_cpu) {
 		int _buscarPorIndice(t_entrada_GlobalFile* entradaGlobal){return entradaGlobal->indiceGlobalTable == entradaProcesoBuscado->referenciaGlobalTable;}
 
 		void _recibirYBuscar(){
-			msg_recibir_data(socket_cpu, msgRecibido);
+			//msg_recibir_data(socket_cpu, msgRecibido);
 
-			memcpy(&fdRecibido, msgRecibido->data, sizeof(u_int32_t));
-			memcpy(&pidRecibido,msgRecibido->data + sizeof(u_int32_t),sizeof(t_num8));
+			memcpy(&fdRecibido, msgRecibido->data, sizeof(t_descriptor_archivo));
+			memcpy(&pidRecibido, msgRecibido->data + sizeof(t_descriptor_archivo), sizeof(t_num8));
+
+			log_trace(logKernel, "fdRecibido %d pidRecibido %d", fdRecibido, pidRecibido);
 
 			TablaProceso = list_find(lista_tabla_de_procesos, (void*) _buscarPid); //tabla proceso es una lista
 
@@ -554,17 +556,16 @@ void escucharCPU(int socket_cpu) {
 				memcpy(entradaGlobalNew->FilePath, pathArchivo, longitudPath);
 				entradaGlobalNew->FilePath[longitudPath] = '\0';
 
-				//entradaGlobalNew->FilePath = pathArchivo;
 				entradaGlobalNew->Open = 1;
 				entradaGlobalNew->indiceGlobalTable = indiceGlobal;
-				indiceGlobal++;
 				indiceActualGlobal = indiceGlobal;
+				indiceGlobal++;
 				list_add(lista_tabla_global, entradaGlobalNew);
 			} else {
 				// de lo contrario este se encuentra abierto y un proceso esta qeriendo abrirlo
 				list_remove_by_condition(lista_tabla_global, (void*) _buscarPath);
 				entradaGlobalOld->Open++;
-				indiceActualGlobal = entradaGlobalOld->Open;	//fixme le seteas la cant de veces q se abrio?
+				indiceActualGlobal = entradaGlobalOld->indiceGlobalTable;
 				list_add(lista_tabla_global, entradaGlobalOld);
 			}
 
@@ -633,7 +634,7 @@ void escucharCPU(int socket_cpu) {
 					list_remove_by_condition(TablaProceso->lista_entradas_de_proceso, (void*) _esFD);
 					msg_enviar_separado(BORRAR,0,0,socket_cpu);
 				}else{
-					log_trace(logKernel, "el archivo esta siendo usado por otros procesos, no se puede borrar");
+					log_trace(logKernel, "el archivo esta siendo usado por %d procesos, no se puede borrar", entradaGlobalBuscada->Open);
 					msg_enviar_separado(ERROR,0,0,socket_cpu);
 				}
 			}

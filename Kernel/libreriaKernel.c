@@ -217,10 +217,10 @@ void escucharCPU(int socket_cpu) {
 		t_tabla_proceso* TablaProceso = malloc(sizeof(t_tabla_proceso));
 		t_entrada_proceso* entradaProcesoBuscado = malloc(sizeof(t_entrada_proceso));
 		t_entrada_GlobalFile* entradaGlobalBuscada = malloc(sizeof(t_entrada_GlobalFile));
-		int _esFD(t_entrada_proceso *entradaP){return entradaP->indice == entradaProcesoBuscado->indice;}
+		int _esFD(t_entrada_proceso *entradaP){return entradaP->fd == entradaProcesoBuscado->fd;}
 		int _esIndiceGlobal(t_entrada_GlobalFile *entradaG){return entradaG->indiceGlobalTable == entradaGlobalBuscada->indiceGlobalTable;}
 		int _buscarPid(t_tabla_proceso* tabla){ return pidRecibido == tabla->pid; }
-		int _buscarFD(t_entrada_proceso* entradaP){ return fdRecibido == entradaP->indice; }
+		int _buscarFD(t_entrada_proceso* entradaP){ return fdRecibido == entradaP->fd; }
 		int _buscarPorIndice(t_entrada_GlobalFile* entradaGlobal){return entradaGlobal->indiceGlobalTable == entradaProcesoBuscado->referenciaGlobalTable;}
 
 		void _recibirYBuscar(){
@@ -526,12 +526,18 @@ void escucharCPU(int socket_cpu) {
 			t_num longitudPath;
 			t_banderas flags;
 			t_num8 pid;
-			memcpy(&longitudPath, msgRecibido->data, sizeof(t_num));
-			pathArchivo = malloc(longitudPath) + 1;
-			memcpy(pathArchivo, msgRecibido->data + sizeof(t_num), longitudPath);
+			int tmpsize;
+			offset = 0;
+			memcpy(&longitudPath, msgRecibido->data + offset, tmpsize = sizeof(t_num));
+			offset += tmpsize;
+			pathArchivo = malloc(longitudPath + 1);
+			memcpy(pathArchivo, msgRecibido->data + offset, tmpsize = longitudPath);
 			pathArchivo[longitudPath] = '\0';
-			memcpy(&flags, msgRecibido->data + sizeof(t_num) + longitudPath, sizeof(t_banderas));
-			memcpy(&pid, msgRecibido->data + sizeof(t_num) + longitudPath + sizeof(t_banderas),sizeof(t_num8));
+			offset += tmpsize;
+			memcpy(&flags, msgRecibido->data + offset, tmpsize = sizeof(t_banderas));
+			offset += tmpsize;
+			memcpy(&pid, msgRecibido->data + offset, tmpsize = sizeof(t_num8));
+			offset += tmpsize;
 
 //-------------- busco si ya tengo este path en la tabla global ---------
 
@@ -541,9 +547,12 @@ void escucharCPU(int socket_cpu) {
 			t_descriptor_archivo indiceActualGlobal;
 
 			if(entradaGlobalOld == NULL){
+				log_trace(logKernel, "Se abre el archivo por primera vez");
 				// si es nulo significa qe se abre el archivo por primera vez
 				t_entrada_GlobalFile * entradaGlobalNew = malloc(sizeof(t_entrada_GlobalFile));
-				memcpy(entradaGlobalNew->FilePath, pathArchivo, longitudPath+1);
+				entradaGlobalNew->FilePath = malloc(longitudPath + 1);
+				memcpy(entradaGlobalNew->FilePath, pathArchivo, longitudPath);
+				entradaGlobalNew->FilePath[longitudPath] = '\0';
 
 				//entradaGlobalNew->FilePath = pathArchivo;
 				entradaGlobalNew->Open = 1;
@@ -567,7 +576,7 @@ void escucharCPU(int socket_cpu) {
 
 			//considero el caso qe venga con + de 2 flags
 			if(flags.lectura){
-				entradaProcesoNew->bandera = "r";
+				string_append(&entradaProcesoNew->bandera,"r");
 			}
 			if(flags.escritura){
 				string_append(&entradaProcesoNew->bandera,"w");
@@ -583,27 +592,26 @@ void escucharCPU(int socket_cpu) {
 			//-------------- busco si ya tengo la tabla para este id de proceso -------------------------
 
 			int _espid(t_tabla_proceso* a){ return a->pid == pid; }
-			t_tabla_proceso* tablaProceso = list_find(lista_tabla_de_procesos, (void*) _esPid);
-			//fixme en q momento se crea una tablaProceso y se agrega a la lista?
+			//poner un mutex lock lista_tabla_de_procesos
+			t_tabla_proceso* tablaProceso = list_remove_by_condition(lista_tabla_de_procesos, (void*) _esPid);
 
 			if(tablaProceso == NULL){
-				//fixme significa q no existe la tabla buscada
-			}else{
-				// si la tabla del proceso no tiene entradas entoncs agrego una entrada nueva
-				if(list_size(tablaProceso->lista_entradas_de_proceso) == 0){
-					entradaProcesoNew->indice = 3; // inicio indice en 3
-					tablaProceso->indiceMax = 3;
-				}else{
-					// defino indice de tabla
-					entradaProcesoNew->indice = tablaProceso->indiceMax + 1;
-					tablaProceso->indiceMax++;
-				}
-				// en este momento ya estan cargados los flags, el indice y la referencia a tabla global
-				list_add(tablaProceso->lista_entradas_de_proceso, entradaProcesoNew);
+				//significa q no existe la tabla buscada => la creo
+				tablaProceso = malloc(sizeof(t_tabla_proceso));
+				tablaProceso->pid = pid;
+				tablaProceso->lista_entradas_de_proceso = list_create();
+				tablaProceso->fdMax = 2;
 			}
+			entradaProcesoNew->fd = tablaProceso->fdMax + 1;
+			tablaProceso->fdMax++;
+
+			// en este momento ya estan cargados los flags, el indice y la referencia a tabla global
+			list_add(tablaProceso->lista_entradas_de_proceso, entradaProcesoNew);
+			list_add(lista_tabla_de_procesos, tablaProceso);
+			//poner un mutex UNLOCK lista_tabla_de_procesos
 
 			// le mando a cpu el fd asignado
-			msg_enviar_separado(ABRIR_ANSISOP, sizeof(t_descriptor_archivo), &entradaProcesoNew->indice, socket_cpu);
+			msg_enviar_separado(ABRIR_ANSISOP, sizeof(t_descriptor_archivo), &entradaProcesoNew->fd, socket_cpu);
 
 			free(pathArchivo);
 			//free(entradaProcesoNew); fixme las cosas q agrego a una lista no se liberan (recien cuando lo saco lo libero)

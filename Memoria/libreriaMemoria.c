@@ -305,7 +305,7 @@ void escucharCPU(void* socket_cpu) {
 						escribirContenido(pag->nroFrame, puntero.offset, puntero.size, contenido_escribir);
 
 						lockFrames();
-						ponerBitModificadoEn1(pag->nroFrame,pidPeticion,pag->nroPag);
+						ponerBitModificadoEn1(pag->nroFrame, pidPeticion, pag->nroPag);
 						unlockFrames();
 
 						//ENVIO ESCRITURA OK
@@ -426,7 +426,7 @@ void liberarFramesDeProceso(t_num8 pid){
 	t_frame* frameAsignado = list_get(listaFrames,numeroFrameAsignado);
 	while (frameAsignado->pid == pid){
 		list_remove(listaFrames,numeroFrameAsignado);
-		t_frame* nuevoFrameLibre;
+		t_frame* nuevoFrameLibre = malloc(sizeof(t_frame));
 		nuevoFrameLibre->bit_modif = 0;
 		list_add(listaFrames,nuevoFrameLibre);
 		log_info(log_memoria,"Frame %d liberado",numeroFrameAsignado);
@@ -689,13 +689,13 @@ void escribirContenido(int frame, int offset, int tamanio_escribir,	void* conten
 
 	int desplazamiento = (frame * tamanioDeMarcos) + offset;
 
-	log_info(log_memoria, "desplazamiento %d frame %d tamanioDeMarcos %d offset %d", desplazamiento, frame, tamanioDeMarcos, offset);
+	log_info(log_memoria, "escribir en (frame %d * tamanioDeMarcos %d) + offset %d = desplazamiento %d ", frame, tamanioDeMarcos, offset, desplazamiento);
 
 	pthread_mutex_lock(&mutexMemoriaReal);
 	memcpy(memoria_real + desplazamiento, contenido, tamanio_escribir);
 	pthread_mutex_unlock(&mutexMemoriaReal);
 
-	free(contenido); //fixme:liberar en otro momento
+	free(contenido); //fixme: liberar en otro momento
 }
 
 void inicializarFrames(){
@@ -747,7 +747,7 @@ void ponerBitModificadoEn1(int nroFrame, t_num8 pid, uint8_t numeroPagina) {
 
 	int numeroFrame = funcionHashing(pid,numeroPagina);
 	t_frame* frameBuscado = list_get(listaFrames,numeroFrame);
-	while(frameBuscado->pid != pid && frameBuscado->nroFrame != nroFrame){
+	while(frameBuscado->pid != pid && frameBuscado->nroFrame != nroFrame && numeroFrame < cantidadDeMarcos){
 		frameBuscado = list_get(listaFrames,numeroFrame++);
 	}
 
@@ -769,7 +769,7 @@ t_frame* buscarFrame(int numeroFrame) {
 t_frame* buscarFrame(int nroFrame,t_num8 pid, uint8_t numeroPagina){
 	int numeroFrameBuscado = funcionHashing(pid,numeroPagina);
 	t_frame* frameBuscado = list_get(listaFrames,numeroFrameBuscado);
-	while(frameBuscado->pid != pid && frameBuscado->nroFrame != nroFrame){
+	while(frameBuscado->pid != pid && frameBuscado->nroFrame != nroFrame && numeroFrameBuscado < cantidadDeMarcos){
 		frameBuscado = list_get(listaFrames,numeroFrameBuscado++);
 	}
 	return frameBuscado;

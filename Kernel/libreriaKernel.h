@@ -51,14 +51,14 @@
 //////////////////////// CAPA FS ////////////////////////////
 
 typedef struct{
-	t_descriptor_archivo indice; //fd??
+	t_descriptor_archivo fd;
 	char* bandera;
 	uint referenciaGlobalTable;
 }t_entrada_proceso;
 
 typedef struct{
 	t_num8 pid;
-	uint indiceMax;
+	uint fdMax;
 	t_list* lista_entradas_de_proceso;
 
 } t_tabla_proceso;

@@ -271,20 +271,25 @@ t_valor_variable obtenerValorCompartida(t_nombre_compartida variable){
 t_descriptor_archivo abrir(t_direccion_archivo direccion, t_banderas flags){
 	
 	u_int fd = 0;
-
+	int offset = 0, tmpsize;
 	log_trace(logAnsisop, "abrir el siguiente archivo ubicado en: %s", direccion);
 	int longitud_buffer = sizeof(t_num) + string_length(direccion) + sizeof(t_banderas) + sizeof(t_num8);
 	void* buffer = malloc(longitud_buffer);
 	t_num longitud_path = string_length(direccion);
 
-	memcpy(buffer, &longitud_path, sizeof(t_num));
-	memcpy(buffer + sizeof(t_num), direccion, longitud_path);
-	memcpy(buffer+ string_length(direccion) + longitud_path, &flags, sizeof(t_banderas));
-	memcpy(buffer+ string_length(direccion) + longitud_path + sizeof(t_banderas),&pcb->pid,sizeof(t_num8));
+	memcpy(buffer + offset, &longitud_path, tmpsize = sizeof(t_num));
+	offset += tmpsize;
+	memcpy(buffer + offset, direccion, tmpsize = longitud_path);
+	offset += tmpsize;
+	memcpy(buffer+ offset, &flags, tmpsize = sizeof(t_banderas));
+	offset += tmpsize;
+	memcpy(buffer+ offset, &pcb->pid, tmpsize = sizeof(t_num8));
+	offset += tmpsize;
+
 	if(buffer == NULL){
-			log_trace(logCPU, "error en al cargar el buffer");
-			flag_error=1;// matar proceso CPU scaso de erro
-		}
+		log_trace(logCPU, "error en al cargar el buffer");
+		flag_error = 1;// matar proceso CPU scaso de erro
+	}
 	msg_enviar_separado(ABRIR_ANSISOP, longitud_buffer, buffer, socket_kernel);
 
 	t_msg* msgRecibido = msg_recibir(socket_kernel);
@@ -320,7 +325,7 @@ void mandarMsgaKernel(int tipoMensaje, t_descriptor_archivo fd){
 
 void borrar(t_descriptor_archivo direccion){
 
-	log_trace(logAnsisop, "borrar el siguiente archivo ubicado en el siguiente file descriptor: %s", direccion);
+	log_trace(logAnsisop, "borrar el siguiente archivo ubicado en el siguiente file descriptor: %d", direccion);
 
 
 	mandarMsgaKernel(BORRAR_ANSISOP,direccion);

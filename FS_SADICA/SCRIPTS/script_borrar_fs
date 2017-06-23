@@ -1,0 +1,5 @@
+begin
+	variables a
+	abrir a LC /unPath/unArchivo
+	borrar a
+end

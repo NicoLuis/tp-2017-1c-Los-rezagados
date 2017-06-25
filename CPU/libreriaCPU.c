@@ -58,6 +58,7 @@ void finalizarCPU(){
 
 	log_destroy(logCPU);
 	log_destroy(logAnsisop);
+	config_destroy(configuracion);
 
 	exit(1);
 }
@@ -171,7 +172,6 @@ t_valor_variable leerMemoria(t_posicion puntero){
 	}
 
 	log_info(logCPU, "Valor %d", valor);
-	log_trace(logAnsisop, "Valor %d", valor);
 	msg_destruir(msgRecibido);
 	return valor;
 }

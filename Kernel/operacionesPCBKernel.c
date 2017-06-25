@@ -8,16 +8,20 @@
 #include "operacionesPCBKernel.h"
 
 t_num8 crearPCB(int socketConsola, char* script){
+
 	t_PCB* pcb = malloc(sizeof(t_PCB));
 	pcb->pid = pid;
 	pcb->exitCode = 1;
 	pcb->cantRafagas = 0;
 	pcb->cantPagsStack = stackSize;
 	pcb->indiceStack = list_create();
-	llenarIndicesPCB(pcb->pid, script);
+
+	llenarIndicesPCB(pcb, script);
+
 	_lockLista_PCBs();
 	list_add(lista_PCBs, pcb);
 	_unlockLista_PCBs();
+
 	return pcb->pid;
 }
 

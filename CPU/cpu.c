@@ -30,12 +30,11 @@ int main(int argc, char* argv[]) {
 	flag_finalizado = 0;
 
 	//Cargo archivo de configuracion
-	t_config* configuracion = config_create(argv[1]);
+	configuracion = config_create(argv[1]);
 	ipKernel = config_get_string_value(configuracion, "IP_KERNEL");
 	puertoKernel = config_get_int_value(configuracion, "PUERTO_KERNEL");
 	ipMemoria = config_get_string_value(configuracion, "IP_MEMORIA");
 	puertoMemoria = config_get_int_value(configuracion, "PUERTO_MEMORIA");
-	config_destroy(configuracion);
 	mostrarArchivoConfig();
 
 	conectarAlKernel();

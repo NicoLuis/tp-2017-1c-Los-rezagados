@@ -20,6 +20,7 @@ typedef struct {
 	t_num pc;				//Program Counter
 	t_num cantPagsCodigo;	//Páginas utilizadas por elcodigo AnSISOP cantPagsStack
 	t_num cantPagsStack;
+	t_num cantPagsHeap;
 	t_indice indiceCodigo;
 	t_indice indiceEtiquetas;
 	t_list* indiceStack;		//Lista de t_Stack

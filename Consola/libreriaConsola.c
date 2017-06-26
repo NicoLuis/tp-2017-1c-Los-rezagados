@@ -83,7 +83,7 @@ void leerComando(char* comando){
 				"● disconnect: Desconectar Consola\n"
 				"● clear: Limpiar Mensajes\n");
 	}else
-		fprintf(stderr, "El comando '%s' no es valido\n", comando);
+		fprintf(stderr, PRINT_COLOR_YELLOW "El comando '%s' no es valido" PRINT_COLOR_RESET "\n", comando);
 
 }
 
@@ -110,20 +110,20 @@ void escucharKernel(){
 			log_trace(logConsola, "Recibi OK");
 			if(msg_recibir_data(socket_kernel, msgRecibido) > 0){
 				memcpy(&pidProg, msgRecibido->data, sizeof(t_num8));
-				log_trace(logConsola, "El pid es %d", pidProg);
+				log_trace(logConsola, "PID %d", pidProg);
 
 				programa = list_find(lista_programas, (void*) _programaSinPid);
 				if(programa == NULL)
 					log_trace(logConsola, "No se encuentra programa sin pid");
 				programa->pid = pidProg;
 
-				fprintf(stderr, "El pid es %d\n", pidProg);
+				fprintf(stderr, PRINT_COLOR_CYAN "PID %d" PRINT_COLOR_RESET "\n", pidProg);
 			}else
 				log_warning(logConsola, "No recibi nada");
 			break;
 		case MARCOS_INSUFICIENTES:
 			log_trace(logConsola, "Recibi MARCOS_INSUFICIENTES");
-			fprintf(stderr, "No hay espacio suficiente en memoria \n");
+			fprintf(stderr, PRINT_COLOR_YELLOW "No hay espacio suficiente en memoria" PRINT_COLOR_RESET "\n");
 			finalizarPrograma(programa, 0);
 			break;
 		case FINALIZAR_PROGRAMA:
@@ -139,7 +139,7 @@ void escucharKernel(){
 				log_warning(logConsola, "No recibi nada");
 			break;
 		case 0:
-			fprintf(stderr, "El kernel se ha desconectado \n");
+			fprintf(stderr, PRINT_COLOR_RED "El kernel se ha desconectado" PRINT_COLOR_RESET "\n");
 			log_trace(logConsola, "La desconecto el kernel");
 			close(socket_kernel);
 			socket_kernel = 0;
@@ -151,11 +151,11 @@ void escucharKernel(){
 			if(msg_recibir_data(socket_kernel, msgRecibido) > 0){
 				memcpy(&pidProg, msgRecibido->data, sizeof(t_num8));
 				log_trace(logConsola, "El pid %d no pudo terminar su ejecucion", pidProg);
-				fprintf(stderr, "El pid %d no pudo terminar su ejecucion \n", pidProg);
+				fprintf(stderr, PRINT_COLOR_YELLOW "El PID %d no pudo terminar su ejecucion" PRINT_COLOR_RESET "\n", pidProg);
 
 				programa = list_find(lista_programas, (void*) _esPrograma);
 				programa->horaFin = temporal_get_string_time();
-				//finalizarPrograma(programa);
+				finalizarPrograma(programa, 0);
 			}else
 				log_warning(logConsola, "No recibi nada");
 			break;

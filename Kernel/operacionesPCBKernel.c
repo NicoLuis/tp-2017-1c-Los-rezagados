@@ -13,7 +13,9 @@ t_num8 crearPCB(int socketConsola, char* script){
 	pcb->pid = pid;
 	pcb->exitCode = 1;
 	pcb->cantRafagas = 0;
+	pcb->cantPagsCodigo = 0;
 	pcb->cantPagsStack = stackSize;
+	pcb->cantPagsHeap = 0;
 	pcb->indiceStack = list_create();
 
 	llenarIndicesPCB(pcb, script);

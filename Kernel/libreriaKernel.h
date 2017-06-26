@@ -45,7 +45,7 @@
 #define COMANDO_FINALIZAR -7
 #define MAS_MEMORIA_TAMANIO_PAG -8
 #define CANT_PAGS_INSUFICIENTES -9
-#define SINTAXIS_SCRIPT -11
+#define ERROR_SCRIPT -11
 #define SIN_DEFINICION -20
 
 //////////////////////// CAPA FS ////////////////////////////

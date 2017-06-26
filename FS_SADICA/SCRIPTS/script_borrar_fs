@@ -1,5 +1,6 @@
 begin
-	variables a
+	variables a, b
 	abrir a LC /unPath/unArchivo
-	borrar a
+	abrir b LC /unPep
+	#borrar a
 end

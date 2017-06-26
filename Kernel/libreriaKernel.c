@@ -188,10 +188,11 @@ void escucharCPU(int socket_cpu) {
 
 		_lockLista_PCB_cpu();
 		t_infosocket* aux = list_find(lista_PCB_cpu, (void*) _esCPU2);
+		t_num8 pidaux = aux->pidPCB;
 		_unlockLista_PCB_cpu();
 
 		int _es_PCB(t_PCB* p){
-			return p->pid == aux->pidPCB;
+			return p->pid == pidaux;
 		}
 
 		_lockLista_PCBs();
@@ -275,7 +276,7 @@ void escucharCPU(int socket_cpu) {
 				free(info);
 			}
 			_lockLista_PCBs();
-			list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
+			if(list_remove_by_condition(lista_PCBs, (void*) _es_PCB) == NULL) log_warning(logKernel, "No se encuentra pcb en ENVIO_PCB");
 			list_add(lista_PCBs, pcb);
 			_unlockLista_PCBs();
 			liberarCPU(cpuUsada);
@@ -285,7 +286,7 @@ void escucharCPU(int socket_cpu) {
 
 
 		case 0: case FIN_CPU:
-			fprintf(stderr, "La cpu %d se ha desconectado \n", socket_cpu);
+			fprintf(stderr, PRINT_COLOR_YELLOW "La cpu %d se ha desconectado" PRINT_COLOR_RESET "\n", socket_cpu);
 			log_trace(logKernel, "La desconecto la cpu %d", socket_cpu);
 			pthread_mutex_unlock(&cpuUsada->mutex);
 			//si la cpu se desconecto la saco de la lista
@@ -304,7 +305,7 @@ void escucharCPU(int socket_cpu) {
 			}
 			list_iterate(lista_variablesSemaforo, (void*) _sacarDeSemaforos);
 			_lockLista_PCBs();
-			list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
+			if(list_remove_by_condition(lista_PCBs, (void*) _es_PCB) == NULL) log_warning(logKernel, "No se encuentra pcb en FIN_CPU");
 			list_add(lista_PCBs, pcb);
 			_unlockLista_PCBs();
 			sem_post(&sem_gradoMp);
@@ -317,9 +318,9 @@ void escucharCPU(int socket_cpu) {
 		case ERROR:
 			log_trace(logKernel, "Recibi ERROR de CPU");
 			pcb = recibir_pcb(socket_cpu, msgRecibido, 1, 0);
-			pcb->exitCode = SINTAXIS_SCRIPT;
+			pcb->exitCode = ERROR_SCRIPT;
 			_lockLista_PCBs();
-			list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
+			if(list_remove_by_condition(lista_PCBs, (void*) _es_PCB) == NULL) log_warning(logKernel, "No se encuentra pcb en ERROR");
 			list_add(lista_PCBs, pcb);
 			_unlockLista_PCBs();
 			_lockLista_PCB_consola();
@@ -454,7 +455,8 @@ void escucharCPU(int socket_cpu) {
 					if(msg_recibir_data(socket_cpu, msgRecibido) > 0){
 						pcb = recibir_pcb(socket_cpu, msgRecibido, 0, 1);
 						_lockLista_PCBs();
-						list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
+						void* pep = list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
+						if(pep == NULL) log_trace(logKernel, "No se encuentra pep 4");
 						list_add(lista_PCBs, pcb);
 						_unlockLista_PCBs();
 						liberarCPU(cpuUsada);
@@ -507,13 +509,7 @@ void escucharCPU(int socket_cpu) {
 				//todo: lo trato como si fuese del FS
 			}
 
-			_lockLista_infoProc();
-			int _espidproc(t_infoProceso* a){ return a->pid == pcb->pid; }
-			t_infoProceso* infP = list_remove_by_condition(infoProcs, (void*) _espidproc);
-			infP->cantOpPriv++;
-			list_add(infoProcs, infP);
-			_unlockLista_infoProc();
-
+			_sumarCantOpPriv(pcb->pid);
 			free(informacion);
 			pthread_mutex_unlock(&cpuUsada->mutex);
 			break;
@@ -577,15 +573,12 @@ void escucharCPU(int socket_cpu) {
 
 			//considero el caso qe venga con + de 2 flags
 			if(flags.lectura){
-				log_trace(logKernel, "r");
 				string_append(&entradaProcesoNew->bandera,"r");
 			}
 			if(flags.escritura){
-				log_trace(logKernel, "w");
 				string_append(&entradaProcesoNew->bandera,"w");
 			}
-			if(flags.creacion){ //si lo crea entoncs puede leer y escribir
-				log_trace(logKernel, "c");
+			if(flags.creacion){
 				string_append(&entradaProcesoNew->bandera,"c");
 				msg_enviar_separado(CREAR_ARCHIVO, longitudPath, pathArchivo, socket_fs);
 				//crear archivo en fs
@@ -620,6 +613,7 @@ void escucharCPU(int socket_cpu) {
 			free(pathArchivo);
 			//free(entradaProcesoNew); fixme las cosas q agrego a una lista no se liberan (recien cuando lo saco lo libero)
 
+			_sumarCantOpPriv(pcb->pid);
 			break;
 
 		case BORRAR_ANSISOP:
@@ -641,6 +635,7 @@ void escucharCPU(int socket_cpu) {
 					msg_enviar_separado(ERROR,0,0,socket_cpu);
 				}
 			}
+			_sumarCantOpPriv(pcb->pid);
 			break;
 
 		case CERRAR_ANSISOP:
@@ -664,8 +659,9 @@ void escucharCPU(int socket_cpu) {
 
 				list_add(lista_tabla_global, entradaGlobalBuscada);
 			}
-		break;
-		} //end while
+			_sumarCantOpPriv(pcb->pid);
+			break;
+		} //end switch
 
 		free(TablaProceso);
 		free(entradaProcesoBuscado);
@@ -811,7 +807,7 @@ void atender_consola(int socket_consola){
 		break;
 
 	case 0: case DESCONECTAR:
-		fprintf(stderr, "La consola %d se ha desconectado \n", socket_consola);
+		fprintf(stderr, PRINT_COLOR_YELLOW "La consola %d se ha desconectado" PRINT_COLOR_RESET "\n", socket_consola);
 		log_trace(logKernel, "Recibi DESCONECTAR de consola %d", socket_consola);
 		_lockLista_PCB_consola();
 		list_iterate(lista_PCB_consola, (void*) _finalizarPIDs);
@@ -859,15 +855,18 @@ void consolaKernel(){
 			int i;
 
 			if(string_starts_with(comando, "s") || string_starts_with(comando, "n")){
-				printf("   ----  PID  ----   PC  ---- CantPags ---- ExitCode ----   Cola   ----   \n");
+				printf(PRINT_COLOR_CYAN "   ····  PID  ····   PC  ···· CantPags ···· ExitCode ····   Cola   ···· " PRINT_COLOR_RESET "\n");
 				_lockLista_PCBs();
 				for(i = 0; i < list_size(lista_PCBs); i++){
 					t_PCB* pcbA = list_get(lista_PCBs, i);
 					char* cola = " -- ";
 					char* exitCode;
+					int cantPags = pcbA->cantPagsCodigo + pcbA->cantPagsStack + pcbA->cantPagsHeap;
+					if(cantPags == stackSize)
+						cantPags = 0;
 
 					if((int)pcbA->exitCode > 0)
-						exitCode = "-";
+						exitCode = " - ";
 					else
 						exitCode = string_from_format("%d", pcbA->exitCode);
 					if(_estaEnCola(pcbA->pid, cola_New, mutex_New))
@@ -882,8 +881,8 @@ void consolaKernel(){
 						cola = "EXIT";
 
 					if(string_starts_with(comando, "s") || !string_equals_ignore_case(cola, " -- "))
-						printf("   ----   %d   ----   %d   ----    %d     ----     %s    ----  %s  ----   \n",
-							pcbA->pid, pcbA->pc, (pcbA->cantPagsCodigo + pcbA->cantPagsStack), exitCode, cola);
+						printf("   ····   %2d  ····  %3d  ····   %3d    ····    %3s   ····  %5s   ···· \n",
+							pcbA->pid, pcbA->pc, cantPags, exitCode, cola);
 				}
 				_unlockLista_PCBs();
 
@@ -937,7 +936,7 @@ void consolaKernel(){
 					printf( "Se liberaron %d bytes \n", infP->canrBytes_liberar);
 					break;
 				default:
-					printf( "Capo que me tiraste? \n");
+					fprintf(stderr, PRINT_COLOR_YELLOW "Capo que me tiraste?" PRINT_COLOR_RESET "\n");
 				}
 
 			}
@@ -972,8 +971,6 @@ void consolaKernel(){
 				}
 				pthread_attr_destroy(&atributo);
 
-				gradoMultiprogramacion = nuevoGMP;
-				fprintf(stderr, "Nuevo grado de multiprogramacion: %d\n", gradoMultiprogramacion);
 			}else{
 				if(nuevoGMP < enEjecucion){
 					log_trace(logKernel, "Waiteo gradoMP_2");
@@ -985,19 +982,15 @@ void consolaKernel(){
 						pthread_create(&hiloEspera, &atributo,(void*) _esperarGradoMP, NULL);
 					}
 					pthread_attr_destroy(&atributo);
-
-					gradoMultiprogramacion = nuevoGMP;
-					fprintf(stderr, "Nuevo grado de multiprogramacion: %d\n", gradoMultiprogramacion);
 				}else{
 					log_trace(logKernel, "Posteo gradoMP");
 					for(i = 0; i < nuevoGMP - valorSem; i++){
 						log_trace(logKernel, "Subo grado de MP");
 						sem_post(&sem_gradoMp);
 					}
-
-					gradoMultiprogramacion = nuevoGMP;
-					fprintf(stderr, "Nuevo grado de multiprogramacion: %d\n", gradoMultiprogramacion);
 				}
+				gradoMultiprogramacion = nuevoGMP;
+				fprintf(stderr, PRINT_COLOR_BLUE "Nuevo grado de multiprogramacion: %d" PRINT_COLOR_RESET "\n", gradoMultiprogramacion);
 			}
 
 		}else if(string_starts_with(comando, "kill ")){
@@ -1011,10 +1004,15 @@ void consolaKernel(){
 			t_PCB* pcbKill = list_find(lista_PCBs, (void*) _es_PCB);
 			_unlockLista_PCBs();
 			if(pcbKill == NULL)
-				printf( "No existe el pid %d \n", pidKill);
+				fprintf(stderr, PRINT_COLOR_YELLOW "No existe el PID %d" PRINT_COLOR_RESET "\n", pidKill);
 			else{
-				finalizarPid(pidKill, COMANDO_FINALIZAR);
-				printf("Finalizo pid %d\n", pidKill);
+				if((int)pcbKill->exitCode <= 0){
+					log_trace(logKernel,  "El PID %d ya finalizo", pidKill);
+					fprintf(stderr, PRINT_COLOR_YELLOW "El PID %d ya finalizo" PRINT_COLOR_RESET "\n", pidKill);
+				}else{
+					finalizarPid(pidKill, COMANDO_FINALIZAR);
+					fprintf(stderr, PRINT_COLOR_BLUE "Finalizo PID %d" PRINT_COLOR_RESET "\n", pidKill);
+				}
 			}
 
 		}else if(string_equals_ignore_case(comando, "detener")){
@@ -1038,7 +1036,7 @@ void consolaKernel(){
 					"● reanudar: Reanuda la planificación\n");
 
 		}else
-			fprintf(stderr, "El comando '%s' no es valido\n", comando);
+			fprintf(stderr, PRINT_COLOR_YELLOW "El comando '%s' no es valido" PRINT_COLOR_RESET "\n", comando);
 
 	}
 

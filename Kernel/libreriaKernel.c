@@ -1257,7 +1257,10 @@ t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
 				t_msg* msgRecibido = msg_recibir(socket_memoria);
 				if(msgRecibido->tipoMensaje != LECTURA_PAGINA){
 					log_error(logKernel, "No recibi LECTURA_PAGINA sino %d", msgRecibido->tipoMensaje);
-					return -2;
+					if(msgRecibido->tipoMensaje == STACKOVERFLOW)
+						return -3;	//todo: considerar error de stackoverflow
+					else
+						return -2;
 				}
 				msg_recibir_data(socket_memoria, msgRecibido);
 				t_HeapMetadata heapMetadata;
@@ -1350,7 +1353,10 @@ int liberarMemoriaHeap(t_puntero posicion, t_PCB* pcb){
 	t_msg* msgRecibido = msg_recibir(socket_memoria);
 	if(msgRecibido->tipoMensaje != LECTURA_PAGINA){
 		log_error(logKernel, "No recibi LECTURA_PAGINA sino %d", msgRecibido->tipoMensaje);
-		return -1;
+		if(msgRecibido->tipoMensaje == STACKOVERFLOW)
+			return -2;
+		else
+			return -1;
 	}
 	msg_recibir_data(socket_memoria, msgRecibido);
 	t_HeapMetadata heapMetadata, heapMetadataProx;

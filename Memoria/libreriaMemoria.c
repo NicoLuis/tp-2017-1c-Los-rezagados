@@ -61,6 +61,8 @@ void escucharKERNEL(void* socket_kernel) {
 
 		header = msg->tipoMensaje;
 		t_num8 stackSize;
+		t_posicion puntero;
+		t_HeapMetadata metadata, metadata2;
 
 		switch (header) {
 
@@ -98,13 +100,131 @@ void escucharKERNEL(void* socket_kernel) {
 			}
 			break;
 
-		case ASIGNACION_MEMORIA:
-			log_info(log_memoria,"Asigno memoria a proceso %d", pid);
+		case LECTURA_PAGINA:
 
-				//todo
+			pthread_mutex_lock(&mutexCantAccesosMemoria);
+			cantAccesosMemoria++;
+			pthread_mutex_unlock(&mutexCantAccesosMemoria);
+
+			memcpy(&puntero, msg->data, sizeof(t_posicion));
+			log_info(log_memoria, "Solicitud de lectura. Pag:%d Offset:%d Size:%d", puntero.pagina, puntero.offset, puntero.size);
+
+			lockProcesos();
+			ponerBitUsoEn1(pid, puntero.pagina);
+			unlockProcesos();
+
+			if (paginaInvalida(pid, puntero.pagina)) {
+
+				log_error(log_memoria, "Stack Overflow proceso %d", pid);
+				msg_enviar_separado(STACKOVERFLOW, 0, 0, socketKernel);
+
+			} else if ((Cache_Activada()) && (estaEnCache(pid, puntero.pagina))) {
+
+				void* contenido_leido = obtenerContenidoSegunCache(pid, puntero.pagina, puntero.offset, puntero.size);
+				msg_enviar_separado(LECTURA_PAGINA, puntero.size, contenido_leido, socketKernel);
+				free(contenido_leido);
+
+			} else if (estaEnMemoriaReal(pid, puntero.pagina)) {
+
+				log_info(log_memoria, "La pagina %d esta en Memoria Real", puntero.pagina);
+
+				//-----Retardo
+				pthread_mutex_lock(&mutexRetardo);
+				usleep(retardoMemoria * 1000);
+				pthread_mutex_unlock(&mutexRetardo);
+				//------------
+
+				lockProcesos();
+				t_pag* pagina = buscarPaginaEnListaDePaginas(pid,puntero.pagina);
+				unlockProcesos();
+
+				char* contenido_leido = obtenerContenido(pagina->nroFrame, puntero.offset, puntero.size);
+				msg_enviar_separado(LECTURA_PAGINA, puntero.size, contenido_leido, socketKernel);
+				free(contenido_leido);
+
+				if (Cache_Activada()) {
+					agregarEntradaCache(pid, puntero.pagina, pagina->nroFrame);
+				}
+
+			} else {
+				log_error(log_memoria, "No esta en cache ni memoria real");
+				msg_enviar_separado(ERROR, 0, 0, socketKernel);
+			}
+
 
 			break;
 
+		case ESCRITURA_PAGINA:
+
+			pthread_mutex_lock(&mutexCantAccesosMemoria);
+			cantAccesosMemoria++;
+			pthread_mutex_unlock(&mutexCantAccesosMemoria);
+
+			memcpy(&puntero, msg->data, sizeof(t_posicion));
+			memcpy(&metadata, msg->data + sizeof(t_posicion), sizeof(t_HeapMetadata));
+			if(msg->longitud == sizeof(t_posicion) + sizeof(t_HeapMetadata)*2)
+				memcpy(&metadata2, msg->data + sizeof(t_posicion)+sizeof(t_HeapMetadata), sizeof(t_HeapMetadata));
+
+			log_info(log_memoria, "Solicitud de escritura. Pag:%d Offset:%d Size:%d", puntero.pagina, puntero.offset, puntero.size);
+
+			lockProcesos();
+			ponerBitUsoEn1(pid, puntero.pagina);
+			unlockProcesos();
+			void* basura = malloc(sizeof(metadata.size));
+			bzero(basura, metadata.size);
+
+			if (paginaInvalida(pid, puntero.pagina)) {
+
+				log_error(log_memoria, "Stack Overflow proceso %d", pid);
+				msg_enviar_separado(STACKOVERFLOW, 0, 0, socketKernel);
+
+			} else if ((Cache_Activada()) && (estaEnCache(pid, puntero.pagina))) {
+				escribirContenidoSegunCache(pid, puntero.pagina, puntero.offset, sizeof(t_HeapMetadata), &metadata);
+				escribirContenidoSegunCache(pid, puntero.pagina, puntero.offset + sizeof(t_HeapMetadata), metadata.size, basura);
+				free(basura);
+
+				if(msg->longitud == sizeof(t_posicion) + sizeof(t_HeapMetadata)*2)
+					escribirContenidoSegunCache(pid, puntero.pagina, puntero.offset + sizeof(t_HeapMetadata) + metadata.size, sizeof(t_HeapMetadata), &metadata2);
+
+				msg_enviar_separado(ESCRITURA_PAGINA, 0, 0, socketKernel);
+
+			} else if (estaEnMemoriaReal(pid, puntero.pagina)) {
+
+				log_info(log_memoria, "La pagina %d esta en Memoria Real",puntero.pagina);
+
+				//-----Retardo
+				pthread_mutex_lock(&mutexRetardo);
+				usleep(retardoMemoria * 1000);
+				pthread_mutex_unlock(&mutexRetardo);
+				//------------
+
+				lockProcesos();
+				t_pag* pag = buscarPaginaEnListaDePaginas(pid, puntero.pagina);
+				unlockProcesos();
+
+				escribirContenido(pag->nroFrame, puntero.offset, sizeof(t_HeapMetadata), &metadata);
+				escribirContenido(pag->nroFrame, puntero.offset + sizeof(t_HeapMetadata), metadata.size, basura);
+				free(basura);
+
+				if(msg->longitud == sizeof(t_posicion) + sizeof(t_HeapMetadata)*2)
+					escribirContenido(pag->nroFrame, puntero.offset + sizeof(t_HeapMetadata) + metadata.size, sizeof(t_HeapMetadata), &metadata2);
+
+				lockFrames();
+				ponerBitModificadoEn1(pag->nroFrame, pid, pag->nroPag);
+				unlockFrames();
+
+				msg_enviar_separado(ESCRITURA_PAGINA, 0, 0, socketKernel);
+
+				if(Cache_Activada()){
+					agregarEntradaCache(pid,puntero.pagina,pag->nroFrame);
+				}
+
+				log_info(log_memoria, "Escribi correctamente");
+
+			}
+
+
+			break;
 		case FINALIZAR_PROGRAMA:
 			log_info(log_memoria,"Finalizando proceso %d", pid);
 
@@ -422,15 +542,15 @@ void liberarFramesDeProceso(t_num8 unPid) {
 */
 
 void liberarFramesDeProceso(t_num8 pid){
-	int numeroFrameAsignado = funcionHashing(pid,0);
-	t_frame* frameAsignado = list_get(listaFrames,numeroFrameAsignado);
+	int indice = funcionHashing(pid,0);
+	t_frame* frameAsignado = list_get(listaFrames,indice);
 	while (frameAsignado->pid == pid){
-		list_remove(listaFrames,numeroFrameAsignado);
+		list_remove(listaFrames,indice);
 		t_frame* nuevoFrameLibre = malloc(sizeof(t_frame));
 		nuevoFrameLibre->bit_modif = 0;
 		list_add(listaFrames,nuevoFrameLibre);
-		log_info(log_memoria,"Frame %d liberado",numeroFrameAsignado);
-		frameAsignado = list_get(listaFrames,numeroFrameAsignado++);
+		log_info(log_memoria,"Frame %d liberado",indice);
+		frameAsignado = list_get(listaFrames,indice++);
 	}
 
 }
@@ -662,8 +782,8 @@ t_frame* buscarFrameLibre(t_num8 pid) {
 	t_proceso* proceso = buscarProcesoEnListaProcesos(pid);
 	//SI HAY FRAME LIBRES Y EL PROCESO NO TIENE OCUPADOS TODOS LOS MARCOS POR PROCESO ELIJO CUALQUIER FRAME
 
-	int numeroFrameLibre = funcionHashing(pid,0);
-	t_frame* frameLibre = list_get(listaFrames, numeroFrameLibre);
+	int indice = funcionHashing(pid,0);
+	t_frame* frameLibre = list_get(listaFrames, indice);
 	lockFrames();
 	while(frameLibre != NULL){
 		if(frameLibre->pid == 0){
@@ -673,8 +793,8 @@ t_frame* buscarFrameLibre(t_num8 pid) {
 			unlockFrames();
 			return frameLibre;
 		}
-		numeroFrameLibre++;
-		frameLibre = list_get(listaFrames, numeroFrameLibre);
+		indice++;
+		frameLibre = list_get(listaFrames, indice);
 	}
 	return NULL;
 }
@@ -745,10 +865,10 @@ void ponerBitModificadoEn1(int nroFrame) {
 
 void ponerBitModificadoEn1(int nroFrame, t_num8 pid, uint8_t numeroPagina) {
 
-	int numeroFrame = funcionHashing(pid,numeroPagina);
-	t_frame* frameBuscado = list_get(listaFrames,numeroFrame);
-	while(frameBuscado->pid != pid && frameBuscado->nroFrame != nroFrame && numeroFrame < cantidadDeMarcos){
-		frameBuscado = list_get(listaFrames,numeroFrame++);
+	int indice = funcionHashing(pid,numeroPagina);
+	t_frame* frameBuscado = list_get(listaFrames,indice);
+	while(frameBuscado->pid != pid && frameBuscado->nroFrame != nroFrame && indice < cantidadDeMarcos){
+		frameBuscado = list_get(listaFrames,indice++);
 	}
 
 	frameBuscado->bit_modif = 1;
@@ -767,10 +887,10 @@ t_frame* buscarFrame(int numeroFrame) {
 */
 
 t_frame* buscarFrame(int nroFrame,t_num8 pid, uint8_t numeroPagina){
-	int numeroFrameBuscado = funcionHashing(pid,numeroPagina);
-	t_frame* frameBuscado = list_get(listaFrames,numeroFrameBuscado);
-	while(frameBuscado->pid != pid && frameBuscado->nroFrame != nroFrame && numeroFrameBuscado < cantidadDeMarcos){
-		frameBuscado = list_get(listaFrames,numeroFrameBuscado++);
+	int indice = funcionHashing(pid,numeroPagina);
+	t_frame* frameBuscado = list_get(listaFrames,indice);
+	while(frameBuscado->pid != pid && frameBuscado->nroFrame != nroFrame && indice < cantidadDeMarcos){
+		frameBuscado = list_get(listaFrames,indice++);
 	}
 	return frameBuscado;
 }
@@ -1310,7 +1430,7 @@ void mostrarContenidoDeUnProceso(t_num8 pid){
 }
 
 int funcionHashing(t_num8 pid, uint8_t numero_pagina){
-	int numero_frame_buscada = ((pid * cantidadDeMarcos) + (numero_pagina * tamanioDeMarcos)) / cantidadDeMarcos;
-	return numero_frame_buscada;
+	int indice = ((pid * cantidadDeMarcos) + (numero_pagina * tamanioDeMarcos)) / cantidadDeMarcos;
+	return indice;
 }
 

@@ -79,6 +79,11 @@ typedef struct {
 	int ultimoAcceso;
 } t_cache;
 
+typedef struct HeapMetadata {
+	t_num size;
+	bool isFree;
+}t_HeapMetadata;
+
 
 void mostrarArchivoConfig();
 

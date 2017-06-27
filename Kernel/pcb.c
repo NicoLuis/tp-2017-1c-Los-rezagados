@@ -199,6 +199,8 @@ t_PCB *desserealizarPCB(void* buffer){
 		offset += tmpsize;
 	memcpy(&pcb->cantPagsStack, buffer + offset, tmpsize = sizeof(t_num));
 		offset += tmpsize;
+	memcpy(&pcb->cantPagsHeap, buffer + offset, tmpsize = sizeof(t_num));
+		offset += tmpsize;
 	memcpy(&pcb->exitCode, buffer + offset, tmpsize = sizeof(t_num));
 		offset += tmpsize;
 	memcpy(&pcb->sp, buffer + offset, tmpsize = sizeof(t_num));

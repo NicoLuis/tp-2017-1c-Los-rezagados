@@ -121,7 +121,8 @@ void setearExitCode(t_num8 pidPCB, int exitCode){
 
 	_lockLista_PCBs();
 	t_PCB* pcb = list_remove_by_condition(lista_PCBs, (void*) _buscarPCB);
-	pcb->exitCode = exitCode;
+	if((int)pcb->exitCode > 0)
+		pcb->exitCode = exitCode;
 	list_add(lista_PCBs, pcb);
 	_unlockLista_PCBs();
 	_ponerEnCola(pcb->pid, cola_Exit, mutex_Exit);

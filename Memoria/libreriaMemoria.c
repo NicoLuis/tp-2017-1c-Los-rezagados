@@ -225,7 +225,18 @@ void escucharKERNEL(void* socket_kernel) {
 
 			break;
 
+		case ASIGNACION_MEMORIA:
 
+			pthread_mutex_lock(&mutexCantAccesosMemoria);
+			cantAccesosMemoria++;
+			pthread_mutex_unlock(&mutexCantAccesosMemoria);
+
+			//todo: agregar 1 nueva  pag a proceso <<--------------------------------------------------------------------------------
+
+
+			msg_enviar_separado(ASIGNACION_MEMORIA, 0, 0, socketKernel);
+
+			break;
 		case LIBERAR:
 
 			pthread_mutex_lock(&mutexCantAccesosMemoria);
@@ -235,13 +246,16 @@ void escucharKERNEL(void* socket_kernel) {
 			memcpy(&puntero, msg->data, sizeof(t_posicion));
 			log_info(log_memoria, "Solicitud liberar Pag:%d", puntero.pagina);
 
-			//todo: liberar pag puntero.pagina del pid
+			//todo: liberar pag puntero.pagina del pid <<--------------------------------------------------------------------------------
+
 
 			msg_enviar_separado(LIBERAR, 0, 0, socketKernel);
 
 			break;
 		case FINALIZAR_PROGRAMA:
 			log_info(log_memoria,"Finalizando proceso %d", pid);
+
+			//todo: no esta liberando -> si ejecuto X veces un programa q finaliza me quedo sin memoria y tengo q reiniciar <<--------------------------------------------------------------------------------
 
 			lockFramesYProcesos();
 
@@ -662,6 +676,11 @@ void* obtenerContenido(int frame, int offset, int tamanio_leer) {
 	usleep(retardoMemoria * 1000);
 	pthread_mutex_unlock(&mutexRetardo);
 	//------------
+
+	//fixme: no considera q offset + tamanio_leer > tamanioFrame
+	// en ese caso tengo q buscar un nuevo frame para seguir leyendo lo faltante (tamanio_leer - (tamanioFrame - offset)) <<--------------------------------------------------------------------------------
+	//todo: buscar otros lugares donde pase esto
+
 	void* contenido = malloc(tamanio_leer);
 	int desplazamiento = (frame * tamanioDeMarcos) + offset;
 
@@ -822,6 +841,10 @@ void escribirContenido(int frame, int offset, int tamanio_escribir,	void* conten
 	pthread_mutex_unlock(&mutexRetardo);
 	//------------
 
+	//fixme: no considera q offset + tamanio_escribir > tamanioFrame
+	// en ese caso tengo q buscar un nuevo frame para seguir escribiendo lo faltante (tamanio_escribir - (tamanioFrame - offset)) <<--------------------------------------------------------------------------------
+	//todo: buscar otros lugares donde pase esto
+
 	int desplazamiento = (frame * tamanioDeMarcos) + offset;
 
 	log_info(log_memoria, "escribir en (frame %d * tamanioDeMarcos %d) + offset %d = desplazamiento %d ", frame, tamanioDeMarcos, offset, desplazamiento);
@@ -830,7 +853,7 @@ void escribirContenido(int frame, int offset, int tamanio_escribir,	void* conten
 	memcpy(memoria_real + desplazamiento, contenido, tamanio_escribir);
 	pthread_mutex_unlock(&mutexMemoriaReal);
 
-	free(contenido); //fixme: liberar en otro momento
+	free(contenido);
 }
 
 void inicializarFrames(){
@@ -1434,10 +1457,10 @@ void mostrarContenidoDeUnProceso(t_num8 pid){
 		lockProcesos();
 		t_pag* pagina = buscarPaginaEnListaDePaginas(pid,numeroPagina);
 		unlockProcesos();
-		void* contenido_leido = obtenerContenido(pagina->nroFrame, 0, tamanioDeMarcos);
+		char* contenido_leido = obtenerContenido(pagina->nroFrame, 0, tamanioDeMarcos);
 
 		printf("Numero de Pagina: %d \n\n",numeroPagina);
-		printf("Contenido: %p",contenido_leido);
+		printf("Contenido: %s",contenido_leido);
 
 		pagina++;
 	}

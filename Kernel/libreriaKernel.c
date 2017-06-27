@@ -12,10 +12,12 @@
 #include "planificacion.h"
 
 
-t_puntero reservarMemoriaHeap(int cantBytes, t_PCB* pcb);	//si, pinto ponerlo aca
+t_puntero reservarMemoriaHeap(t_num cantBytes, t_PCB* pcb);	//si, pinto ponerlo aca
+int liberarMemoriaHeap(t_puntero posicion, t_PCB* pcb);
 
 void mostrarArchivoConfig() {
 
+	system("clear");
 	printf("El puerto del Programa es: %d\n", puertoPrograma);
 	printf("El puerto de la CPU es: %d\n", puertoCPU);
 	printf("La IP de la Memoria es: %s\n", ipMemoria);
@@ -476,15 +478,33 @@ void escucharCPU(int socket_cpu) {
 
 		case ASIGNACION_MEMORIA:
 			log_trace(logKernel, "Recibi ASIGNACION_MEMORIA de CPU");
-			int cantBytes;
+			t_num cantBytes;
 			memcpy(&cantBytes, msgRecibido->data, msgRecibido->longitud);
 			log_trace(logKernel, "ASIGNACION_MEMORIA %d bytes", cantBytes);
 
 			t_puntero direccion = reservarMemoriaHeap(cantBytes, pcb);
 			if((int)direccion > 0)
 				msg_enviar_separado(ASIGNACION_MEMORIA, sizeof(t_puntero), &direccion, socket_cpu);
+			else
+				msg_enviar_separado(ERROR, 0, 0, socket_cpu);
 
 			break;
+
+
+
+		case LIBERAR:
+			log_trace(logKernel, "Recibi ASIGNACION_MEMORIA de CPU");
+			t_puntero posicion;
+			memcpy(&posicion, msgRecibido->data, msgRecibido->longitud);
+			log_trace(logKernel, "ASIGNACION_MEMORIA %d bytes", cantBytes);
+
+			if( liberarMemoriaHeap(posicion, pcb) < 0)
+				msg_enviar_separado(LIBERAR, sizeof(t_puntero), &direccion, socket_cpu);
+			else
+				msg_enviar_separado(ERROR, 0, 0, socket_cpu);
+
+			break;
+
 
 
 
@@ -1160,25 +1180,8 @@ void _unlockLista_infoProc(){
 
 
 
-void* _serializarPunteroYMetadata(t_posicion puntero, t_HeapMetadata metadata){
-	int offset = 0, tmpsize;
-	void* buffer = malloc(sizeof(t_posicion) + sizeof(t_HeapMetadata));
 
-	memcpy(buffer + offset, &puntero.pagina, tmpsize = sizeof(t_num));
-	offset += tmpsize;
-	memcpy(buffer + offset, &puntero.offset, tmpsize = sizeof(t_num));
-	offset += tmpsize;
-	memcpy(buffer + offset, &puntero.size, tmpsize = sizeof(t_num));
-	offset += tmpsize;
-	memcpy(buffer + offset, &metadata.size, tmpsize = sizeof(t_num));
-	offset += tmpsize;
-	memcpy(buffer + offset, &metadata.isFree, tmpsize = sizeof(bool));
-	offset += tmpsize;
-
-	return buffer;
-}
-
-void _asignarNuevaPag(t_PCB* pcb){
+void asignarNuevaPag(t_PCB* pcb){
 	int _esHeap(t_heap* h){
 		return h->pid == pcb->pid;
 	}
@@ -1195,37 +1198,121 @@ void _asignarNuevaPag(t_PCB* pcb){
 	t_heap* nuevaHeap = malloc(sizeof(t_heap));
 	nuevaHeap->pid = pcb->pid;
 	nuevaHeap->nroPag = list_count_satisfying(tabla_heap, (void*) _esHeap);
-	nuevaHeap->espacioLibre = tamanioPag - sizeof(t_HeapMetadata);
 
 	t_posicion puntero;
 	puntero.pagina = pcb->cantPagsCodigo + pcb->cantPagsStack + nuevaHeap->nroPag;
-	puntero.offset = tamanioPag - nuevaHeap->espacioLibre;
-	puntero.size = sizeof(t_HeapMetadata) + 0;
+	puntero.offset = 0;
+	puntero.size = sizeof(t_HeapMetadata);
 
 	t_HeapMetadata metadata;
-	metadata.size = nuevaHeap->espacioLibre;
+	metadata.size = tamanioPag - sizeof(t_HeapMetadata);
 	metadata.isFree = true;
 
-	void* buffer = _serializarPunteroYMetadata(puntero, metadata);
-	buffer = realloc(buffer, sizeof(t_posicion) + sizeof(t_HeapMetadata));
-	memcpy(buffer, &metadata, sizeof(t_HeapMetadata));
+	void* buffer = malloc(sizeof(t_posicion) + sizeof(t_HeapMetadata));
+	memcpy(buffer, &puntero, sizeof(t_posicion));
+	memcpy(buffer + sizeof(t_posicion), &metadata, sizeof(t_HeapMetadata));
 
 	send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
 	msg_enviar_separado(ESCRITURA_PAGINA, sizeof(t_posicion) + sizeof(t_HeapMetadata), buffer, socket_memoria);
 	msgRecibido = msg_recibir(socket_memoria);
 	if(msgRecibido->tipoMensaje != ESCRITURA_PAGINA)
 		log_error(logKernel, "No recibi ESCRITURA_PAGINA sino %d", msgRecibido->tipoMensaje);
-	//msg_recibir_data(socket_memoria, msgRecibido);
 	msg_destruir(msgRecibido);
 
+	free(buffer);
 	list_add(tabla_heap, nuevaHeap);
 }
 
-t_puntero reservarMemoriaHeap(int cantBytes, t_PCB* pcb){
+
+
+
+t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
+
 	int _esHeap(t_heap* h){
 		return h->pid == pcb->pid;
 	}
-	bool _maxPag(t_heap* h1, t_heap* h2){
+	bool _menorPag(t_heap* h1, t_heap* h2){
+		return h1->nroPag <= h2->nroPag;
+	}
+
+	t_list* listAux = list_filter(tabla_heap, (void*) _esHeap);	//fixme: ver si explota por no tener 2 elementeos
+	list_sort(tabla_heap, (void*) _menorPag);
+
+	int i=0, j=0, offset=0, tmpsize;
+
+	for(; i < list_size(listAux); i++){
+		t_heap* h = list_get(listAux, i);
+		if(h->nroPag == i){
+			j = 0;
+			while(j < tamanioPag){
+				//envio solicitud
+				t_posicion puntero;
+				puntero.pagina = pcb->cantPagsCodigo + pcb->cantPagsStack + i;
+				puntero.offset = j;
+				puntero.size = sizeof(t_HeapMetadata);
+				send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
+				msg_enviar_separado(LECTURA_PAGINA, sizeof(t_posicion), &puntero, socket_memoria);
+
+				//recibo
+				t_msg* msgRecibido = msg_recibir(socket_memoria);
+				if(msgRecibido->tipoMensaje != LECTURA_PAGINA){
+					log_error(logKernel, "No recibi LECTURA_PAGINA sino %d", msgRecibido->tipoMensaje);
+					return -2;
+				}
+				msg_recibir_data(socket_memoria, msgRecibido);
+				t_HeapMetadata heapMetadata;
+				memcpy(&heapMetadata, msgRecibido->data, sizeof(t_HeapMetadata));
+				msg_destruir(msgRecibido);
+
+				if(heapMetadata.isFree && heapMetadata.size <= cantBytes){
+					//encontre hueco
+					heapMetadata.isFree = false;
+					heapMetadata.size = cantBytes;
+					t_HeapMetadata heapMetadataProx;
+					heapMetadataProx.isFree = true;
+					heapMetadataProx.size = heapMetadata.size - cantBytes - sizeof(t_HeapMetadata);
+
+					void* buffer = malloc(sizeof(t_posicion) + sizeof(t_HeapMetadata)*2);
+					memcpy(buffer + offset, &puntero, tmpsize = sizeof(t_posicion));
+					offset += tmpsize;
+					memcpy(buffer + offset, &heapMetadata, tmpsize = sizeof(t_HeapMetadata));
+					offset += tmpsize;
+					memcpy(buffer + offset, &heapMetadataProx, tmpsize = sizeof(t_HeapMetadata));
+					offset += tmpsize;
+
+					send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
+					msg_enviar_separado(ESCRITURA_PAGINA, offset, buffer, socket_memoria);
+
+					t_msg* msgRecibido2 = msg_recibir(socket_memoria);
+					if(msgRecibido2->tipoMensaje != ESCRITURA_PAGINA){
+						log_error(logKernel, "No recibi ESCRITURA_PAGINA sino %d", msgRecibido2->tipoMensaje);
+						return -2;
+					}
+					msg_destruir(msgRecibido2);
+
+					free(buffer);
+					list_destroy(listAux);
+					return puntero.pagina * tamanioPag + puntero.offset;
+
+				}else
+					//sigo buscando
+					j = j + sizeof(t_HeapMetadata) + heapMetadata.size;
+			}
+		}
+	}
+	list_destroy(listAux);
+	// no encontre hueco
+	return -1;
+}
+
+
+
+
+t_puntero reservarMemoriaHeap(t_num cantBytes, t_PCB* pcb){
+	int _esHeap(t_heap* h){
+		return h->pid == pcb->pid;
+	}
+	bool _menorPag(t_heap* h1, t_heap* h2){
 		return h1->nroPag >= h2->nroPag;
 	}
 
@@ -1236,60 +1323,59 @@ t_puntero reservarMemoriaHeap(int cantBytes, t_PCB* pcb){
 	}
 
 	if( list_count_satisfying(tabla_heap, (void*)_esHeap) == 0 )
-		_asignarNuevaPag(pcb);
+		asignarNuevaPag(pcb);
 
-	t_list* listAux = list_filter(tabla_heap, (void*) _esHeap);	//fixme: ver si explota por no tener 2 elementeos
-	list_sort(tabla_heap, (void*) _maxPag);
-	t_heap* heapActual = list_get(listAux, 0);
-	if(cantBytes + sizeof(t_HeapMetadata) > heapActual->espacioLibre)
-		_asignarNuevaPag(pcb);
-
-	heapActual->espacioLibre = heapActual->espacioLibre - sizeof(t_HeapMetadata) - cantBytes;
-
-	t_posicion puntero;
-	puntero.pagina = pcb->cantPagsCodigo + pcb->cantPagsStack + heapActual->nroPag;
-	puntero.offset = tamanioPag - heapActual->espacioLibre;
-	puntero.size = sizeof(t_HeapMetadata) + cantBytes;
-
-	t_HeapMetadata metadata;
-	metadata.size = heapActual->espacioLibre - sizeof(t_HeapMetadata) - cantBytes;
-	metadata.isFree = true;
-
-	//todo: settear cantBytes y false en anterior
-
-	void* buffer = _serializarPunteroYMetadata(puntero, metadata);
-	send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
-	msg_enviar_separado(ESCRITURA_PAGINA, sizeof(t_posicion) + sizeof(t_HeapMetadata), buffer, socket_memoria);
-	free(buffer);
-
-	t_msg* msgRecibido = msg_recibir(socket_memoria);
-	if(msgRecibido->tipoMensaje != ESCRITURA_PAGINA)
-		log_error(logKernel, "No recibi ESCRITURA_PAGINA sino %d", msgRecibido->tipoMensaje);
-	//msg_recibir_data(socket_memoria, msgRecibido);
-	msg_destruir(msgRecibido);
-
-	list_destroy_and_destroy_elements(listAux, free);
-	return puntero.pagina * tamanioPag + puntero.offset;
-}
-
-/*		me exploto la cabeza
-t_puntero liberarMemoriaHeap(t_puntero posicion, t_PCB* pcb){
-	int _esHeap(t_heap* h){
-		return h->pid == pcb->pid;
+	int retorno = encontrarHueco(cantBytes, pcb);
+	if( retorno == -2 )
+		return -1;
+	if( retorno == -1 ){
+		asignarNuevaPag(pcb);
+		retorno = encontrarHueco(cantBytes, pcb);
 	}
 
+	return retorno;
+}
 
+int liberarMemoriaHeap(t_puntero posicion, t_PCB* pcb){
+
+	//envio solicitud
 	t_posicion puntero;
 	puntero.pagina = posicion / tamanioPag;
 	puntero.offset = posicion % tamanioPag - sizeof(t_HeapMetadata);
-	puntero.size = 0;
-
-	t_HeapMetadata metadata;
-
-	void* buffer = _serializarPunteroYMetadata(puntero, metadata);
+	puntero.size = sizeof(t_HeapMetadata);
 	send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
+	msg_enviar_separado(LECTURA_PAGINA, sizeof(t_posicion), &puntero, socket_memoria);
 
-	msg_enviar_separado(ESCRITURA_PAGINA, sizeof(t_posicion) + sizeof(t_HeapMetadata), buffer, socket_memoria);
+	//recibo
+	t_msg* msgRecibido = msg_recibir(socket_memoria);
+	if(msgRecibido->tipoMensaje != LECTURA_PAGINA){
+		log_error(logKernel, "No recibi LECTURA_PAGINA sino %d", msgRecibido->tipoMensaje);
+		return -1;
+	}
+	msg_recibir_data(socket_memoria, msgRecibido);
+	t_HeapMetadata heapMetadata, heapMetadataProx;
+	memcpy(&heapMetadata, msgRecibido->data, sizeof(t_HeapMetadata));
+	memcpy(&heapMetadataProx, msgRecibido->data + sizeof(t_HeapMetadata), sizeof(t_HeapMetadata));
+	msg_destruir(msgRecibido);
 
+	if(heapMetadata.isFree == true){
+		log_warning(logKernel, "Quiero liberar algo liberado");
+		return -1;
+	}
 
-}*/
+	heapMetadata.isFree = true;
+	if(heapMetadataProx.isFree == true){
+		heapMetadata.size = heapMetadata.size + sizeof(t_HeapMetadata) + heapMetadataProx.size;
+	}
+
+	puntero.size = heapMetadata.size;
+
+	void* buffer = malloc(sizeof(t_posicion) + sizeof(t_HeapMetadata));
+	memcpy(buffer, &puntero, sizeof(t_posicion));
+	memcpy(buffer + sizeof(t_posicion), &heapMetadata, sizeof(t_HeapMetadata));
+
+	send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
+	msg_enviar_separado(ESCRITURA_PAGINA, sizeof(t_posicion) + sizeof(t_HeapMetadata), &puntero, socket_memoria);
+
+	return 0;
+}

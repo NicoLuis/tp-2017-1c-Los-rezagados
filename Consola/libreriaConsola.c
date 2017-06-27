@@ -9,6 +9,7 @@
 
 void mostrarArchivoConfig() {
 
+	system("clear");
 	printf("Nº log %d \n", process_getpid());
 	printf("La IP del Kernel es: %s \n", ipKernel);
 	printf("El puerto del Kernel es: %d\n", puertoKernel);

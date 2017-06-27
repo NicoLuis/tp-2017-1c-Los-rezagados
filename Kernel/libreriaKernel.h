@@ -100,7 +100,6 @@ t_list* lista_variablesSemaforo;
 typedef struct {
 	int nroPag;
 	t_num8 pid;
-	int espacioLibre;
 }t_heap;
 t_list* tabla_heap;
 

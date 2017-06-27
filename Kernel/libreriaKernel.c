@@ -457,8 +457,7 @@ void escucharCPU(int socket_cpu) {
 					if(msg_recibir_data(socket_cpu, msgRecibido) > 0){
 						pcb = recibir_pcb(socket_cpu, msgRecibido, 0, 1);
 						_lockLista_PCBs();
-						void* pep = list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
-						if(pep == NULL) log_trace(logKernel, "No se encuentra pep 4");
+						if(list_remove_by_condition(lista_PCBs, (void*) _es_PCB) == NULL) log_warning(logKernel, "No se encuentra pcb en WAIT");
 						list_add(lista_PCBs, pcb);
 						_unlockLista_PCBs();
 						liberarCPU(cpuUsada);
@@ -488,6 +487,10 @@ void escucharCPU(int socket_cpu) {
 			else
 				msg_enviar_separado(ERROR, 0, 0, socket_cpu);
 
+			_lockLista_PCBs();
+			if(list_remove_by_condition(lista_PCBs, (void*) _es_PCB) == NULL) log_warning(logKernel, "No se encuentra pcb en ASIGNACION_MEMORIA");
+			list_add(lista_PCBs, pcb);
+			_unlockLista_PCBs();
 			break;
 
 
@@ -502,6 +505,11 @@ void escucharCPU(int socket_cpu) {
 				msg_enviar_separado(LIBERAR, sizeof(t_puntero), &direccion, socket_cpu);
 			else
 				msg_enviar_separado(ERROR, 0, 0, socket_cpu);
+
+			_lockLista_PCBs();
+			if(list_remove_by_condition(lista_PCBs, (void*) _es_PCB) == NULL) log_warning(logKernel, "No se encuentra pcb en LIBERAR");
+			list_add(lista_PCBs, pcb);
+			_unlockLista_PCBs();
 
 			break;
 
@@ -1218,6 +1226,7 @@ void asignarNuevaPag(t_PCB* pcb){
 	if(msgRecibido->tipoMensaje != ESCRITURA_PAGINA)
 		log_error(logKernel, "No recibi ESCRITURA_PAGINA sino %d", msgRecibido->tipoMensaje);
 	msg_destruir(msgRecibido);
+	pcb->cantPagsHeap++;
 
 	free(buffer);
 	list_add(tabla_heap, nuevaHeap);
@@ -1381,7 +1390,23 @@ int liberarMemoriaHeap(t_puntero posicion, t_PCB* pcb){
 	memcpy(buffer + sizeof(t_posicion), &heapMetadata, sizeof(t_HeapMetadata));
 
 	send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
-	msg_enviar_separado(ESCRITURA_PAGINA, sizeof(t_posicion) + sizeof(t_HeapMetadata), &puntero, socket_memoria);
+
+	if(heapMetadata.size == tamanioPag - sizeof(t_HeapMetadata))
+		msg_enviar_separado(LIBERAR, sizeof(t_posicion) + sizeof(t_HeapMetadata), &puntero, socket_memoria);
+	else
+		msg_enviar_separado(ESCRITURA_PAGINA, sizeof(t_posicion) + sizeof(t_HeapMetadata), &puntero, socket_memoria);
+
+	msgRecibido = msg_recibir(socket_memoria);
+	if(msgRecibido->tipoMensaje == LIBERAR){
+		pcb->cantPagsHeap--;
+	}else if(msgRecibido->tipoMensaje != ESCRITURA_PAGINA){
+		log_error(logKernel, "No recibi ESCRITURA_PAGINA o LIBERAR sino %d", msgRecibido->tipoMensaje);
+		if(msgRecibido->tipoMensaje == STACKOVERFLOW)
+			return -2;
+		else
+			return -1;
+	}
+	msg_destruir(msgRecibido);
 
 	return 0;
 }

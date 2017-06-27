@@ -223,6 +223,21 @@ void escucharKERNEL(void* socket_kernel) {
 
 			}
 
+			break;
+
+
+		case LIBERAR:
+
+			pthread_mutex_lock(&mutexCantAccesosMemoria);
+			cantAccesosMemoria++;
+			pthread_mutex_unlock(&mutexCantAccesosMemoria);
+
+			memcpy(&puntero, msg->data, sizeof(t_posicion));
+			log_info(log_memoria, "Solicitud liberar Pag:%d", puntero.pagina);
+
+			//todo: liberar pag puntero.pagina del pid
+
+			msg_enviar_separado(LIBERAR, 0, 0, socketKernel);
 
 			break;
 		case FINALIZAR_PROGRAMA:

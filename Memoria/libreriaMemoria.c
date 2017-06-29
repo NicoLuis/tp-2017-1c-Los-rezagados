@@ -231,7 +231,8 @@ void escucharKERNEL(void* socket_kernel) {
 			cantAccesosMemoria++;
 			pthread_mutex_unlock(&mutexCantAccesosMemoria);
 
-			//todo: agregar 1 nueva  pag a proceso <<--------------------------------------------------------------------------------
+			//todo: agregar 1 nueva  pag a proceso
+			agregarNuevaPagina(pid);
 
 
 			msg_enviar_separado(ASIGNACION_MEMORIA, 0, 0, socketKernel);
@@ -494,8 +495,6 @@ void* reservarMemoria(int cantidad_marcos, int capacidad_marco) {
 	// La creo con calloc para que me la llene de \0
 	void * memoria = calloc(cantidad_marcos, capacidad_marco);
 	log_info(log_memoria,"Memoria reservada");
-	//fixme: Devuelvo la direccion a la memoria reserva sumandole la cantidad de frames que se predefinieron para estructuras administrativas multiplicadas por la capacidad de marco
-	//return memoria + (cantidadFramesEstructurasAdministrativas * capacidad_marco);
 	return memoria;
 }
 
@@ -788,29 +787,6 @@ void cargarPaginaAMemoria(t_num8 pid, uint8_t numero_pagina,void* paginaLeida, i
 
 }
 
-/*
-t_frame* buscarFrameLibre(t_num8 pid) {
-
-	int _soy_frame_libre(t_frame* frame) {
-		return (frame->pid == 0);
-	}
-
-	t_proceso* proceso = buscarProcesoEnListaProcesos(pid);
-	//SI HAY FRAME LIBRES Y EL PROCESO NO TIENE OCUPADOS TODOS LOS MARCOS POR PROCESO ELIJO CUALQUIER FRAME
-
-	//fixme: Usar funcion Hash no list_find
-	lockFrames();
-	t_frame* frameLibre = list_find(listaFrames, (void*) _soy_frame_libre);
-	unlockFrames();
-	if(frameLibre != NULL){
-		frameLibre->pid = pid;
-		proceso->cantFramesAsignados++;
-	}
-	return frameLibre;
-
-}
-*/
-
 t_frame* buscarFrameLibre(t_num8 pid) {
 
 	t_proceso* proceso = buscarProcesoEnListaProcesos(pid);
@@ -892,14 +868,6 @@ void terminarProceso(){			//aca libero todos
 	exit(1);
 }
 
-/*
-void ponerBitModificadoEn1(int nroFrame) {
-
-	t_frame* frame = buscarFrame(nroFrame);
-
-	frame->bit_modif = 1;
-}
-*/
 
 void ponerBitModificadoEn1(int nroFrame, t_num8 pid, uint8_t numeroPagina) {
 
@@ -911,18 +879,6 @@ void ponerBitModificadoEn1(int nroFrame, t_num8 pid, uint8_t numeroPagina) {
 
 	frameBuscado->bit_modif = 1;
 }
-
-/*
-t_frame* buscarFrame(int numeroFrame) {
-
-	int _soy_el_frame_buscado(t_frame* frame) {
-		return (frame->nroFrame == numeroFrame);
-	}
-
-	//fixme: Usar funcion Hash no list_find
-	return list_find(listaFrames, (void*) _soy_el_frame_buscado);
-}
-*/
 
 t_frame* buscarFrame(int nroFrame,t_num8 pid, uint8_t numeroPagina){
 	int indice = funcionHashing(pid,numeroPagina);
@@ -1471,4 +1427,47 @@ int funcionHashing(t_num8 pid, uint8_t numero_pagina){
 	int indice = ((pid * cantidadDeMarcos) + (numero_pagina * tamanioDeMarcos)) / cantidadDeMarcos;
 	return indice;
 }
+
+
+void agregarNuevaPagina(t_num8 pid){
+
+	t_proceso* proceso = buscarProcesoEnListaProcesos(pid);
+	proceso->cantPaginas++;
+	int numeroFrame = funcionHashing(pid,proceso->cantPaginas);
+	if(hayFramesLibres(1)){
+
+		int numeroFrameReal = asignarFrameAlProceso(pid,numeroFrame);
+		log_info(log_memoria,"Al pid: %d se le asigna el numero de frame: %d\n",pid,numeroFrame);
+
+		proceso->cantFramesAsignados++;
+		t_pag* pagina;
+		pagina->nroPag = proceso->cantPaginas;
+		pagina->nroFrame = numeroFrameReal;
+		pagina->bit_pres = 0;
+		pagina->bit_uso = 0;
+		lockProcesos();
+		list_add(proceso->listaPaginas,pagina);
+		unlockProcesos();
+		asignarFrameAlProceso(pid,pagina->nroFrame);
+	}
+
+	log_error(log_memoria,"No hay frame libres para asignarle\n");
+}
+
+int asignarFrameAlProceso(t_num8 pid,int numeroFrame){
+
+	t_frame* nuevoFrame = list_get(listaFrames,numeroFrame);
+	while(nuevoFrame != NULL){
+		numeroFrame++;
+		nuevoFrame = list_get(listaFrames,numeroFrame);
+	}
+	//lockFrames();
+	nuevoFrame->pid = pid;
+	nuevoFrame->nroFrame = numeroFrame;
+	nuevoFrame->bit_modif = 0;
+	//unlockFrames();
+	return nuevoFrame->nroFrame;
+}
+
+
 

@@ -201,6 +201,9 @@ void mostrarContenidoTodosLosProcesos();
 
 void mostrarContenidoDeUnProceso(t_num8 pid);
 
+void agregarNuevaPagina(t_num8 pid);
+
+int asignarFrameAlProceso(t_num8 pid,int numeroFrame);
 
 //Variable Global para LRU
 int cantAccesosMemoria;

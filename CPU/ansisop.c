@@ -396,6 +396,7 @@ t_puntero reservar(t_valor_variable espacio){
 	t_msg* msgRecibido = msg_recibir(socket_kernel);
 
 	if(msgRecibido->tipoMensaje == ASIGNACION_MEMORIA){
+		msg_recibir_data(socket_kernel, msgRecibido);
 		memcpy(&direccion, msgRecibido->data, sizeof(t_puntero) );
 		memcpy(&flag_se_agrego_pag, msgRecibido->data + sizeof(t_puntero), sizeof(bool));
 		if(flag_se_agrego_pag){

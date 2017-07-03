@@ -99,6 +99,7 @@ void escucharKERNEL(void* socket_kernel) {
 
 					nroFrame = buscarFrameLibre(pid);
 					escribirContenido(nroFrame, 0, tamanioDeMarcos, tmpBuffer);
+					free(tmpBuffer);
 				}
 				log_info(log_memoria, "Asigne correctamente");
 		 		header = OK;
@@ -321,8 +322,10 @@ void escucharCPU(void* socket_cpu) {
 
 				} else if ((Cache_Activada()) && (estaEnCache(pidPeticion, puntero.pagina))) {
 
-					void* contenido_leido = obtenerContenidoSegunCache(pidPeticion,puntero.pagina, puntero.offset, puntero.size);
+					char* contenido_leido = obtenerContenidoSegunCache(pidPeticion,puntero.pagina, puntero.offset, puntero.size);
 					msg_enviar_separado(LECTURA_PAGINA, puntero.size, contenido_leido, socketCPU);
+					if(puntero.size != sizeof(t_num))
+						contenido_leido[puntero.size-1] = '\0';
 					log_info(log_memoria, "contenido_leido %s", contenido_leido);
 					free(contenido_leido);
 
@@ -338,9 +341,10 @@ void escucharCPU(void* socket_cpu) {
 
 					int nroFrame = buscarFramePorPidPag(pidPeticion, puntero.pagina);
 					char* contenido_leido = obtenerContenido(nroFrame, puntero.offset, puntero.size);
-					log_info(log_memoria, "contenido_leido %s", contenido_leido);
-
 					msg_enviar_separado(LECTURA_PAGINA, puntero.size, contenido_leido, socketCPU);
+					if(puntero.size != sizeof(t_num))
+						contenido_leido[puntero.size-1] = '\0';
+					log_info(log_memoria, "contenido_leido %s", contenido_leido);
 					free(contenido_leido);
 
 					if (Cache_Activada()) {
@@ -400,6 +404,7 @@ void escucharCPU(void* socket_cpu) {
 				} else if ((Cache_Activada()) && (estaEnCache(pidPeticion, puntero.pagina))) {
 
 					escribirContenidoSegunCache(pidPeticion, puntero.pagina, puntero.offset, puntero.size, contenido_escribir);
+					free(contenido_escribir);
 
 					//ENVIO ESCRITURA OK
 					header = ESCRITURA_PAGINA;
@@ -423,6 +428,7 @@ void escucharCPU(void* socket_cpu) {
 
 						int nroFrame = buscarFramePorPidPag(pidPeticion, puntero.pagina);
 						escribirContenido(nroFrame, puntero.offset, puntero.size, contenido_escribir);
+						free(contenido_escribir);
 
 						//ENVIO ESCRITURA OK
 						header = ESCRITURA_PAGINA;//OK
@@ -567,7 +573,6 @@ void escribirContenido(int frame, int offset, int tamanio_escribir,	void* conten
 	memcpy(memoria_real + desplazamiento, contenido, tamanio_escribir);
 	pthread_mutex_unlock(&mutexMemoriaReal);
 
-	free(contenido);
 }
 
 

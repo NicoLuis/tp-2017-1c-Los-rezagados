@@ -984,10 +984,8 @@ void consolaKernel(){
 						PRINT_COLOR_BLUE "  b -" PRINT_COLOR_RESET " Cantidad de operaciones privilegiadas que ejecutó \n"
 						PRINT_COLOR_BLUE "  c -" PRINT_COLOR_RESET " Tabla de archivos abiertos por el proceso \n"
 						PRINT_COLOR_BLUE "  d -" PRINT_COLOR_RESET " Cantidad de páginas de Heap utilizadas \n"
-						PRINT_COLOR_BLUE "  e -" PRINT_COLOR_RESET " Cantidad de acciones alocar realizadas [cantidad de operaciones] \n"
-						PRINT_COLOR_BLUE "  f -" PRINT_COLOR_RESET " Cantidad de acciones alocar realizadas [bytes] \n"
-						PRINT_COLOR_BLUE "  g -" PRINT_COLOR_RESET " Cantidad de acciones liberar realizadas [cantidad de operaciones]  \n"
-						PRINT_COLOR_BLUE "  h -" PRINT_COLOR_RESET " Cantidad de acciones liberar realizadas [bytes] \n");
+						PRINT_COLOR_BLUE "  e -" PRINT_COLOR_RESET " Cantidad de acciones alocar realizadas \n"
+						PRINT_COLOR_BLUE "  f -" PRINT_COLOR_RESET " Cantidad de acciones liberar realizadas \n" );
 
 				switch(getchar()){
 				case 'a':
@@ -1004,14 +1002,10 @@ void consolaKernel(){
 					break;
 				case 'e':
 					printf( "Cantidad de operaciones alocar: %d \n", infP->cantOp_alocar);
-					break;
-				case 'f':
 					printf( "Se alocaron %d bytes \n", infP->canrBytes_alocar);
 					break;
-				case 'g':
+				case 'f':
 					printf( "Cantidad de operaciones liberar: %d \n", infP->cantOp_liberar);
-					break;
-				case 'h':
 					printf( "Se liberaron %d bytes \n", infP->canrBytes_liberar);
 					break;
 				default:
@@ -1276,10 +1270,6 @@ void asignarNuevaPag(t_PCB* pcb){
 	puntero.offset = 0;
 	puntero.size = sizeof(t_HeapMetadata);
 
-
-	puntero.pagina = 2;	//fixme: hardcodeado
-	puntero.offset = 50;
-
 	t_HeapMetadata metadata;
 	metadata.size = tamanioPag - sizeof(t_HeapMetadata);
 	metadata.isFree = true;
@@ -1345,7 +1335,7 @@ t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
 				memcpy(&heapMetadata, msgRecibido->data, sizeof(t_HeapMetadata));
 				msg_destruir(msgRecibido);
 
-				if(heapMetadata.isFree && heapMetadata.size <= cantBytes){
+				if(heapMetadata.isFree && cantBytes <= heapMetadata.size ){
 					//encontre hueco
 					heapMetadata.isFree = false;
 					heapMetadata.size = cantBytes;
@@ -1403,13 +1393,16 @@ t_puntero reservarMemoriaHeap(t_num cantBytes, t_PCB* pcb){
 		return -1;
 	}
 
-	if( list_count_satisfying(tabla_heap, (void*)_esHeap) == 0 )
+	if( list_count_satisfying(tabla_heap, (void*)_esHeap) == 0 ){
+		log_trace(logKernel, "Se reserva primer pagina heap pid %d", pcb->pid);
 		asignarNuevaPag(pcb);
+	}
 
 	int retorno = encontrarHueco(cantBytes, pcb);
 	if( retorno == -2 )
 		return -1;
 	if( retorno == -1 ){
+		log_trace(logKernel, "No encontre hueco");
 		asignarNuevaPag(pcb);
 		retorno = encontrarHueco(cantBytes, pcb);
 	}

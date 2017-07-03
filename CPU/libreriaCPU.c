@@ -166,8 +166,8 @@ t_valor_variable leerMemoria(t_posicion puntero){
 	case 0:
 		log_error(logCPU, "Se desconecto Memoria");
 		break;
-	case FINALIZAR_PROGRAMA:
-		log_error(logCPU, "Stack Overflow?");
+	case PAGINA_INVALIDA:
+		log_error(logCPU, "Pagina %d invalida", puntero.pagina);
 		break;
 	}
 
@@ -194,8 +194,8 @@ t_posicion escribirMemoria(t_posicion puntero, t_valor_variable valor){
 	case 0:
 		log_error(logCPU, "Se desconecto Memoria");
 		break;
-	case FINALIZAR_PROGRAMA:
-		log_error(logCPU, "Stack Overflow?");
+	case PAGINA_INVALIDA:
+		log_error(logCPU, "Pagina %d invalida", puntero.pagina);
 		break;
 	}
 

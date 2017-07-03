@@ -43,7 +43,6 @@ int retardoMemoria;
 int tamanioDeMarcos;
 int cantidadFramesEstructurasAdministrativas;
 t_list* lista_cpus;
-t_list* listaFrames;
 t_list* listaProcesos;
 t_list* Cache;
 t_log* log_memoria;
@@ -51,31 +50,24 @@ t_log* log_memoria;
 //PROCESO
 typedef struct {
 	t_num8 PID;
-	int cantPaginas;
 	int cantFramesAsignados;
-	t_list* listaPaginas;
 } t_proceso;
 
 //FRAME
 typedef struct {
-	int nroFrame;
-	int bit_modif;
+	// cant posibles de frames 65536 (2¹⁶)
+	// si usara t_num8 serian 256 (2⁸)
+	// no uso t_num (2³²) xq se quiere achicar espacio
+	t_num16 nroFrame;
 	t_num8 pid;
+	t_num16 nroPag;
 } t_frame;
-
-//PAGINA
-typedef struct {
-	uint8_t nroPag;
-	int nroFrame;
-	int bit_pres;
-	int bit_uso;
-} t_pag;
 
 //ENTRADA Cache
 typedef struct {
 	t_num8 pid;
-	uint8_t numPag;
-	int numFrame;
+	t_num8 numPag;
+	t_num8 numFrame;
 	int ultimoAcceso;
 } t_cache;
 
@@ -93,65 +85,45 @@ void escucharCPU(void*);
 
 void* memoria_real;
 
-void* reservarMemoria(int, int);
 
+/*			LOCKS MUTEX			*/
 void lockProcesos();
-
 void unlockProcesos();
-
 void lockFrames();
-
 void unlockFrames();
-
 void lockFramesYProcesos();
-
 void unlockFramesYProcesos();
 
-void crearProcesoYAgregarAListaDeProcesos(t_num8 pid,	uint32_t cantidadDePaginas);
+/*			LISTAPROCESOS			*/
+void crearProcesoYAgregarAListaDeProcesos(t_num8 pid);
+void eliminarProcesoDeListaDeProcesos(t_num8 pid);
 
-void liberarFramesDeProceso(t_num8 unPid);
-
-void eliminarProcesoDeListaDeProcesos(t_num8 unPid);
-
-t_list* crearEInicializarListaDePaginas(uint32_t cantidadDePaginas, t_num8 PID);
-
-void ponerBitUsoEn1(t_num8 pid, uint8_t numero_pagina);
-
-int paginaInvalida(t_num8 pid, uint8_t numero_pagina);
-
-t_pag* buscarPaginaEnListaDePaginas(t_num8 pid, uint8_t numero_pagina);
-
+/*			LECTURA-ESCRITURA			*/
 void* obtenerContenido(int frame, int offset, int tamanio_leer);
-
-void enviarContenidoCPU(void* contenido_leido, uint32_t tamanioContenido,int socket_cpu);
-
-t_proceso* buscarProcesoEnListaProcesos(t_num8 pid);
-
-void cargarPaginaAMemoria(t_num8 pid, uint8_t numero_pagina,void* paginaLeida, int accion);
-
-int hayFramesLibres(int);
-
-t_frame* buscarFrameLibre(t_num8 pid);
-
 void escribirContenido(int frame, int offset, int tamanio_escribir,	void* contenido);
 
+/*			FRAMES			*/
 void inicializarFrames();
+int hayFramesLibres(int cantidad);
+int buscarFrameLibre(t_num8 pid);
 
-void terminarProceso();
+/*			FRAMES POR PAGINA DE PROCESO			*/
+int funcionHashing(t_num8 pid, uint8_t nroPagina);
+int paginaInvalida(t_num8 pid, uint8_t nroPagina);
+int buscarFramePorPidPag(t_num8 pid, t_num8 nroPagina);
+void liberarPagina(t_num8 pid, t_num8 nroPagina);
+void liberarFramesDeProceso(t_num8 pid);
 
-//void ponerBitModificadoEn1(int nroFrame);
+/*			MISC			*/
+void terminarMemoria();
 
-void ponerBitModificadoEn1(int nroFrame,t_num8 pid,uint8_t numeroPagina);
 
-//t_frame* buscarFrame(int numeroFrame);
 
-t_frame* buscarFrame(int numeroFrame,t_num8 pid, uint8_t  numeroPagina);
 
-int estaEnMemoriaReal(t_num8 pid, uint8_t numero_pagina);
 
-int funcionHashing(t_num8 pid, uint8_t numeroPagina);
 
-//Cache
+
+/*			CACHE (y otros)			*/
 
 t_list* crearCache();
 
@@ -183,17 +155,13 @@ void algoritmoLRU();
 
 void ejecutarComandos();
 
-void dumpTablaDePaginasDeProceso(t_proceso* proceso, FILE* archivoDump);
-
 void dumpEstructurasMemoriaTodosLosProcesos(FILE* archivoDump);
 
 void dumpTodosLosProcesos();
 
-void dumpContenidoMemoriaProceso(t_proceso* proceso, FILE* archivoDump);
+void dumpContenidoMemoriaProceso(t_num8 pid, FILE* archivoDump);
 
 void dumpProcesoParticular(t_num8 pid);
-
-void flushMemoria();
 
 t_proceso* buscarProcesoEnListaProcesosParaDump(t_num8 pid);
 
@@ -201,11 +169,6 @@ void mostrarContenidoTodosLosProcesos();
 
 void mostrarContenidoDeUnProceso(t_num8 pid);
 
-void agregarNuevaPagina(t_num8 pid);
-
-int asignarFrameAlProceso(t_num8 pid,int numeroFrame);
-
-void liberarPagina(t_num8 pid,int pagina);
 
 //Variable Global para LRU
 int cantAccesosMemoria;

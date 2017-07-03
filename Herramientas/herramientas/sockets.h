@@ -44,6 +44,7 @@
 #define PRINT_COLOR_RESET   "\x1b[0m"
 
 typedef uint32_t t_num;
+typedef uint16_t t_num16;
 typedef uint8_t t_num8;
 
 typedef struct {

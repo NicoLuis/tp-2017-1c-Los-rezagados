@@ -42,15 +42,12 @@ int main(int argc, char* argv[]) {
 	cachePorProceso = config_get_int_value(configuracion, "CACHE_X_PROC");
 	algoritmoReemplazo = config_get_string_value(configuracion, "REEMPLAZO_CACHE");
 	retardoMemoria = config_get_int_value(configuracion, "RETARDO_MEMORIA");
-	cantidadFramesEstructurasAdministrativas = config_get_int_value(configuracion,"CANTIDAD_FRAME_ESTTRUCTURAS_ADMINISTRATIVAS");
-		//todo: calcular las cantidadFramesEstructurasAdministrativas, no es x config
 
 	//Muestro archivo de configuracion
-
 	mostrarArchivoConfig();
 
 	//reservo memoria para la memoria real
-	memoria_real = reservarMemoria(cantidadDeMarcos, tamanioDeMarcos);
+	memoria_real = calloc(cantidadDeMarcos, tamanioDeMarcos);
 
 	// inicializo el resto
 	lista_cpus = list_create();
@@ -64,7 +61,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	//Defino señales
-	signal (SIGINT, terminarProceso);
+	signal (SIGINT, terminarMemoria);
 
 
 	//Creo un hilo para comunicarme con el Kernel

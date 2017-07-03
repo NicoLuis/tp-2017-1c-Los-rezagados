@@ -53,7 +53,6 @@ void inicializarSemaforosYVariables(char** ids, char** valores, char** shared_va
 		log_info(logKernel, "shared_vars[%d] %s", i, variable->nombre);
 		list_add(lista_variablesCompartidas, variable);
 	}
-
 	sem_init(&sem_gradoMp, 0, gradoMultiprogramacion);
 	sem_init(&sem_cantColaReady, 0, 0);
 }
@@ -118,7 +117,54 @@ int handshake(int socket_cliente, int tipo){
 	return retorno;
 }
 
+void _sumarCantOpAlocar(t_num8 pid, t_num cantBytes){
+	_lockLista_infoProc();
+	int _espidproc(t_infoProceso* a){ return a->pid == pid; }
+	t_infoProceso* infP = list_remove_by_condition(infoProcs, (void*) _espidproc);
+	infP->cantOp_alocar++;
+	infP->canrBytes_alocar += cantBytes;
+	list_add(infoProcs, infP);
+	_unlockLista_infoProc();
+}
 
+void _sumarCantOpLiberar(t_num8 pid, t_num cantBytes){
+	_lockLista_infoProc();
+	int _espidproc(t_infoProceso* a){ return a->pid == pid; }
+	t_infoProceso* infP = list_remove_by_condition(infoProcs, (void*) _espidproc);
+	infP->cantOp_liberar++;
+	infP->canrBytes_liberar += cantBytes;
+	list_add(infoProcs, infP);
+	_unlockLista_infoProc();
+}
+
+
+void _sumarCantPagsHeap(t_num8 pid, int cant){
+	_lockLista_infoProc();
+	int _espidproc(t_infoProceso* a){ return a->pid == pid; }
+	t_infoProceso* infP = list_remove_by_condition(infoProcs, (void*) _espidproc);
+	infP->cantPagsHeap = infP->cantPagsHeap + cant;
+	list_add(infoProcs, infP);
+	_unlockLista_infoProc();
+}
+
+int _cantPagsHeap(t_num8 pid){
+	int cant;
+	_lockLista_infoProc();
+	int _espidproc(t_infoProceso* a){ return a->pid == pid; }
+	t_infoProceso* infP = list_find(infoProcs, (void*) _espidproc);
+	cant = infP->cantPagsHeap;
+	_unlockLista_infoProc();
+	return cant;
+}
+
+void _sumarCantOpPriv(t_num8 pid){
+	_lockLista_infoProc();
+	int _espidproc(t_infoProceso* a){ return a->pid == pid; }
+	t_infoProceso* infP = list_remove_by_condition(infoProcs, (void*) _espidproc);
+	infP->cantOpPriv++;
+	list_add(infoProcs, infP);
+	_unlockLista_infoProc();
+}
 
 t_PCB* recibir_pcb(int socket_cpu, t_msg* msgRecibido, bool flag_bloqueo, bool flag_colaReady){
 	bool _esCPU2(t_infosocket* aux){
@@ -147,9 +193,6 @@ t_PCB* recibir_pcb(int socket_cpu, t_msg* msgRecibido, bool flag_bloqueo, bool f
 
 	return pcb;
 }
-
-
-
 
 
 void liberarCPU(t_cpu* cpu){
@@ -207,6 +250,7 @@ void escucharCPU(int socket_cpu) {
 			return string_equals_ignore_case(s->nombre, varSemaforo->nombre);
 		}
 		t_num tamanioNombre, offset = 0;
+		int tmpsize;
 
 //-------------- VARIABLES EMPLEADAS PARA BORRAR Y CERRAR --------------------
 
@@ -475,14 +519,30 @@ void escucharCPU(int socket_cpu) {
 		case ASIGNACION_MEMORIA:
 			log_trace(logKernel, "Recibi ASIGNACION_MEMORIA de CPU");
 			t_num cantBytes;
-			memcpy(&cantBytes, msgRecibido->data, msgRecibido->longitud);
+			memcpy(&cantBytes, msgRecibido->data, sizeof(t_valor_variable));
 			log_trace(logKernel, "ASIGNACION_MEMORIA %d bytes", cantBytes);
 
+			/*//recibo pcb
+			tmpsize = msgRecibido->longitud - sizeof(t_valor_variable);
+			void* tmpbuffer = malloc(tmpsize);
+			memcpy(tmpbuffer, msgRecibido->data + sizeof(t_valor_variable), tmpsize);
+			pcb = desserealizarPCB(tmpbuffer);
+			free(tmpbuffer);*/
+			bool flag_se_agrego_pag = 0;
+			if(pcb->cantPagsHeap < _cantPagsHeap(pcb->pid))
+				flag_se_agrego_pag = 1;
+
 			t_puntero direccion = reservarMemoriaHeap(cantBytes, pcb);
+
+			void* tmpb = malloc(sizeof(t_puntero) + sizeof(bool));
+			memcpy(tmpb, &direccion, sizeof(t_puntero));
+			memcpy(tmpb + sizeof(t_puntero), &flag_se_agrego_pag, sizeof(bool));
+
 			if((int)direccion > 0)
-				msg_enviar_separado(ASIGNACION_MEMORIA, sizeof(t_puntero), &direccion, socket_cpu);
+				msg_enviar_separado(ASIGNACION_MEMORIA, sizeof(t_puntero) + sizeof(bool), tmpb, socket_cpu);
 			else
 				msg_enviar_separado(ERROR, 0, 0, socket_cpu);
+			free(tmpb);
 
 			_lockLista_PCBs();
 			if(list_remove_by_condition(lista_PCBs, (void*) _es_PCB) == NULL) log_warning(logKernel, "No se encuentra pcb en ASIGNACION_MEMORIA");
@@ -500,7 +560,7 @@ void escucharCPU(int socket_cpu) {
 			memcpy(&posicion, msgRecibido->data, msgRecibido->longitud);
 			log_trace(logKernel, "LIBERAR posicion %d", posicion);
 
-			if( liberarMemoriaHeap(posicion, pcb) < 0)
+			if( liberarMemoriaHeap(posicion, pcb) < 0 )
 				msg_enviar_separado(LIBERAR, sizeof(t_puntero), &direccion, socket_cpu);
 			else
 				msg_enviar_separado(ERROR, 0, 0, socket_cpu);
@@ -552,7 +612,6 @@ void escucharCPU(int socket_cpu) {
 			t_num longitudPath;
 			t_banderas flags;
 			t_num8 pid;
-			int tmpsize;
 			offset = 0;
 			memcpy(&longitudPath, msgRecibido->data + offset, tmpsize = sizeof(t_num));
 			offset += tmpsize;
@@ -701,44 +760,6 @@ void escucharCPU(int socket_cpu) {
 }
 
 
-void _sumarCantOpAlocar(t_num8 pid, t_num cantBytes){
-	_lockLista_infoProc();
-	int _espidproc(t_infoProceso* a){ return a->pid == pid; }
-	t_infoProceso* infP = list_remove_by_condition(infoProcs, (void*) _espidproc);
-	infP->cantOp_alocar++;
-	infP->canrBytes_alocar += cantBytes;
-	list_add(infoProcs, infP);
-	_unlockLista_infoProc();
-}
-
-void _sumarCantOpLiberar(t_num8 pid, t_num cantBytes){
-	_lockLista_infoProc();
-	int _espidproc(t_infoProceso* a){ return a->pid == pid; }
-	t_infoProceso* infP = list_remove_by_condition(infoProcs, (void*) _espidproc);
-	infP->cantOp_liberar++;
-	infP->canrBytes_liberar += cantBytes;
-	list_add(infoProcs, infP);
-	_unlockLista_infoProc();
-}
-
-
-void _sumarCantPagsHeap(t_num8 pid, int cant){
-	_lockLista_infoProc();
-	int _espidproc(t_infoProceso* a){ return a->pid == pid; }
-	t_infoProceso* infP = list_remove_by_condition(infoProcs, (void*) _espidproc);
-	infP->cantPagsHeap = infP->cantPagsHeap + cant;
-	list_add(infoProcs, infP);
-	_unlockLista_infoProc();
-}
-
-void _sumarCantOpPriv(t_num8 pid){
-	_lockLista_infoProc();
-	int _espidproc(t_infoProceso* a){ return a->pid == pid; }
-	t_infoProceso* infP = list_remove_by_condition(infoProcs, (void*) _espidproc);
-	infP->cantOpPriv++;
-	list_add(infoProcs, infP);
-	_unlockLista_infoProc();
-}
 
 typedef struct {
 	t_num8 pid;
@@ -1229,6 +1250,11 @@ void asignarNuevaPag(t_PCB* pcb){
 	int _esHeap(t_heap* h){
 		return h->pid == pcb->pid;
 	}
+	int nroPag = 0;
+	void _buscarMayorNumPag(t_heap* h){
+		if(h->pid == pcb->pid && nroPag < h->nroPag)
+			nroPag = h->nroPag;
+	}
 
 	log_trace(logKernel, "Asigno nueva pagina a proceso %d", pcb->pid);
 	send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
@@ -1241,12 +1267,18 @@ void asignarNuevaPag(t_PCB* pcb){
 
 	t_heap* nuevaHeap = malloc(sizeof(t_heap));
 	nuevaHeap->pid = pcb->pid;
-	nuevaHeap->nroPag = list_count_satisfying(tabla_heap, (void*) _esHeap);
+	list_iterate(tabla_heap, (void*) _buscarMayorNumPag);
+	nuevaHeap->nroPag = nroPag;
+	log_trace(logKernel, "Nueva pag numero %d", nroPag);
 
 	t_posicion puntero;
 	puntero.pagina = pcb->cantPagsCodigo + pcb->cantPagsStack + nuevaHeap->nroPag;
 	puntero.offset = 0;
 	puntero.size = sizeof(t_HeapMetadata);
+
+
+	puntero.pagina = 2;	//fixme: hardcodeado
+	puntero.offset = 50;
 
 	t_HeapMetadata metadata;
 	metadata.size = tamanioPag - sizeof(t_HeapMetadata);
@@ -1263,7 +1295,6 @@ void asignarNuevaPag(t_PCB* pcb){
 		log_error(logKernel, "No recibi ESCRITURA_PAGINA sino %d", msgRecibido->tipoMensaje);
 	msg_destruir(msgRecibido);
 
-	pcb->cantPagsHeap++;
 	_sumarCantPagsHeap(pcb->pid, 1);
 
 	free(buffer);
@@ -1391,6 +1422,7 @@ int liberarMemoriaHeap(t_puntero posicion, t_PCB* pcb){
 	int _esHeap(t_heap* h){
 		return h->pid == pcb->pid;
 	}
+	bool flag_se_libero_pag = 0;
 
 	//envio solicitud
 	t_posicion puntero;
@@ -1441,7 +1473,7 @@ int liberarMemoriaHeap(t_puntero posicion, t_PCB* pcb){
 
 	msgRecibido = msg_recibir(socket_memoria);
 	if(msgRecibido->tipoMensaje == LIBERAR){
-		pcb->cantPagsHeap--;
+		flag_se_libero_pag = 1;
 		_sumarCantPagsHeap(pcb->pid, -1);
 		list_remove_and_destroy_by_condition(tabla_heap, (void*) _esHeap, free);
 	}else if(msgRecibido->tipoMensaje != ESCRITURA_PAGINA){
@@ -1453,5 +1485,5 @@ int liberarMemoriaHeap(t_puntero posicion, t_PCB* pcb){
 	}
 	msg_destruir(msgRecibido);
 
-	return 0;
+	return flag_se_libero_pag;
 }

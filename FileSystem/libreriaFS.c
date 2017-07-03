@@ -67,6 +67,7 @@ void escucharKERNEL(void* socket_kernel) {
 			crearArchivo(path);
 			msg_enviar_separado(CREAR_ARCHIVO, 0, 0, socketKernel);
 			free(path);
+			log_info(logFS, "Se creo archivo");
 			break;
 		case BORRAR:
 			log_info(logFS, "Borrar archivo");
@@ -94,6 +95,7 @@ void escucharKERNEL(void* socket_kernel) {
 			char* data = leerBloquesArchivo(path, offset, size);
 			msg_enviar_separado(OBTENER_DATOS, size, data, socketKernel);
 			free(data);
+			free(path);
 
 			break;
 		case GUARDAR_DATOS:
@@ -116,6 +118,7 @@ void escucharKERNEL(void* socket_kernel) {
 			escribirBloquesArchivo(path, offset, size, buffer);
 			msg_enviar_separado(GUARDAR_DATOS, 0, 0, socketKernel);
 			free(data);
+			free(path);
 			break;
 
 		}
@@ -176,24 +179,24 @@ void leerBitMap(){		//fixme: con q numero arranc bloques 0 o 1?	considero 1
 		perror("Fallo el mmap del bitmap");
 		exit(1);
 	}
-	bitMap = bitarray_create_with_mode(data, sbuf.st_size, LSB_FIRST);	//fixme: LSB_FISRT o MSB_FIRST ??
+	bitMap = bitarray_create_with_mode(data, sbuf.st_size, MSB_FIRST);
 
 	close(fd);
 }
 
 void crearArchivo(void* path){
-	int nroBloque, i;
+	int nroBloque = -1, i;
 	char* rutaMetadata = string_new();
 	string_append(&rutaMetadata, puntoMontaje);
 	string_append(&rutaMetadata, "/Archivos");
 	string_append(&rutaMetadata, path);
 	log_info(logFS, "rutaMetadata %s", rutaMetadata);
+	log_info(logFS, "bitMap->size %d", bitMap->size);
 
-	for(i = 0; i < bitMap->size; i++){
+	for(i = 0; i < bitMap->size && nroBloque == -1; i++){
 		if(!bitarray_test_bit(bitMap, i)){
 			bitarray_set_bit(bitMap, i);
 			nroBloque = i;
-			break;
 		}
 	}
 

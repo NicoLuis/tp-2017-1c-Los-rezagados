@@ -381,12 +381,27 @@ void moverCursor(t_descriptor_archivo descriptor_archivo, t_valor_variable posic
 
 t_puntero reservar(t_valor_variable espacio){
 	log_trace(logAnsisop, "Reservo %d bytes", espacio);
+	/*	no necesitaba pasarle el pcb
+	int tmpsize = tamanioTotalPCB(pcb);
+	void* buffer = malloc(tmpsize + sizeof(t_valor_variable));
+	memcpy(buffer, &espacio, sizeof(t_valor_variable));
+	void* tmpbuffer = serializarPCB(pcb);
+	memcpy(buffer + sizeof(t_valor_variable), tmpbuffer, tmpsize);
+	*/
 	msg_enviar_separado(ASIGNACION_MEMORIA, sizeof(t_valor_variable), &espacio, socket_kernel);
+
 	t_puntero direccion = -1;
+	bool flag_se_agrego_pag;
 	t_msg* msgRecibido = msg_recibir(socket_kernel);
 
-	if(msgRecibido->tipoMensaje == ASIGNACION_MEMORIA)
-		memcpy(&direccion, msgRecibido->data, msgRecibido->longitud);
+	if(msgRecibido->tipoMensaje == ASIGNACION_MEMORIA){
+		memcpy(&direccion, msgRecibido->data, sizeof(t_puntero) );
+		memcpy(&flag_se_agrego_pag, msgRecibido->data + sizeof(t_puntero), sizeof(bool));
+		if(flag_se_agrego_pag){
+			log_info(logAnsisop, "Se asigno una nueva pagina al heap");
+			pcb->cantPagsHeap++;
+		}
+	}
 	else{
 		log_error(logAnsisop, "Error al reservar memoria - se recibio %d", msgRecibido->tipoMensaje);
 		flag_error = true;
@@ -400,8 +415,13 @@ void liberar(t_puntero puntero){
 	msg_enviar_separado(LIBERAR, sizeof(t_puntero), &puntero, socket_kernel);
 	t_msg* msgRecibido = msg_recibir(socket_kernel);
 
-	if(msgRecibido->tipoMensaje == LIBERAR)
-		log_error(logAnsisop, "Se libero correctamente");
+	if(msgRecibido->tipoMensaje == LIBERAR){
+		log_info(logAnsisop, "Se libero correctamente");
+		if(msgRecibido->longitud == 1){
+			log_info(logAnsisop, "Se libero una pagina al heap");
+			pcb->cantPagsHeap--;
+		}
+	}
 	else{
 		log_error(logAnsisop, "Error al reservar memoria - se recibio %d", msgRecibido->tipoMensaje);
 		flag_error = true;

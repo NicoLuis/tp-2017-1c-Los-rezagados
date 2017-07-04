@@ -318,7 +318,12 @@ void escucharCPU(int socket_cpu) {
 				msg_enviar_separado(FINALIZAR_PROGRAMA, sizeof(t_num8), &info->pidPCB, info->socket);
 				sem_post(&sem_gradoMp);
 				free(info);
-				finalizarPid(pcb->pid, 0);
+				finalizarPid(pcb->pid);
+				if((int)pcb->exitCode > 0){
+					pcb->exitCode = 0;
+					_ponerEnCola(pcb->pid, cola_Exit, mutex_Exit);
+					liberarPCB(pcb, true);
+				}
 			}
 			_lockLista_PCBs();
 			if(list_remove_by_condition(lista_PCBs, (void*) _es_PCB) == NULL) log_warning(logKernel, "No se encuentra pcb en ENVIO_PCB");
@@ -365,7 +370,12 @@ void escucharCPU(int socket_cpu) {
 		case ERROR:
 			log_trace(logKernel, "Recibi ERROR de CPU");
 			pcb = recibir_pcb(socket_cpu, msgRecibido, 0, 0);
-			finalizarPid(pcb->pid, ERROR_SCRIPT);
+			finalizarPid(pcb->pid);
+			if((int)pcb->exitCode > 0){
+				pcb->exitCode = ERROR_SCRIPT;
+				_ponerEnCola(pcb->pid, cola_Exit, mutex_Exit);
+				liberarPCB(pcb, true);
+			}
 			_lockLista_PCBs();
 			if(list_remove_by_condition(lista_PCBs, (void*) _es_PCB) == NULL) log_warning(logKernel, "No se encuentra pcb en ERROR");
 			list_add(lista_PCBs, pcb);
@@ -565,9 +575,9 @@ void escucharCPU(int socket_cpu) {
 			log_trace(logKernel, "LIBERAR posicion %d", posicion);
 
 			if( liberarMemoriaHeap(posicion, pcb) < 0 )
-				msg_enviar_separado(LIBERAR, sizeof(t_puntero), &direccion, socket_cpu);
-			else
 				msg_enviar_separado(ERROR, 0, 0, socket_cpu);
+			else
+				msg_enviar_separado(LIBERAR, 1, 0, socket_cpu);
 
 			_lockLista_PCBs();
 			if(list_remove_by_condition(lista_PCBs, (void*) _es_PCB) == NULL) log_warning(logKernel, "No se encuentra pcb en LIBERAR");
@@ -610,8 +620,8 @@ void escucharCPU(int socket_cpu) {
 
 
 		case ABRIR_ANSISOP:
+			// fixme cuando ejecute 2do script q abre archivo exploto -> buscar porque
 			log_trace(logKernel, "Recibi la siguiente operacion ABRIR_ANSISOP de CPU");
-			//t_num longitud_msj = 0;
 			t_direccion_archivo pathArchivo;
 			t_num longitudPath;
 			t_banderas flags;
@@ -680,7 +690,7 @@ void escucharCPU(int socket_cpu) {
 			//-------------- busco si ya tengo la tabla para este id de proceso -------------------------
 
 			int _espid(t_tabla_proceso* a){ return a->pid == pid; }
-			//poner un mutex lock lista_tabla_de_procesos
+			// todo: poner un mutex lock lista_tabla_de_procesos
 			t_tabla_proceso* tablaProceso = list_remove_by_condition(lista_tabla_de_procesos, (void*) _esPid);
 
 			if(tablaProceso == NULL){
@@ -696,13 +706,12 @@ void escucharCPU(int socket_cpu) {
 			// en este momento ya estan cargados los flags, el indice y la referencia a tabla global
 			list_add(tablaProceso->lista_entradas_de_proceso, entradaProcesoNew);
 			list_add(lista_tabla_de_procesos, tablaProceso);
-			//poner un mutex UNLOCK lista_tabla_de_procesos
+			// todo: poner un mutex UNLOCK lista_tabla_de_procesos
 
 			// le mando a cpu el fd asignado
 			msg_enviar_separado(ABRIR_ANSISOP, sizeof(t_descriptor_archivo), &entradaProcesoNew->fd, socket_cpu);
 
 			free(pathArchivo);
-			//free(entradaProcesoNew); fixme las cosas q agrego a una lista no se liberan (recien cuando lo saco lo libero)
 
 			_sumarCantOpPriv(pcb->pid);
 			break;
@@ -840,8 +849,10 @@ void atender_consola(int socket_consola){
 
 	void* script;	//si lo declaro adentro del switch se queja
 	void _finalizarPIDs(t_infosocket* i){
-		if(i->socket == socket_consola)
-			finalizarPid(i->pidPCB, DESCONEXION_CONSOLA);
+		if(i->socket == socket_consola){
+			finalizarPid(i->pidPCB);
+			setearExitCode(i->pidPCB, DESCONEXION_CONSOLA);
+		}
 	}
 
 
@@ -886,7 +897,8 @@ void atender_consola(int socket_consola){
 		t_num8 pidAFinalizar;
 		memcpy(&pidAFinalizar, msgRecibido->data, sizeof(t_num8));
 		log_trace(logKernel, "FINALIZAR_PROGRAMA pid %d", pidAFinalizar);
-		finalizarPid(pidAFinalizar, COMANDO_FINALIZAR);
+		finalizarPid(pidAFinalizar);
+		setearExitCode(pidAFinalizar, COMANDO_FINALIZAR);
 		break;
 
 	case 0: case DESCONECTAR:
@@ -999,7 +1011,7 @@ void consolaKernel(){
 					printf( "Cantidad de operaciones privilegiadas que ejecutó: %d \n", infP->cantOpPriv);
 					break;
 				case 'c':
-					printf( "Tabla de archivos abiertos por el proceso %d \n", infP->tablaArchivos);	//todo
+					printf( "Tabla de archivos abiertos por el proceso %d \n", infP->tablaArchivos);	// todo: implementar
 					break;
 				case 'd':
 					printf( "Cantidad de páginas de Heap utilizadas: %d \n", infP->cantPagsHeap);
@@ -1020,7 +1032,7 @@ void consolaKernel(){
 			_unlockLista_infoProc();
 		}else if(string_equals_ignore_case(comando, "tabla archivos")){
 
-			//todo: implementar
+			// todo: implementar
 
 		}else if(string_starts_with(comando, "grado mp ")){
 
@@ -1088,7 +1100,8 @@ void consolaKernel(){
 					log_trace(logKernel,  "El PID %d ya finalizo", pidKill);
 					fprintf(stderr, PRINT_COLOR_YELLOW "El PID %d ya finalizo" PRINT_COLOR_RESET "\n", pidKill);
 				}else{
-					finalizarPid(pidKill, COMANDO_FINALIZAR);
+					finalizarPid(pidKill);
+					setearExitCode(pidKill, COMANDO_FINALIZAR);
 					fprintf(stderr, PRINT_COLOR_BLUE "Finalizo PID %d" PRINT_COLOR_RESET "\n", pidKill);
 				}
 			}
@@ -1155,8 +1168,8 @@ void terminarKernel(){			//aca libero todos
 
 
 
-void finalizarPid(t_num8 pid, int exitCode){
-	log_trace(logKernel, "Finalizo pid %d con exitCode %d", pid, exitCode);
+void finalizarPid(t_num8 pid){
+	log_trace(logKernel, "Finalizo pid %d", pid);
 	int _buscarPID(t_infosocket* i){
 		return i->pidPCB == pid;
 	}
@@ -1197,7 +1210,6 @@ void finalizarPid(t_num8 pid, int exitCode){
 
 		send(socket_memoria, &pid, sizeof(t_num8), 0);
 		msg_enviar_separado(FINALIZAR_PROGRAMA, 0, 0, socket_memoria);
-		setearExitCode(pid, exitCode);
 		sem_post(&sem_gradoMp);
 	}
 }
@@ -1307,7 +1319,7 @@ t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
 		return h1->nroPag <= h2->nroPag;
 	}
 
-	t_list* listAux = list_filter(tabla_heap, (void*) _esHeap);	//fixme: ver si explota por no tener 2 elementeos
+	t_list* listAux = list_filter(tabla_heap, (void*) _esHeap);
 	list_sort(tabla_heap, (void*) _menorPag);
 
 	int i=0, j=0, offset=0, tmpsize;
@@ -1344,7 +1356,6 @@ t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
 					t_HeapMetadata heapMetadataProx;
 					heapMetadataProx.isFree = true;
 					heapMetadataProx.size = heapMetadata.size - cantBytes - sizeof(t_HeapMetadata);
-					//fixme aca	-------------------------------------------------------------------------------------------------
 					heapMetadata.isFree = false;
 					heapMetadata.size = cantBytes;
 
@@ -1394,7 +1405,12 @@ t_puntero reservarMemoriaHeap(t_num cantBytes, t_PCB* pcb){
 
 	if(cantBytes > tamanioPag - sizeof(t_HeapMetadata)*2){
 		log_warning(logKernel, "Se quiere asignar mas que tamanio de pagina");
-		finalizarPid(pcb->pid, MAS_MEMORIA_TAMANIO_PAG);
+		finalizarPid(pcb->pid);
+		if((int)pcb->exitCode > 0){
+			pcb->exitCode = MAS_MEMORIA_TAMANIO_PAG;
+			_ponerEnCola(pcb->pid, cola_Exit, mutex_Exit);
+			liberarPCB(pcb, true);
+		}
 		return -1;
 	}
 
@@ -1416,6 +1432,25 @@ t_puntero reservarMemoriaHeap(t_num cantBytes, t_PCB* pcb){
 	return retorno;
 }
 
+
+t_HeapMetadata _recibirHeapMetadata(t_num8 pid, t_posicion puntero){
+	t_HeapMetadata heapMetadata;
+	send(socket_memoria, &pid, sizeof(t_num8), 0);
+	msg_enviar_separado(LECTURA_PAGINA, sizeof(t_posicion), &puntero, socket_memoria);
+
+	//recibo
+	t_msg* msgRecibido = msg_recibir(socket_memoria);
+	if(msgRecibido->tipoMensaje != LECTURA_PAGINA){
+		log_error(logKernel, "No recibi LECTURA_PAGINA sino %d", msgRecibido->tipoMensaje);
+		return heapMetadata;
+	}
+	msg_recibir_data(socket_memoria, msgRecibido);
+	memcpy(&heapMetadata, msgRecibido->data, sizeof(t_HeapMetadata));
+	msg_destruir(msgRecibido);
+
+	return heapMetadata;
+}
+
 int liberarMemoriaHeap(t_puntero posicion, t_PCB* pcb){
 	int _esHeap(t_heap* h){
 		return h->pid == pcb->pid;
@@ -1427,28 +1462,17 @@ int liberarMemoriaHeap(t_puntero posicion, t_PCB* pcb){
 	puntero.pagina = posicion / tamanioPag;
 	puntero.offset = posicion % tamanioPag;
 	puntero.size = sizeof(t_HeapMetadata);
-	send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
-	msg_enviar_separado(LECTURA_PAGINA, sizeof(t_posicion), &puntero, socket_memoria);
 
-	//recibo
-	t_msg* msgRecibido = msg_recibir(socket_memoria);
-	if(msgRecibido->tipoMensaje != LECTURA_PAGINA){
-		log_error(logKernel, "No recibi LECTURA_PAGINA sino %d", msgRecibido->tipoMensaje);
-		if(msgRecibido->tipoMensaje == STACKOVERFLOW)
-			return -2;
-		else
-			return -1;
-	}
-	msg_recibir_data(socket_memoria, msgRecibido);
-	t_HeapMetadata heapMetadata, heapMetadataProx;
-	memcpy(&heapMetadata, msgRecibido->data, sizeof(t_HeapMetadata));
-	memcpy(&heapMetadataProx, msgRecibido->data + sizeof(t_HeapMetadata), sizeof(t_HeapMetadata));
-	msg_destruir(msgRecibido);
+	t_HeapMetadata heapMetadata = _recibirHeapMetadata(pcb->pid, puntero);
+	puntero.offset = (posicion % tamanioPag) + sizeof(t_HeapMetadata) + heapMetadata.size;
+	t_HeapMetadata heapMetadataProx = _recibirHeapMetadata(pcb->pid, puntero);
 
 	if(heapMetadata.isFree == true){
 		log_warning(logKernel, "Quiero liberar algo liberado");
 		return -1;
 	}
+
+	_sumarCantOpLiberar(pcb->pid, heapMetadata.size);
 
 	heapMetadata.isFree = true;
 	if(heapMetadataProx.isFree == true){
@@ -1456,24 +1480,20 @@ int liberarMemoriaHeap(t_puntero posicion, t_PCB* pcb){
 		heapMetadata.size = heapMetadata.size + sizeof(t_HeapMetadata) + heapMetadataProx.size;
 	}
 
-	_sumarCantOpLiberar(pcb->pid, heapMetadata.size);
-
 	void* buffer = malloc(sizeof(t_posicion) + sizeof(t_HeapMetadata));
 	memcpy(buffer, &puntero, sizeof(t_posicion));
 	memcpy(buffer + sizeof(t_posicion), &heapMetadata, sizeof(t_HeapMetadata));
 
 	send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
 
-	log_trace(logKernel, "heapMetadata.size %d heapMetadataProx.size %d", heapMetadata.size, heapMetadataProx.size);
-
 	if(heapMetadata.size == tamanioPag - sizeof(t_HeapMetadata))
 		msg_enviar_separado(LIBERAR, sizeof(t_posicion) + sizeof(t_HeapMetadata), buffer, socket_memoria);
 	else
 		msg_enviar_separado(ESCRITURA_PAGINA, sizeof(t_posicion) + sizeof(t_HeapMetadata), buffer, socket_memoria);
 
-	msgRecibido = msg_recibir(socket_memoria);
+	t_msg* msgRecibido = msg_recibir(socket_memoria);
 	if(msgRecibido->tipoMensaje == LIBERAR){
-		log_trace(logKernel, "se LIBERO piola");
+		log_trace(logKernel, "Se LIBERO piola");
 		flag_se_libero_pag = 1;
 		_sumarCantPagsHeap(pcb->pid, -1);
 		list_remove_and_destroy_by_condition(tabla_heap, (void*) _esHeap, free);

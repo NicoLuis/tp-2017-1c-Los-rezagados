@@ -221,6 +221,6 @@ void atender_consola(int socket_consola);
 void consolaKernel();
 void terminarKernel();
 
-void finalizarPid(t_num8 pid, int exitCode);
+void finalizarPid(t_num8 pid);
 
 #endif /* LIBRERIAKERNEL_H_ */

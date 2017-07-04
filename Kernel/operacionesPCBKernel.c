@@ -115,6 +115,7 @@ void finalizarPCB(t_num8 pidPCB){
 
 
 void setearExitCode(t_num8 pidPCB, int exitCode){
+	log_warning(logKernel, "Setteo exit code %d a pid %d", exitCode, pidPCB);
 	bool _buscarPCB(t_PCB* pcb){
 		return pcb->pid == pidPCB;
 	}

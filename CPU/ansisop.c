@@ -425,7 +425,7 @@ void liberar(t_puntero puntero){
 		}
 	}
 	else{
-		log_error(logAnsisop, "Error al reservar memoria - se recibio %d", msgRecibido->tipoMensaje);
+		log_error(logAnsisop, "Error al liberar memoria - se recibio %d", msgRecibido->tipoMensaje);
 		flag_error = true;
 	}
 	msg_destruir(msgRecibido);

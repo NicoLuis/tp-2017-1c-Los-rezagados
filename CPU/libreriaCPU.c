@@ -44,12 +44,12 @@ void finalizarCPU(){
 	log_trace(logAnsisop, "  FIN CPU  ");
 
 	if(socket_kernel != 0){
-		msg_enviar_separado(FIN_CPU, 1, 0, socket_kernel);
+		msg_enviar_separado(FIN_CPU, 0, 0, socket_kernel);
 		close(socket_kernel);
 	}
 
 	if(socket_memoria != 0){
-		msg_enviar_separado(FIN_CPU, 1, 0, socket_memoria);
+		msg_enviar_separado(FIN_CPU, 0, 0, socket_memoria);
 		close(socket_memoria);
 	}
 

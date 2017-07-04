@@ -229,7 +229,9 @@ void escucharCPU(int socket_cpu) {
 
 		_lockLista_PCB_cpu();
 		t_infosocket* aux = list_find(lista_PCB_cpu, (void*) _esCPU2);
-		t_num8 pidaux = aux->pidPCB;
+		t_num8 pidaux = 0;
+		if(aux != NULL)
+			pidaux = aux->pidPCB;
 		_unlockLista_PCB_cpu();
 
 		int _es_PCB(t_PCB* p){
@@ -339,18 +341,20 @@ void escucharCPU(int socket_cpu) {
 			_lockLista_PCB_cpu();
 			list_remove_and_destroy_by_condition(lista_PCB_cpu, (void*) _esCPU2, free);
 			_unlockLista_PCB_cpu();
-			_sacarDeCola(pcb->pid, cola_Exec, mutex_Exec);
-			setearExitCode(pcb->pid, SIN_DEFINICION);
-			void _sacarDeSemaforos(t_VariableSemaforo* sem){
-				t_num8 encontrado = _sacarDeCola(pcb->pid, sem->colaBloqueados, sem->mutex_colaBloqueados);
-				if(encontrado == pcb->pid)
-					sem->valorSemaforo++;
+			if(pcb != NULL){
+				_sacarDeCola(pcb->pid, cola_Exec, mutex_Exec);
+				setearExitCode(pcb->pid, SIN_DEFINICION);
+				void _sacarDeSemaforos(t_VariableSemaforo* sem){
+					t_num8 encontrado = _sacarDeCola(pcb->pid, sem->colaBloqueados, sem->mutex_colaBloqueados);
+					if(encontrado == pcb->pid)
+						sem->valorSemaforo++;
+				}
+				list_iterate(lista_variablesSemaforo, (void*) _sacarDeSemaforos);
+				_lockLista_PCBs();
+				if(list_remove_by_condition(lista_PCBs, (void*) _es_PCB) == NULL) log_warning(logKernel, "No se encuentra pcb en FIN_CPU");
+				list_add(lista_PCBs, pcb);
+				_unlockLista_PCBs();
 			}
-			list_iterate(lista_variablesSemaforo, (void*) _sacarDeSemaforos);
-			_lockLista_PCBs();
-			if(list_remove_by_condition(lista_PCBs, (void*) _es_PCB) == NULL) log_warning(logKernel, "No se encuentra pcb en FIN_CPU");
-			list_add(lista_PCBs, pcb);
-			_unlockLista_PCBs();
 			sem_post(&sem_gradoMp);
 			pthread_exit(NULL);
 			break;
@@ -1337,11 +1341,12 @@ t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
 
 				if(heapMetadata.isFree && cantBytes <= heapMetadata.size ){
 					//encontre hueco
-					heapMetadata.isFree = false;
-					heapMetadata.size = cantBytes;
 					t_HeapMetadata heapMetadataProx;
 					heapMetadataProx.isFree = true;
 					heapMetadataProx.size = heapMetadata.size - cantBytes - sizeof(t_HeapMetadata);
+					//fixme aca	-------------------------------------------------------------------------------------------------
+					heapMetadata.isFree = false;
+					heapMetadata.size = cantBytes;
 
 					void* buffer = malloc(sizeof(t_posicion) + sizeof(t_HeapMetadata)*2);
 					memcpy(buffer + offset, &puntero, tmpsize = sizeof(t_posicion));
@@ -1420,7 +1425,7 @@ int liberarMemoriaHeap(t_puntero posicion, t_PCB* pcb){
 	//envio solicitud
 	t_posicion puntero;
 	puntero.pagina = posicion / tamanioPag;
-	puntero.offset = posicion % tamanioPag - sizeof(t_HeapMetadata);
+	puntero.offset = posicion % tamanioPag;
 	puntero.size = sizeof(t_HeapMetadata);
 	send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
 	msg_enviar_separado(LECTURA_PAGINA, sizeof(t_posicion), &puntero, socket_memoria);
@@ -1447,11 +1452,11 @@ int liberarMemoriaHeap(t_puntero posicion, t_PCB* pcb){
 
 	heapMetadata.isFree = true;
 	if(heapMetadataProx.isFree == true){
+		log_trace(logKernel, "El proximo esta libre, lo uno");
 		heapMetadata.size = heapMetadata.size + sizeof(t_HeapMetadata) + heapMetadataProx.size;
 	}
 
 	_sumarCantOpLiberar(pcb->pid, heapMetadata.size);
-	puntero.size = heapMetadata.size;
 
 	void* buffer = malloc(sizeof(t_posicion) + sizeof(t_HeapMetadata));
 	memcpy(buffer, &puntero, sizeof(t_posicion));
@@ -1459,13 +1464,16 @@ int liberarMemoriaHeap(t_puntero posicion, t_PCB* pcb){
 
 	send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
 
+	log_trace(logKernel, "heapMetadata.size %d heapMetadataProx.size %d", heapMetadata.size, heapMetadataProx.size);
+
 	if(heapMetadata.size == tamanioPag - sizeof(t_HeapMetadata))
-		msg_enviar_separado(LIBERAR, sizeof(t_posicion) + sizeof(t_HeapMetadata), &puntero, socket_memoria);
+		msg_enviar_separado(LIBERAR, sizeof(t_posicion) + sizeof(t_HeapMetadata), buffer, socket_memoria);
 	else
-		msg_enviar_separado(ESCRITURA_PAGINA, sizeof(t_posicion) + sizeof(t_HeapMetadata), &puntero, socket_memoria);
+		msg_enviar_separado(ESCRITURA_PAGINA, sizeof(t_posicion) + sizeof(t_HeapMetadata), buffer, socket_memoria);
 
 	msgRecibido = msg_recibir(socket_memoria);
 	if(msgRecibido->tipoMensaje == LIBERAR){
+		log_trace(logKernel, "se LIBERO piola");
 		flag_se_libero_pag = 1;
 		_sumarCantPagsHeap(pcb->pid, -1);
 		list_remove_and_destroy_by_condition(tabla_heap, (void*) _esHeap, free);

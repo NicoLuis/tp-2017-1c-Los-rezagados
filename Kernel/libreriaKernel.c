@@ -262,15 +262,18 @@ void escucharCPU(int socket_cpu) {
 		t_entrada_GlobalFile* entradaGlobalBuscada = malloc(sizeof(t_entrada_GlobalFile));
 		int _esFD(t_entrada_proceso *entradaP){return entradaP->fd == entradaProcesoBuscado->fd;}
 		int _esIndiceGlobal(t_entrada_GlobalFile *entradaG){return entradaG->indiceGlobalTable == entradaGlobalBuscada->indiceGlobalTable;}
+
 		int _buscarPid(t_tabla_proceso* tabla){ return pidRecibido == tabla->pid; }
 		int _buscarFD(t_entrada_proceso* entradaP){ return fdRecibido == entradaP->fd; }
 		int _buscarPorIndice(t_entrada_GlobalFile* entradaGlobal){return entradaGlobal->indiceGlobalTable == entradaProcesoBuscado->referenciaGlobalTable;}
 
-		void _recibirYBuscar(){
+		void _cargarEntradasxTabla(){
 			//msg_recibir_data(socket_cpu, msgRecibido);
 
+			/*
 			memcpy(&fdRecibido, msgRecibido->data, sizeof(t_descriptor_archivo));
 			memcpy(&pidRecibido, msgRecibido->data + sizeof(t_descriptor_archivo), sizeof(t_num8));
+			*/
 
 			log_trace(logKernel, "fdRecibido %d pidRecibido %d", fdRecibido, pidRecibido);
 
@@ -286,7 +289,9 @@ void escucharCPU(int socket_cpu) {
 					log_trace(logKernel, "no existe entrada de la tabla proceso que tenga a FD");
 					// hacer algo??
 				} else {
-					entradaGlobalBuscada = list_remove_by_condition(lista_tabla_global, (void*) _buscarPorIndice);
+
+					entradaGlobalBuscada = list_find(lista_tabla_global, (void*) _buscarPorIndice);
+					//entradaGlobalBuscada = list_remove_by_condition(lista_tabla_global, (void*) _buscarPorIndice);
 				}
 			}
 		}
@@ -572,16 +577,101 @@ void escucharCPU(int socket_cpu) {
 
 			_sumarCantOpPriv(pcb->pid);
 			break;
+//----------------------------------------------------------------------------------------------------
+		case MOVER_ANSISOP:
+			log_trace(logKernel, "Recibi MOVER_ANSISOP de CPU");
+			t_valor_variable cursorRecibido;
+
+			memcpy(&fdRecibido, msgRecibido->data, sizeof(t_descriptor_archivo));
+			memcpy(&cursorRecibido, msgRecibido->data + sizeof(t_descriptor_archivo), sizeof(t_valor_variable));
+			memcpy(&pidRecibido, msgRecibido->data + sizeof(t_descriptor_archivo) + sizeof(t_valor_variable), sizeof(t_num8));
+
+			_cargarEntradasxTabla();
+
+			if(entradaProcesoBuscado == NULL){
+				log_trace(logKernel, "no existe la entrada buscada");
+			}else{
+				entradaProcesoBuscado->cursor = cursorRecibido;
+			}
+
+			break;
+
+		case LEER_ANSISOP:
+			log_trace(logKernel, "Recibi ESCRIBIR_FD de CPU");
+
+			t_valor_variable tamanio;
 
 
+			memcpy(&fdRecibido, msgRecibido->data, sizeof(t_descriptor_archivo));
+			memcpy(&tamanio, msgRecibido->data + sizeof(t_descriptor_archivo), sizeof(t_valor_variable));
+			void* informacion = malloc(tamanio);
+			memcpy(informacion, msgRecibido->data + sizeof(t_valor_variable) + sizeof(t_descriptor_archivo), tamanio);
+			memcpy(&pidRecibido, msgRecibido->data + sizeof(t_valor_variable) + sizeof(t_descriptor_archivo) + tamanio, sizeof(t_num8));
 
+			_cargarEntradasxTabla();
+
+			if(entradaGlobalBuscada == NULL){
+				log_trace(logKernel, "no existe la entrada buscada");
+			}else{
+				void* buffer = malloc(sizeof(t_num) + string_length(entradaGlobalBuscada->FilePath) + sizeof(t_valor_variable) + sizeof(t_valor_variable));
+				offset = 0;
+				tmpsize = 0;
+				memcpy(buffer, string_length(entradaGlobalBuscada->FilePath), tmpsize = sizeof(t_num));
+				offset += tmpsize;
+				memcpy(buffer + offset, entradaGlobalBuscada->FilePath, tmpsize = string_length(entradaGlobalBuscada->FilePath));
+				offset += tmpsize;
+				memcpy(buffer+ offset, entradaProcesoBuscado->cursor, tmpsize = sizeof(t_valor_variable));
+				offset += tmpsize;
+				memcpy(buffer+ offset, &tamanio, tmpsize = sizeof(t_valor_variable));
+				offset += tmpsize;
+				memcpy(buffer+ offset, &informacion, tmpsize = sizeof(t_valor_variable));
+				offset += tmpsize;
+
+				msg_enviar_separado(OBTENER_DATOS, offset, buffer, socket_fs);
+
+				free(buffer);
+
+				t_msg* msgDatosObtenidos = msg_recibir(socket_fs);
+
+				if(msgDatosObtenidos->tipoMensaje == OBTENER_DATOS && msgDatosObtenidos->data != NULL){
+
+					log_trace(logKernel, "lei bien");
+					msg_enviar_separado(OBTENER_DATOS, msgDatosObtenidos->longitud, msgDatosObtenidos->data, socket_cpu);
+
+				}else{
+					log_error(logKernel, "Error al leer");
+					//flag_error = 1; escribo algun flag??
+				}
+				msg_destruir(msgDatosObtenidos);
+				//free(buffer);
+			}
+
+
+			break;
 
 		case ESCRIBIR_FD:
+
+
+
 			log_trace(logKernel, "Recibi ESCRIBIR_FD de CPU");
-			int size = msgRecibido->longitud - sizeof(t_puntero), fd;
-			void* informacion = malloc(size);
-			memcpy(&fd, msgRecibido->data, sizeof(t_puntero));
-			memcpy(informacion, msgRecibido->data + sizeof(t_puntero), size);
+
+			//t_descriptor_archivo fd;
+			//t_num8 pidActual;
+			t_valor_variable tamanio;
+
+
+			memcpy(&fdRecibido, msgRecibido->data, sizeof(t_descriptor_archivo));
+			memcpy(&tamanio, msgRecibido->data + sizeof(t_descriptor_archivo), sizeof(t_valor_variable));
+			void* informacion = malloc(tamanio);
+			memcpy(informacion, msgRecibido->data + sizeof(t_valor_variable) + sizeof(t_descriptor_archivo), tamanio);
+			memcpy(&pidRecibido, msgRecibido->data + sizeof(t_valor_variable) + sizeof(t_descriptor_archivo) + tamanio, sizeof(t_num8));
+
+			//int size = msgRecibido->longitud - sizeof(t_puntero), fd;
+			//void* informacion = malloc(size);
+			int fd;
+			fd = fdRecibido;
+			//memcpy(&fd, msgRecibido->data, sizeof(t_puntero));
+			//memcpy(informacion, msgRecibido->data + sizeof(t_puntero), size);
 
 			if(fd == 1){
 				log_trace(logKernel, "Imprimo por consola: %s", informacion);
@@ -590,10 +680,42 @@ void escucharCPU(int socket_cpu) {
 				_unlockLista_PCB_consola();
 				if(info == NULL)
 					log_trace(logKernel, "No se ecuentra consola asociada a pid %d", pcb->pid);
-				msg_enviar_separado(IMPRIMIR_TEXTO, size, informacion, info->socket);
+				msg_enviar_separado(IMPRIMIR_TEXTO, /*size*/ tamanio, informacion, info->socket);
 				msg_enviar_separado(ESCRIBIR_FD, 0, 0, socket_cpu);
 			}else{
 				log_trace(logKernel, "Escribo en fd %d: %s", fd, informacion);
+
+				_cargarEntradasxTabla();
+
+				if(entradaGlobalBuscada == NULL){
+					log_trace(logKernel, "no existe la entrada buscada");
+				}else{
+					void* buffer = malloc(sizeof(t_num) + string_length(entradaGlobalBuscada->FilePath) + sizeof(t_valor_variable) + sizeof(t_valor_variable));
+					offset = 0;
+					tmpsize = 0;
+					memcpy(buffer, string_length(entradaGlobalBuscada->FilePath), tmpsize = sizeof(t_num));
+					offset += tmpsize;
+					memcpy(buffer + offset, entradaGlobalBuscada->FilePath, tmpsize = string_length(entradaGlobalBuscada->FilePath));
+					offset += tmpsize;
+					memcpy(buffer+ offset, entradaProcesoBuscado->cursor, tmpsize = sizeof(t_valor_variable));
+					offset += tmpsize;
+					memcpy(buffer+ offset, &tamanio, tmpsize = sizeof(t_valor_variable));
+					offset += tmpsize;
+					memcpy(buffer+ offset, &informacion, tmpsize = sizeof(t_valor_variable));
+					offset += tmpsize;
+
+					msg_enviar_separado(GUARDAR_DATOS, offset, buffer, socket_fs);
+
+					if(msgRecibido->tipoMensaje == GUARDAR_DATOS){
+						log_trace(logKernel, "Escribio bien");
+						msg_enviar_separado(GUARDAR_DATOS, 0, 0, socket_cpu);
+					}else{
+						log_error(logKernel, "Error al escribir");
+						//flag_error = 1; escribo algun flag??
+					}
+					msg_destruir(msgRecibido);
+					free(buffer);
+				}
 				//todo: lo trato como si fuese del FS
 			}
 
@@ -603,7 +725,7 @@ void escucharCPU(int socket_cpu) {
 			break;
 
 
-
+//-----------------------------------------------------------------------------------------
 
 		case ABRIR_ANSISOP:
 			log_trace(logKernel, "Recibi la siguiente operacion ABRIR_ANSISOP de CPU");
@@ -640,7 +762,7 @@ void escucharCPU(int socket_cpu) {
 				entradaGlobalNew->FilePath[longitudPath] = '\0';
 
 				entradaGlobalNew->Open = 1;
-				entradaGlobalNew->indiceGlobalTable = indiceGlobal;
+				entradaGlobalNew->indiceGlobalTable = indiceGlobal; // indiceGlobal = 0 seteado en kernel.c
 				indiceActualGlobal = indiceGlobal;
 				indiceGlobal++;
 				list_add(lista_tabla_global, entradaGlobalNew);
@@ -672,6 +794,8 @@ void escucharCPU(int socket_cpu) {
 			}
 
 			entradaProcesoNew->referenciaGlobalTable = indiceActualGlobal;
+
+			entradaProcesoNew->cursor = 0; // seteo del cursor
 
 			//-------------- busco si ya tengo la tabla para este id de proceso -------------------------
 
@@ -707,7 +831,10 @@ void escucharCPU(int socket_cpu) {
 
 			log_trace(logKernel, "Recibi la siguiente operacion BORRAR_ANSISOP de CPU");
 
-			_recibirYBuscar();
+			memcpy(&fdRecibido, msgRecibido->data, sizeof(t_descriptor_archivo));
+			memcpy(&pidRecibido, msgRecibido->data + sizeof(t_descriptor_archivo), sizeof(t_num8));
+
+			_cargarEntradasxTabla();
 
 			if(entradaGlobalBuscada == NULL){
 				log_trace(logKernel, "no existe la entrada buscada");
@@ -725,11 +852,16 @@ void escucharCPU(int socket_cpu) {
 			_sumarCantOpPriv(pcb->pid);
 			break;
 
+
+
 		case CERRAR_ANSISOP:
 
 			log_trace(logKernel, "Recibi la siguiente operacion CERRAR_ANSISOP de CPU");
 
-			_recibirYBuscar();
+			memcpy(&fdRecibido, msgRecibido->data, sizeof(t_descriptor_archivo));
+			memcpy(&pidRecibido, msgRecibido->data + sizeof(t_descriptor_archivo), sizeof(t_num8));
+
+			_cargarEntradasxTabla();
 
 			if(entradaGlobalBuscada == NULL){
 				log_trace(logKernel, "no existe la entrada buscada");

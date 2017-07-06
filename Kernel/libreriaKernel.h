@@ -54,6 +54,7 @@ typedef struct{
 	t_descriptor_archivo fd;
 	char* bandera;
 	uint referenciaGlobalTable;
+	t_valor_variable cursor;
 }t_entrada_proceso;
 
 typedef struct{

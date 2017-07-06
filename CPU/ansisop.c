@@ -348,13 +348,25 @@ void cerrar(t_descriptor_archivo descriptor_archivo){
 
 }
 
+void mandarMSGaKernel_LE(t_descriptor_archivo descriptor_archivo, void* informacion, t_valor_variable tamanio, int tipoMsj){
+	int sizeFD = sizeof(t_descriptor_archivo);
+		void* buf = malloc(sizeFD + tamanio + sizeof(t_valor_variable));
+
+		memcpy(buf, &descriptor_archivo, sizeFD);
+		memcpy(buf + sizeFD, &tamanio, sizeof(t_valor_variable));
+		memcpy(buf + sizeFD + sizeof(t_valor_variable), informacion, tamanio);
+		memcpy(buf + sizeFD + sizeof(t_valor_variable) + tamanio, &pcb->pid, sizeof(t_num8));
+
+		msg_enviar_separado(tipoMsj, sizeFD + sizeof(t_valor_variable) + tamanio + sizeof(t_num8), buf, socket_kernel);
+
+		free(buf);
+}
+
 void escribir(t_descriptor_archivo descriptor_archivo, void* informacion, t_valor_variable tamanio){
+
 	log_trace(logAnsisop, "Escribir en fd %d: %s", descriptor_archivo, informacion);
-	int tmpsize = sizeof(t_descriptor_archivo);
-	void* buf = malloc(tamanio + tmpsize);
-	memcpy(buf, &descriptor_archivo, tmpsize);
-	memcpy(buf + tmpsize, informacion, tamanio);
-	msg_enviar_separado(ESCRIBIR_FD, tamanio + tmpsize, buf, socket_kernel);
+
+	mandarMSGaKernel_LE(descriptor_archivo, informacion, tamanio, ESCRIBIR_FD);
 
 	t_msg* msgRecibido = msg_recibir(socket_kernel);
 
@@ -366,15 +378,67 @@ void escribir(t_descriptor_archivo descriptor_archivo, void* informacion, t_valo
 	}
 
 	msg_destruir(msgRecibido);
+
+
+	/*log_trace(logAnsisop, "Escribir en fd %d: %s", descriptor_archivo, informacion);
+	int tmpsize = sizeof(t_descriptor_archivo);
+	void* buf = malloc(tamanio + tmpsize);
+	memcpy(buf, &descriptor_archivo, tmpsize);
+	memcpy(buf + tmpsize, informacion, tamanio);
+	msg_enviar_separado(ESCRIBIR_FD, tamanio + tmpsize, buf, socket_kernel);
+
+	*/
 }
 
 void leer(t_descriptor_archivo descriptor_archivo, t_puntero informacion, t_valor_variable tamanio){
+
+
 	log_trace(logAnsisop, "Leer fd %d en %d size %d", descriptor_archivo, informacion, tamanio);
+	mandarMSGaKernel_LE(descriptor_archivo,informacion,tamanio,	LEER_ANSISOP);
+
+	t_msg* msgDatosObtenidos = msg_recibir(socket_kernel);
+
+	if(msgDatosObtenidos->tipoMensaje == OBTENER_DATOS && msgDatosObtenidos->data != NULL){
+
+		log_trace(logCPU, "lei bien");
+
+
+	}else{
+		log_error(logKernel, "Error al leer");
+		//flag_error = 1; escribo algun flag??
+	}
+	msg_destruir(msgDatosObtenidos);
 
 }
 
 void moverCursor(t_descriptor_archivo descriptor_archivo, t_valor_variable posicion){
+
 	log_trace(logAnsisop, "Mover Cursor fd %d posicion %d", descriptor_archivo,posicion );
+
+	void* buffer = malloc(sizeof(t_descriptor_archivo) + sizeof(t_valor_variable));
+
+	memcpy(buffer, &descriptor_archivo, sizeof(t_descriptor_archivo));
+	memcpy(buffer + sizeof(t_descriptor_archivo), &posicion, sizeof(t_valor_variable));
+	memcpy(buffer + sizeof(t_descriptor_archivo) + sizeof(t_valor_variable), &pcb->pid, sizeof(t_num8));
+
+	msg_enviar_separado(MOVER_ANSISOP, sizeof(t_descriptor_archivo) + sizeof(t_descriptor_archivo), buffer, socket_kernel);
+	free(buffer);
+
+
+
+
+	/*
+	* MOVER CURSOR DE ARCHIVO
+	*
+	* Informa al Kernel que el proceso requiere que se mueva el cursor a la posicion indicada.
+	*
+	* @syntax TEXT_SEEK_FILE (buscar)
+	* @param descriptor_archivo Descriptor de archivo del archivo abierto
+	* @param posicion Posicion a donde mover el cursor
+	* @return void
+	*/
+
+
 
 }
 

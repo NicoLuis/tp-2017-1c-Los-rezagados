@@ -368,13 +368,8 @@ void escucharCPU(void* socket_cpu) {
 				// desserializacion
 				memcpy(&pidPeticion, msg->data + offset, tmpsize = sizeof(t_num8));
 				offset += tmpsize;
-				memcpy(&puntero.pagina, msg->data + offset, tmpsize = sizeof(t_num));
+				memcpy(&puntero, msg->data + offset, tmpsize = sizeof(t_posicion));
 				offset += tmpsize;
-				memcpy(&puntero.offset, msg->data + offset, tmpsize = sizeof(t_num));
-				offset += tmpsize;
-				memcpy(&puntero.size, msg->data + offset, tmpsize = sizeof(t_num));
-				offset += tmpsize;
-
 				void* contenido_escribir = malloc(puntero.size);
 				memcpy(contenido_escribir, msg->data + offset, tmpsize = puntero.size);
 				offset += tmpsize;

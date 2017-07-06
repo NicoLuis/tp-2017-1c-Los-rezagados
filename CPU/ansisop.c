@@ -106,7 +106,10 @@ void asignar(t_puntero direccion_variable, t_valor_variable valor){
 		puntero.offset = direccion_variable % tamanioPagina;
 		puntero.size = sizeof(t_valor_variable);
 
-		escribirMemoria(puntero, valor);
+		void* buffer = malloc(sizeof(t_valor_variable));
+		memcpy(buffer, &valor, sizeof(t_valor_variable));
+		escribirMemoria(puntero, buffer);
+		free(buffer);
 	}else{
 		log_error(logAnsisop, "No se puede asignar en %d", direccion_variable);
 		flag_error = true;
@@ -175,7 +178,10 @@ void retornar(t_valor_variable retorno){
 
 	t_Stack* stackActual = list_get(pcb->indiceStack, list_size(pcb->indiceStack) - 1);
 
-	escribirMemoria(stackActual->retVar, retorno);
+	void* buffer = malloc(sizeof(t_valor_variable));
+	memcpy(buffer, &retorno, sizeof(t_valor_variable));
+	escribirMemoria(stackActual->retVar, buffer);
+	free(buffer);
 }
 
 void finalizar(){

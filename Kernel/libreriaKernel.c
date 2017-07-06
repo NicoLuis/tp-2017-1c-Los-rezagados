@@ -806,7 +806,7 @@ void enviarScriptAMemoria(_t_hiloEspera* aux){
 
 	send(socket_memoria, &aux->pid, sizeof(t_num8), 0);
 	msg_enviar_separado(INICIALIZAR_PROGRAMA, aux->size, aux->script, socket_memoria);
-	send(socket_memoria, &pcb->cantPagsStack, sizeof(t_num8), 0);
+	send(socket_memoria, &pcb->cantPagsStack, sizeof(t_num16), 0);
 	t_num8 respuesta;
 	recv(socket_memoria, &respuesta, sizeof(t_num8), 0);
 
@@ -1168,7 +1168,7 @@ void terminarKernel(){			//aca libero todos
 
 
 
-void finalizarPid(t_num8 pid){
+void finalizarPid(t_pid pid){
 	log_trace(logKernel, "Finalizo pid %d", pid);
 	int _buscarPID(t_infosocket* i){
 		return i->pidPCB == pid;
@@ -1202,13 +1202,13 @@ void finalizarPid(t_num8 pid){
 
 	if(flag_hagoesto){
 		void _sacarDeSemaforos(t_VariableSemaforo* sem){
-			t_num8 encontrado = _sacarDeCola(pid, sem->colaBloqueados, sem->mutex_colaBloqueados);
+			t_pid encontrado = _sacarDeCola(pid, sem->colaBloqueados, sem->mutex_colaBloqueados);
 			if(encontrado == pid)
 				sem->valorSemaforo++;
 		}
 		list_iterate(lista_variablesSemaforo, (void*) _sacarDeSemaforos);
 
-		send(socket_memoria, &pid, sizeof(t_num8), 0);
+		send(socket_memoria, &pid, sizeof(t_pid), 0);
 		msg_enviar_separado(FINALIZAR_PROGRAMA, 0, 0, socket_memoria);
 		sem_post(&sem_gradoMp);
 	}
@@ -1267,7 +1267,7 @@ void asignarNuevaPag(t_PCB* pcb){
 	}
 
 	log_trace(logKernel, "Asigno nueva pagina a proceso %d", pcb->pid);
-	send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
+	send(socket_memoria, &pcb->pid, sizeof(t_pid), 0);
 	msg_enviar_separado(ASIGNACION_MEMORIA, 0, 0, socket_memoria);
 	t_msg* msgRecibido = msg_recibir(socket_memoria);
 	if(msgRecibido->tipoMensaje != ASIGNACION_MEMORIA)
@@ -1294,7 +1294,7 @@ void asignarNuevaPag(t_PCB* pcb){
 	memcpy(buffer, &puntero, sizeof(t_posicion));
 	memcpy(buffer + sizeof(t_posicion), &metadata, sizeof(t_HeapMetadata));
 
-	send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
+	send(socket_memoria, &pcb->pid, sizeof(t_pid), 0);
 	msg_enviar_separado(ESCRITURA_PAGINA, sizeof(t_posicion) + sizeof(t_HeapMetadata), buffer, socket_memoria);
 	msgRecibido = msg_recibir(socket_memoria);
 	if(msgRecibido->tipoMensaje != ESCRITURA_PAGINA)
@@ -1334,7 +1334,7 @@ t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
 				puntero.pagina = pcb->cantPagsCodigo + pcb->cantPagsStack + i;
 				puntero.offset = j;
 				puntero.size = sizeof(t_HeapMetadata);
-				send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
+				send(socket_memoria, &pcb->pid, sizeof(t_pid), 0);
 				msg_enviar_separado(LECTURA_PAGINA, sizeof(t_posicion), &puntero, socket_memoria);
 
 				//recibo
@@ -1367,7 +1367,7 @@ t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
 					memcpy(buffer + offset, &heapMetadataProx, tmpsize = sizeof(t_HeapMetadata));
 					offset += tmpsize;
 
-					send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
+					send(socket_memoria, &pcb->pid, sizeof(t_pid), 0);
 					msg_enviar_separado(ESCRITURA_PAGINA, offset, buffer, socket_memoria);
 
 					t_msg* msgRecibido2 = msg_recibir(socket_memoria);
@@ -1433,9 +1433,9 @@ t_puntero reservarMemoriaHeap(t_num cantBytes, t_PCB* pcb){
 }
 
 
-t_HeapMetadata _recibirHeapMetadata(t_num8 pid, t_posicion puntero){
+t_HeapMetadata _recibirHeapMetadata(t_pid pid, t_posicion puntero){
 	t_HeapMetadata heapMetadata;
-	send(socket_memoria, &pid, sizeof(t_num8), 0);
+	send(socket_memoria, &pid, sizeof(t_pid), 0);
 	msg_enviar_separado(LECTURA_PAGINA, sizeof(t_posicion), &puntero, socket_memoria);
 
 	//recibo
@@ -1484,7 +1484,7 @@ int liberarMemoriaHeap(t_puntero posicion, t_PCB* pcb){
 	memcpy(buffer, &puntero, sizeof(t_posicion));
 	memcpy(buffer + sizeof(t_posicion), &heapMetadata, sizeof(t_HeapMetadata));
 
-	send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
+	send(socket_memoria, &pcb->pid, sizeof(t_pid), 0);
 
 	if(heapMetadata.size == tamanioPag - sizeof(t_HeapMetadata))
 		msg_enviar_separado(LIBERAR, sizeof(t_posicion) + sizeof(t_HeapMetadata), buffer, socket_memoria);

@@ -280,7 +280,7 @@ t_descriptor_archivo abrir(t_direccion_archivo direccion, t_banderas flags){
 	u_int fd = 0;
 	int offset = 0, tmpsize;
 	log_trace(logAnsisop, "abrir el siguiente archivo ubicado en: %s", direccion);
-	int longitud_buffer = sizeof(t_num) + string_length(direccion) + sizeof(t_banderas) + sizeof(t_num8);
+	int longitud_buffer = sizeof(t_num) + string_length(direccion) + sizeof(t_banderas) + sizeof(t_pid);
 	void* buffer = malloc(longitud_buffer);
 	t_num longitud_path = string_length(direccion);
 
@@ -290,7 +290,7 @@ t_descriptor_archivo abrir(t_direccion_archivo direccion, t_banderas flags){
 	offset += tmpsize;
 	memcpy(buffer+ offset, &flags, tmpsize = sizeof(t_banderas));
 	offset += tmpsize;
-	memcpy(buffer+ offset, &pcb->pid, tmpsize = sizeof(t_num8));
+	memcpy(buffer+ offset, &pcb->pid, tmpsize = sizeof(t_pid));
 	offset += tmpsize;
 
 	if(buffer == NULL){
@@ -319,11 +319,11 @@ t_descriptor_archivo abrir(t_direccion_archivo direccion, t_banderas flags){
 void mandarMsgaKernel(int tipoMensaje, t_descriptor_archivo fd){
 
 
-	int longitud_buffer = sizeof(t_descriptor_archivo) + sizeof(t_num8);
+	int longitud_buffer = sizeof(t_descriptor_archivo) + sizeof(t_pid);
 	void* buffer = malloc(longitud_buffer);
 
 	memcpy(buffer, &fd, sizeof(t_descriptor_archivo));
-	memcpy(buffer + sizeof(t_descriptor_archivo), &pcb->pid, sizeof(t_num8));
+	memcpy(buffer + sizeof(t_descriptor_archivo), &pcb->pid, sizeof(t_pid));
 	msg_enviar_separado(tipoMensaje, longitud_buffer, buffer, socket_kernel);
 
 	free(buffer);

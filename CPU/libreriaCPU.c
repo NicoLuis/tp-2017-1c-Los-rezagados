@@ -133,9 +133,9 @@ void ejecutarInstruccion(){
 
 void* _serializarPuntero(t_posicion puntero){
 	int offset = 0, tmpsize;
-	void* buffer = malloc(sizeof(t_posicion) + sizeof(t_num8));
+	void* buffer = malloc(sizeof(t_posicion) + sizeof(t_pid));
 
-	memcpy(buffer + offset, &pcb->pid, tmpsize = sizeof(t_num8));
+	memcpy(buffer + offset, &pcb->pid, tmpsize = sizeof(t_pid));
 	offset += tmpsize;
 	memcpy(buffer + offset, &puntero, tmpsize = sizeof(t_posicion));
 	offset += tmpsize;
@@ -176,10 +176,10 @@ t_valor_variable leerMemoria(t_posicion puntero){
 t_posicion escribirMemoria(t_posicion puntero, void* valor){
 
 	int offset = 0, tmpsize;
-	int sizeTotal = sizeof(t_num8) + sizeof(t_posicion) + puntero.size;
+	int sizeTotal = sizeof(t_pid) + sizeof(t_posicion) + puntero.size;
 	void* buffer = malloc(sizeTotal);
 
-	memcpy(buffer + offset, &pcb->pid, tmpsize = sizeof(t_num8));
+	memcpy(buffer + offset, &pcb->pid, tmpsize = sizeof(t_pid));
 	offset += tmpsize;
 	memcpy(buffer + offset, &puntero, tmpsize = sizeof(t_posicion));
 	offset += tmpsize;

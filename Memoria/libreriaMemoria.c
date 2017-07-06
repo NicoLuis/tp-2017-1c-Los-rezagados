@@ -39,7 +39,7 @@ void escucharKERNEL(void* socket_kernel) {
 	//Casteo socketKernel
 	int socketKernel = (int) socket_kernel;
 
-	t_num8 pid;
+	t_pid pid;
 	uint32_t cantidadDePaginas;
 
 	log_info(log_memoria,"Se conecto el Kernel");
@@ -56,7 +56,7 @@ void escucharKERNEL(void* socket_kernel) {
 	uint32_t header;
 	while (1) {
 
-		if (recv(socketKernel, &pid, sizeof(t_num8), 0) <= 0) {
+		if (recv(socketKernel, &pid, sizeof(t_pid), 0) <= 0) {
 			log_info(log_memoria,"El Kernel se ha desconectado");
 			pthread_exit(NULL);
 		}
@@ -68,7 +68,7 @@ void escucharKERNEL(void* socket_kernel) {
 		void* tmpBuffer;
 
 		header = msg->tipoMensaje;
-		t_num8 stackSize;
+		t_num16 stackSize;
 		t_posicion puntero;
 		t_HeapMetadata metadata, metadata2;
 
@@ -76,7 +76,7 @@ void escucharKERNEL(void* socket_kernel) {
 
 		case INICIALIZAR_PROGRAMA:
 
-			recv(socketKernel, &stackSize, sizeof(t_num8), 0);
+			recv(socketKernel, &stackSize, sizeof(t_num16), 0);
 
 			cantidadDePaginas = msg->longitud / tamanioDeMarcos;
 			cantidadDePaginas = (msg->longitud % tamanioDeMarcos) == 0? cantidadDePaginas: cantidadDePaginas + 1;
@@ -301,7 +301,7 @@ void escucharCPU(void* socket_cpu) {
 				offset = 0;
 
 				// desserializacion
-				memcpy(&pidPeticion, msg->data + offset, tmpsize = sizeof(t_num8));
+				memcpy(&pidPeticion, msg->data + offset, tmpsize = sizeof(t_pid));
 				offset += tmpsize;
 				memcpy(&puntero.pagina, msg->data + offset, tmpsize = sizeof(t_num));
 				offset += tmpsize;
@@ -366,7 +366,7 @@ void escucharCPU(void* socket_cpu) {
 				offset = 0;
 
 				// desserializacion
-				memcpy(&pidPeticion, msg->data + offset, tmpsize = sizeof(t_num8));
+				memcpy(&pidPeticion, msg->data + offset, tmpsize = sizeof(t_pid));
 				offset += tmpsize;
 				memcpy(&puntero, msg->data + offset, tmpsize = sizeof(t_posicion));
 				offset += tmpsize;
@@ -483,7 +483,7 @@ void unlockFramesYProcesos() {
 
 /*			LISTAPROCESOS			*/
 
-void crearProcesoYAgregarAListaDeProcesos(t_num8 pid) {
+void crearProcesoYAgregarAListaDeProcesos(t_pid pid) {
 
 	t_proceso* procesoNuevo = malloc(sizeof(t_proceso));
 	procesoNuevo->PID = pid;
@@ -493,7 +493,7 @@ void crearProcesoYAgregarAListaDeProcesos(t_num8 pid) {
 
 }
 
-void eliminarProcesoDeListaDeProcesos(t_num8 pid) {
+void eliminarProcesoDeListaDeProcesos(t_pid pid) {
 
 	int _soy_el_proceso_buscado(t_proceso* proceso) {
 		return proceso->PID == pid;
@@ -630,7 +630,7 @@ int hayFramesLibres(int cantidad) {
 	return cantidad <= cantidadLibres;
 }
 
-int buscarFrameLibre(t_num8 pid) {
+int buscarFrameLibre(t_pid pid) {
 
 	int _soy_el_pid_buscado(t_proceso* proceso) {
 		return (proceso->PID == pid);
@@ -676,7 +676,7 @@ int buscarFrameLibre(t_num8 pid) {
 
 /*			FRAMES POR PAGINA DE PROCESO			*/
 
-int funcionHashing(t_num8 pid, uint8_t nroPagina){
+int funcionHashing(t_pid pid, t_num16 nroPagina){
 	int indice = ((pid * cantidadDeMarcos) + (nroPagina * tamanioDeMarcos)) / cantidadDeMarcos;
 	// fixme: no considera indice >= cantidadDeMarcos
 	// ej: pid=8 nroPagina=5 cantMarcos=30 tamanioMarocs=256  =>  (8*30 + 5*256)/30 = 50
@@ -684,7 +684,7 @@ int funcionHashing(t_num8 pid, uint8_t nroPagina){
 	return indice;
 }
 
-int paginaInvalida(t_num8 pid, uint8_t nroPagina) {
+int paginaInvalida(t_pid pid, t_num16 nroPagina) {
 
 	int _soy_el_pid_buscado(t_proceso* proceso) {
 		return (proceso->PID == pid);
@@ -699,7 +699,7 @@ int paginaInvalida(t_num8 pid, uint8_t nroPagina) {
 	return esPagInvalida;
 }
 
-int buscarFramePorPidPag(t_num8 pid, t_num8 nroPagina){
+int buscarFramePorPidPag(t_pid pid, t_num16 nroPagina){
 
 	log_trace(log_memoria, "Busco frame de pid %d pag %d", pid, nroPagina);
 
@@ -760,7 +760,7 @@ int agregarNuevaPagina(t_num8 pid){
 	return nroFrame;
 }*/
 
-void liberarPagina(t_num8 pid, t_num8 nroPagina){
+void liberarPagina(t_pid pid, t_num16 nroPagina){
 
 	int _soy_el_pid_buscado(t_proceso* proceso) {
 		return (proceso->PID == pid);
@@ -796,7 +796,7 @@ void liberarPagina(t_num8 pid, t_num8 nroPagina){
 
 }
 
-void liberarFramesDeProceso(t_num8 pid){
+void liberarFramesDeProceso(t_pid pid){
 
 	int _soy_el_pid_buscado(t_proceso* proceso) {
 		return (proceso->PID == pid);
@@ -846,7 +846,7 @@ t_list* crearCache() {
 	return cache;
 }
 
-t_cache* buscarEntradaCache(t_num8 pid, uint8_t numero_pagina) {
+t_cache* buscarEntradaCache(t_pid pid, t_num16 numero_pagina) {
 
 	int _soy_la_entrada_cache_buscada(t_cache* entradaCache) {
 		return ((entradaCache->pid == pid) && (entradaCache->numPag == numero_pagina));
@@ -856,7 +856,7 @@ t_cache* buscarEntradaCache(t_num8 pid, uint8_t numero_pagina) {
 
 }
 
-int estaEnCache(t_num8 pid, uint8_t numero_pagina) {
+int estaEnCache(t_pid pid, t_num16 numero_pagina) {
 
 	pthread_mutex_lock(&mutexCache);
 	t_cache* entradaCache = buscarEntradaCache(pid, numero_pagina);
@@ -871,7 +871,7 @@ int estaEnCache(t_num8 pid, uint8_t numero_pagina) {
 	}
 }
 
-t_cache* crearRegistroCache(t_num8 pid, uint8_t numPag, int numFrame) {
+t_cache* crearRegistroCache(t_pid pid, t_num16 numPag, int numFrame) {
 
 	t_cache* unaEntradaCache = malloc(sizeof(t_cache));
 	unaEntradaCache->pid = pid;
@@ -896,7 +896,7 @@ int hayEspacioEnCache() {
 	return tamanioCache < cantidadEntradasCache;
 }
 
-void agregarEntradaCache(t_num8 pid, uint8_t numero_pagina, int nroFrame) {
+void agregarEntradaCache(t_pid pid, t_num16 numero_pagina, int nroFrame) {
 
 	t_cache* nuevaEntradaCache = crearRegistroCache(pid, numero_pagina, nroFrame);
 
@@ -910,12 +910,12 @@ void agregarEntradaCache(t_num8 pid, uint8_t numero_pagina, int nroFrame) {
 		list_add(Cache, nuevaEntradaCache);
 	}
 
-	log_info(log_memoria, "Pagina %d del proceso %d agregada a Cache", numero_pagina,pid);
+	log_info(log_memoria, "Pagina %d del proceso %d agregada a Cache", numero_pagina, pid);
 
 	pthread_mutex_unlock(&mutexCache);
 }
 
-void* obtenerContenidoSegunCache(t_num8 pid, uint8_t numero_pagina,uint32_t offset, uint32_t tamanio_leer) {
+void* obtenerContenidoSegunCache(t_pid pid, t_num16 numero_pagina, uint32_t offset, uint32_t tamanio_leer) {
 
 	t_cache* entradaCache = buscarEntradaCache(pid, numero_pagina);
 
@@ -931,7 +931,7 @@ void* obtenerContenidoSegunCache(t_num8 pid, uint8_t numero_pagina,uint32_t offs
 
 }
 
-void escribirContenidoSegunCache(t_num8 pid, uint8_t numero_pagina,uint32_t offset, uint32_t tamanio_escritura, void* contenido_escribir) {
+void escribirContenidoSegunCache(t_pid pid, t_num16 numero_pagina, uint32_t offset, uint32_t tamanio_escritura, void* contenido_escribir) {
 
 	t_cache* entradaCache = buscarEntradaCache(pid, numero_pagina);
 
@@ -963,7 +963,7 @@ void vaciarCache() {
 
 }
 
-void borrarEntradasCacheSegunPID(t_num8 pid) {
+void borrarEntradasCacheSegunPID(t_pid pid) {
 
 	int _no_es_entrada_Cache_de_PID(t_cache* entradaCache) {
 		return (entradaCache->pid != pid);
@@ -1180,7 +1180,7 @@ void dumpTodosLosProcesos() {
 	fclose(archivoDump);
 }
 
-void dumpContenidoMemoriaProceso(t_num8 pid, FILE* archivoDump) {
+void dumpContenidoMemoriaProceso(t_pid pid, FILE* archivoDump) {
 
 	int i = 0, nroFrame;
 	void* contenidoFrame;
@@ -1205,7 +1205,7 @@ void dumpContenidoMemoriaProceso(t_num8 pid, FILE* archivoDump) {
 			proceso->PID);
 }
 
-void dumpProcesoParticular(t_num8 pid) {
+void dumpProcesoParticular(t_pid pid) {
 
 	t_proceso* proceso = buscarProcesoEnListaProcesosParaDump(pid);
 
@@ -1243,7 +1243,7 @@ void dumpProcesoParticular(t_num8 pid) {
 }
 
 
-t_proceso* buscarProcesoEnListaProcesosParaDump(t_num8 pid) {
+t_proceso* buscarProcesoEnListaProcesosParaDump(t_pid pid) {
 
 	int _soy_el_pid_buscado(t_proceso* proceso) {
 		return (proceso->PID == pid);
@@ -1260,7 +1260,7 @@ void mostrarContenidoTodosLosProcesos(){
 	list_iterate(listaProcesos, (void*) mostrarContenido);
 }
 
-void mostrarContenidoDeUnProceso(t_num8 pid){
+void mostrarContenidoDeUnProceso(t_pid pid){
 
 	int _soy_el_pid_buscado(t_proceso* proceso) {
 		return (proceso->PID == pid);

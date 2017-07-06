@@ -117,7 +117,7 @@ int handshake(int socket_cliente, int tipo){
 	return retorno;
 }
 
-void _sumarCantOpAlocar(t_num8 pid, t_num cantBytes){
+void _sumarCantOpAlocar(t_pid pid, t_num cantBytes){
 	_lockLista_infoProc();
 	int _espidproc(t_infoProceso* a){ return a->pid == pid; }
 	t_infoProceso* infP = list_remove_by_condition(infoProcs, (void*) _espidproc);
@@ -127,7 +127,7 @@ void _sumarCantOpAlocar(t_num8 pid, t_num cantBytes){
 	_unlockLista_infoProc();
 }
 
-void _sumarCantOpLiberar(t_num8 pid, t_num cantBytes){
+void _sumarCantOpLiberar(t_pid pid, t_num cantBytes){
 	_lockLista_infoProc();
 	int _espidproc(t_infoProceso* a){ return a->pid == pid; }
 	t_infoProceso* infP = list_remove_by_condition(infoProcs, (void*) _espidproc);
@@ -138,7 +138,7 @@ void _sumarCantOpLiberar(t_num8 pid, t_num cantBytes){
 }
 
 
-void _sumarCantPagsHeap(t_num8 pid, int cant){
+void _sumarCantPagsHeap(t_pid pid, int cant){
 	_lockLista_infoProc();
 	int _espidproc(t_infoProceso* a){ return a->pid == pid; }
 	t_infoProceso* infP = list_remove_by_condition(infoProcs, (void*) _espidproc);
@@ -147,7 +147,7 @@ void _sumarCantPagsHeap(t_num8 pid, int cant){
 	_unlockLista_infoProc();
 }
 
-int _cantPagsHeap(t_num8 pid){
+int _cantPagsHeap(t_pid pid){
 	int cant;
 	_lockLista_infoProc();
 	int _espidproc(t_infoProceso* a){ return a->pid == pid; }
@@ -157,7 +157,7 @@ int _cantPagsHeap(t_num8 pid){
 	return cant;
 }
 
-void _sumarCantOpPriv(t_num8 pid){
+void _sumarCantOpPriv(t_pid pid){
 	_lockLista_infoProc();
 	int _espidproc(t_infoProceso* a){ return a->pid == pid; }
 	t_infoProceso* infP = list_remove_by_condition(infoProcs, (void*) _espidproc);
@@ -229,7 +229,7 @@ void escucharCPU(int socket_cpu) {
 
 		_lockLista_PCB_cpu();
 		t_infosocket* aux = list_find(lista_PCB_cpu, (void*) _esCPU2);
-		t_num8 pidaux = 0;
+		t_pid pidaux = 0;
 		if(aux != NULL)
 			pidaux = aux->pidPCB;
 		_unlockLista_PCB_cpu();
@@ -257,7 +257,7 @@ void escucharCPU(int socket_cpu) {
 //-------------- VARIABLES EMPLEADAS PARA BORRAR Y CERRAR --------------------
 
 		t_descriptor_archivo fdRecibido;
-		t_num8 pidRecibido;
+		t_pid pidRecibido;
 
 		t_tabla_proceso* TablaProceso = malloc(sizeof(t_tabla_proceso));
 		t_entrada_proceso* entradaProcesoBuscado = malloc(sizeof(t_entrada_proceso));
@@ -272,7 +272,7 @@ void escucharCPU(int socket_cpu) {
 			//msg_recibir_data(socket_cpu, msgRecibido);
 
 			memcpy(&fdRecibido, msgRecibido->data, sizeof(t_descriptor_archivo));
-			memcpy(&pidRecibido, msgRecibido->data + sizeof(t_descriptor_archivo), sizeof(t_num8));
+			memcpy(&pidRecibido, msgRecibido->data + sizeof(t_descriptor_archivo), sizeof(t_pid));
 
 			log_trace(logKernel, "fdRecibido %d pidRecibido %d", fdRecibido, pidRecibido);
 
@@ -315,7 +315,7 @@ void escucharCPU(int socket_cpu) {
 				_unlockLista_PCB_cpu();
 				if(info == NULL)
 					log_trace(logKernel, "No se encuentra consola asociada a pid %d", pcb->pid);
-				msg_enviar_separado(FINALIZAR_PROGRAMA, sizeof(t_num8), &info->pidPCB, info->socket);
+				msg_enviar_separado(FINALIZAR_PROGRAMA, sizeof(t_pid), &info->pidPCB, info->socket);
 				sem_post(&sem_gradoMp);
 				free(info);
 				finalizarPid(pcb->pid);
@@ -350,7 +350,7 @@ void escucharCPU(int socket_cpu) {
 				_sacarDeCola(pcb->pid, cola_Exec, mutex_Exec);
 				setearExitCode(pcb->pid, SIN_DEFINICION);
 				void _sacarDeSemaforos(t_VariableSemaforo* sem){
-					t_num8 encontrado = _sacarDeCola(pcb->pid, sem->colaBloqueados, sem->mutex_colaBloqueados);
+					t_pid encontrado = _sacarDeCola(pcb->pid, sem->colaBloqueados, sem->mutex_colaBloqueados);
 					if(encontrado == pcb->pid)
 						sem->valorSemaforo++;
 				}
@@ -383,7 +383,7 @@ void escucharCPU(int socket_cpu) {
 			_lockLista_PCB_consola();
 			t_infosocket* info = list_find(lista_PCB_consola, (void*) _esPid);
 			_unlockLista_PCB_consola();
-			msg_enviar_separado(ERROR, sizeof(t_num8), &pcb->pid, info->socket);
+			msg_enviar_separado(ERROR, sizeof(t_pid), &pcb->pid, info->socket);
 			sem_post(&sem_gradoMp);
 			liberarCPU(cpuUsada);
 			break;
@@ -458,12 +458,12 @@ void escucharCPU(int socket_cpu) {
 				semBuscado->valorSemaforo++;
 				log_trace(logKernel, "Valor %d", semBuscado->valorSemaforo);
 				if(semBuscado->valorSemaforo <= 0){
-					t_num8 pidADesbloquear;
-					void* tmp = malloc(sizeof(t_num8));
+					t_pid pidADesbloquear;
+					void* tmp = malloc(sizeof(t_pid));
 					pthread_mutex_lock(&semBuscado->mutex_colaBloqueados);
 					tmp = queue_pop(semBuscado->colaBloqueados);
 					pthread_mutex_unlock(&semBuscado->mutex_colaBloqueados);
-					memcpy(&pidADesbloquear, tmp, sizeof(t_num8));
+					memcpy(&pidADesbloquear, tmp, sizeof(t_pid));
 					free(tmp);
 					log_trace(logKernel, "Desbloqueo pid %d", pidADesbloquear);
 
@@ -500,8 +500,8 @@ void escucharCPU(int socket_cpu) {
 				msg_enviar_separado(WAIT, sizeof(t_num), &semBuscad->valorSemaforo, socket_cpu);
 
 				if(semBuscad->valorSemaforo < 0){
-					void* tmp = malloc(sizeof(t_num8));
-					memcpy(tmp, &pcb->pid, sizeof(t_num8));
+					void* tmp = malloc(sizeof(t_pid));
+					memcpy(tmp, &pcb->pid, sizeof(t_pid));
 					pthread_mutex_lock(&semBuscad->mutex_colaBloqueados);
 					queue_push(semBuscad->colaBloqueados, tmp);
 					pthread_mutex_unlock(&semBuscad->mutex_colaBloqueados);
@@ -625,7 +625,7 @@ void escucharCPU(int socket_cpu) {
 			t_direccion_archivo pathArchivo;
 			t_num longitudPath;
 			t_banderas flags;
-			t_num8 pid;
+			t_pid pid;
 			offset = 0;
 			memcpy(&longitudPath, msgRecibido->data + offset, tmpsize = sizeof(t_num));
 			offset += tmpsize;
@@ -635,7 +635,7 @@ void escucharCPU(int socket_cpu) {
 			offset += tmpsize;
 			memcpy(&flags, msgRecibido->data + offset, tmpsize = sizeof(t_banderas));
 			offset += tmpsize;
-			memcpy(&pid, msgRecibido->data + offset, tmpsize = sizeof(t_num8));
+			memcpy(&pid, msgRecibido->data + offset, tmpsize = sizeof(t_pid));
 			offset += tmpsize;
 
 //-------------- busco si ya tengo este path en la tabla global ---------
@@ -775,7 +775,7 @@ void escucharCPU(int socket_cpu) {
 
 
 typedef struct {
-	t_num8 pid;
+	t_pid pid;
 	t_num size;
 	char* script;
 }_t_hiloEspera;
@@ -804,7 +804,7 @@ void enviarScriptAMemoria(_t_hiloEspera* aux){
 	t_PCB* pcb = list_find(lista_PCBs, (void*) _buscarPCB);
 	_unlockLista_PCBs();
 
-	send(socket_memoria, &aux->pid, sizeof(t_num8), 0);
+	send(socket_memoria, &aux->pid, sizeof(t_pid), 0);
 	msg_enviar_separado(INICIALIZAR_PROGRAMA, aux->size, aux->script, socket_memoria);
 	send(socket_memoria, &pcb->cantPagsStack, sizeof(t_num16), 0);
 	t_num8 respuesta;
@@ -816,7 +816,7 @@ void enviarScriptAMemoria(_t_hiloEspera* aux){
 		pcb->cantPagsCodigo = (string_length(aux->script) / tamanioPag);
 		pcb->cantPagsCodigo = (string_length(aux->script) % tamanioPag) == 0? pcb->cantPagsCodigo: pcb->cantPagsCodigo + 1;
 		pcb->sp = pcb->cantPagsCodigo * tamanioPag;
-		msg_enviar_separado(respuesta, sizeof(t_num8), &pcb->pid, socketConsola);
+		msg_enviar_separado(respuesta, sizeof(t_pid), &pcb->pid, socketConsola);
 
 		_lockLista_infoProc();
 		t_infoProceso* infP = malloc(sizeof(t_infoProceso));
@@ -865,7 +865,7 @@ void atender_consola(int socket_consola){
 		memcpy(script, msgRecibido->data, msgRecibido->longitud);
 		log_info(logKernel, "\n%s", script);
 
-		t_num8 pidActual = crearPCB(socket_consola, script);
+		t_pid pidActual = crearPCB(socket_consola, script);
 
 		_lockLista_PCB_consola();
 		t_infosocket* info = malloc(sizeof(t_infosocket));
@@ -894,8 +894,8 @@ void atender_consola(int socket_consola){
 	case FINALIZAR_PROGRAMA:
 		//msg_recibir_data(socket_consola, msgRecibido);
 		log_trace(logKernel, "Recibi FINALIZAR_PROGRAMA de consola %d", socket_consola);
-		t_num8 pidAFinalizar;
-		memcpy(&pidAFinalizar, msgRecibido->data, sizeof(t_num8));
+		t_pid pidAFinalizar;
+		memcpy(&pidAFinalizar, msgRecibido->data, sizeof(t_pid));
 		log_trace(logKernel, "FINALIZAR_PROGRAMA pid %d", pidAFinalizar);
 		finalizarPid(pidAFinalizar);
 		setearExitCode(pidAFinalizar, COMANDO_FINALIZAR);

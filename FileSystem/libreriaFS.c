@@ -83,15 +83,19 @@ void escucharKERNEL(void* socket_kernel) {
 		case OBTENER_DATOS:
 			log_info(logFS, "Obtener datos archivo");
 
-			tmpsize = msgRecibido->longitud - sizeof(t_num)*2;
+			t_num sizePath;
 
-			path = malloc(tmpsize);
-			memcpy(path, msgRecibido->data, tmpsize);
-			path[tmpsize] = '\0';
+			memcpy(&sizePath, msgRecibido->data + tmpoffset, tmpsize = sizeof(t_num));
 			tmpoffset += tmpsize;
-			memcpy(&offset, msgRecibido->data + tmpoffset, sizeof(t_num));
-			tmpoffset += sizeof(t_num);
-			memcpy(&size, msgRecibido->data + tmpoffset, sizeof(t_num));
+			path = malloc(sizePath+1);
+			memcpy(path, msgRecibido->data + tmpoffset, tmpsize = sizePath);
+			path[sizePath] = '\0';
+			tmpoffset += tmpsize;
+			memcpy(&offset, msgRecibido->data + tmpoffset, tmpsize = sizeof(t_valor_variable));
+			tmpoffset += tmpsize;
+			memcpy(&size, msgRecibido->data + tmpoffset, tmpsize = sizeof(t_valor_variable));
+			tmpoffset += tmpsize;
+
 			log_info(logFS, "Path: %s - offset: %d - size %d", path, offset, size);
 
 			char* data = leerBloquesArchivo(path, offset, size);

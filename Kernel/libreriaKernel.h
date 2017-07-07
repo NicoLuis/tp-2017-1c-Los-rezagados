@@ -52,7 +52,7 @@
 
 typedef struct{
 	t_descriptor_archivo fd;
-	char* bandera;
+	t_banderas bandera;
 	uint referenciaGlobalTable;
 	t_valor_variable cursor;
 }t_entrada_proceso;

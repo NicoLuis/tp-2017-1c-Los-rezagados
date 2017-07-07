@@ -106,7 +106,10 @@ void asignar(t_puntero direccion_variable, t_valor_variable valor){
 		puntero.offset = direccion_variable % tamanioPagina;
 		puntero.size = sizeof(t_valor_variable);
 
-		escribirMemoria(puntero, valor);
+		void* buffer = malloc(sizeof(t_valor_variable));
+		memcpy(buffer, &valor, sizeof(t_valor_variable));
+		escribirMemoria(puntero, buffer);
+		free(buffer);
 	}else{
 		log_error(logAnsisop, "No se puede asignar en %d", direccion_variable);
 		flag_error = true;
@@ -175,7 +178,10 @@ void retornar(t_valor_variable retorno){
 
 	t_Stack* stackActual = list_get(pcb->indiceStack, list_size(pcb->indiceStack) - 1);
 
-	escribirMemoria(stackActual->retVar, retorno);
+	void* buffer = malloc(sizeof(t_valor_variable));
+	memcpy(buffer, &retorno, sizeof(t_valor_variable));
+	escribirMemoria(stackActual->retVar, buffer);
+	free(buffer);
 }
 
 void finalizar(){
@@ -274,7 +280,7 @@ t_descriptor_archivo abrir(t_direccion_archivo direccion, t_banderas flags){
 	u_int fd = 0;
 	int offset = 0, tmpsize;
 	log_trace(logAnsisop, "abrir el siguiente archivo ubicado en: %s", direccion);
-	int longitud_buffer = sizeof(t_num) + string_length(direccion) + sizeof(t_banderas) + sizeof(t_num8);
+	int longitud_buffer = sizeof(t_num) + string_length(direccion) + sizeof(t_banderas) + sizeof(t_pid);
 	void* buffer = malloc(longitud_buffer);
 	t_num longitud_path = string_length(direccion);
 
@@ -284,7 +290,7 @@ t_descriptor_archivo abrir(t_direccion_archivo direccion, t_banderas flags){
 	offset += tmpsize;
 	memcpy(buffer+ offset, &flags, tmpsize = sizeof(t_banderas));
 	offset += tmpsize;
-	memcpy(buffer+ offset, &pcb->pid, tmpsize = sizeof(t_num8));
+	memcpy(buffer+ offset, &pcb->pid, tmpsize = sizeof(t_pid));
 	offset += tmpsize;
 
 	if(buffer == NULL){
@@ -313,11 +319,11 @@ t_descriptor_archivo abrir(t_direccion_archivo direccion, t_banderas flags){
 void mandarMsgaKernel(int tipoMensaje, t_descriptor_archivo fd){
 
 
-	int longitud_buffer = sizeof(t_descriptor_archivo) + sizeof(t_num8);
+	int longitud_buffer = sizeof(t_descriptor_archivo) + sizeof(t_pid);
 	void* buffer = malloc(longitud_buffer);
 
 	memcpy(buffer, &fd, sizeof(t_descriptor_archivo));
-	memcpy(buffer + sizeof(t_descriptor_archivo), &pcb->pid, sizeof(t_num8));
+	memcpy(buffer + sizeof(t_descriptor_archivo), &pcb->pid, sizeof(t_pid));
 	msg_enviar_separado(tipoMensaje, longitud_buffer, buffer, socket_kernel);
 
 	free(buffer);
@@ -349,17 +355,21 @@ void cerrar(t_descriptor_archivo descriptor_archivo){
 }
 
 void mandarMSGaKernel_LE(t_descriptor_archivo descriptor_archivo, void* informacion, t_valor_variable tamanio, int tipoMsj){
-		int sizeFD = sizeof(t_descriptor_archivo);
-		void* buf = malloc(sizeFD + tamanio + sizeof(t_valor_variable));
+	int offset = 0, tmpsize;
+	void* buf = malloc(sizeof(t_descriptor_archivo) + sizeof(t_valor_variable) + tamanio + sizeof(t_pid));
 
-		memcpy(buf, &descriptor_archivo, sizeFD);
-		memcpy(buf + sizeFD, &tamanio, sizeof(t_valor_variable));
-		memcpy(buf + sizeFD + sizeof(t_valor_variable), informacion, tamanio);
-		memcpy(buf + sizeFD + sizeof(t_valor_variable) + tamanio, &pcb->pid, sizeof(t_pid));
+	memcpy(buf + offset, &descriptor_archivo, tmpsize = sizeof(t_descriptor_archivo));
+	offset += tmpsize;
+	memcpy(buf + offset, &tamanio, tmpsize = sizeof(t_valor_variable));
+	offset += tmpsize;
+	memcpy(buf + offset, informacion, tmpsize = tamanio);
+	offset += tmpsize;
+	memcpy(buf + offset, &pcb->pid, tmpsize = sizeof(t_pid));
+	offset += tmpsize;
 
-		msg_enviar_separado(tipoMsj, sizeFD + sizeof(t_valor_variable) + tamanio + sizeof(t_pid), buf, socket_kernel);
+	msg_enviar_separado(tipoMsj, offset, buf, socket_kernel);
 
-		free(buf);
+	free(buf);
 }
 
 void escribir(t_descriptor_archivo descriptor_archivo, void* informacion, t_valor_variable tamanio){
@@ -394,16 +404,17 @@ void leer(t_descriptor_archivo descriptor_archivo, t_puntero informacion, t_valo
 
 
 	log_trace(logAnsisop, "Leer fd %d en %d size %d", descriptor_archivo, informacion, tamanio);
+	int offset = 0, tmpsize;
+	void* buff = malloc(sizeof(t_descriptor_archivo) + sizeof(t_valor_variable) + sizeof(t_pid));
 
-	int sizeFD = sizeof(t_descriptor_archivo);
-	void* buff = malloc(sizeFD + tamanio + sizeof(t_valor_variable));
+	memcpy(buff + offset, &descriptor_archivo, tmpsize = sizeof(t_descriptor_archivo));
+	offset += tmpsize;
+	memcpy(buff + offset, &tamanio, tmpsize = sizeof(t_valor_variable));
+	offset += tmpsize;
+	memcpy(buff + offset, &pcb->pid, tmpsize = sizeof(t_pid));
+	offset += tmpsize;
 
-	memcpy(buff, &descriptor_archivo, sizeFD);
-	memcpy(buff + sizeFD, &tamanio, sizeof(t_valor_variable));
-	//memcpy(buf + sizeFD + sizeof(t_valor_variable), informacion, tamanio);
-	memcpy(buff + sizeFD + sizeof(t_valor_variable), &pcb->pid, sizeof(t_pid));
-
-	msg_enviar_separado(LEER_ANSISOP, sizeFD + sizeof(t_valor_variable) + tamanio + sizeof(t_pid), buff, socket_kernel);
+	msg_enviar_separado(LEER_ANSISOP, offset, buff, socket_kernel);
 
 	free(buff);
 
@@ -416,14 +427,14 @@ void leer(t_descriptor_archivo descriptor_archivo, t_puntero informacion, t_valo
 		void * infoObtenida = malloc(msgDatosObtenidos->longitud);
 
 		if(informacion >= 0){
-		//log_trace(logAnsisop, "Asigno valor %d en direccion variable %d", valor, direccion_variable);
-		t_posicion puntero;
-		puntero.pagina = informacion / tamanioPagina;
-		puntero.offset = informacion % tamanioPagina;
-		puntero.size = msgDatosObtenidos->longitud;
+			//log_trace(logAnsisop, "Asigno valor %d en direccion variable %d", valor, direccion_variable);
+			t_posicion puntero;
+			puntero.pagina = informacion / tamanioPagina;
+			puntero.offset = informacion % tamanioPagina;
+			puntero.size = msgDatosObtenidos->longitud;
 
-		escribirMemoria(puntero, infoObtenida);
-
+			escribirMemoria(puntero, infoObtenida);
+		}
 	}else{
 		log_error(logCPU, "Error al leer");
 		//flag_error = 1; escribo algun flag??
@@ -440,7 +451,7 @@ void moverCursor(t_descriptor_archivo descriptor_archivo, t_valor_variable posic
 
 	memcpy(buffer, &descriptor_archivo, sizeof(t_descriptor_archivo));
 	memcpy(buffer + sizeof(t_descriptor_archivo), &posicion, sizeof(t_valor_variable));
-	memcpy(buffer + sizeof(t_descriptor_archivo) + sizeof(t_valor_variable), &pcb->pid, sizeof(t_num8));
+	memcpy(buffer + sizeof(t_descriptor_archivo) + sizeof(t_valor_variable), &pcb->pid, sizeof(t_pid));
 
 	msg_enviar_separado(MOVER_ANSISOP, sizeof(t_descriptor_archivo) + sizeof(t_descriptor_archivo), buffer, socket_kernel);
 	free(buffer);
@@ -510,7 +521,7 @@ void liberar(t_puntero puntero){
 		}
 	}
 	else{
-		log_error(logAnsisop, "Error al reservar memoria - se recibio %d", msgRecibido->tipoMensaje);
+		log_error(logAnsisop, "Error al liberar memoria - se recibio %d", msgRecibido->tipoMensaje);
 		flag_error = true;
 	}
 	msg_destruir(msgRecibido);

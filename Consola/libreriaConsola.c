@@ -64,6 +64,7 @@ void leerComando(char* comando){
 		if(prog != NULL){
 			msg_enviar_separado(FINALIZAR_PROGRAMA, sizeof(t_pid), &pidAFinalizar, socket_kernel);
 			//finalizarPrograma(prog, 0);
+			fprintf(stderr, PRINT_COLOR_BLUE "Finalizo PID %d" PRINT_COLOR_RESET "\n", pidAFinalizar);
 		}
 		else
 			fprintf(stderr, "El pid %d no pertenece a esta consola\n", pidAFinalizar);
@@ -71,7 +72,6 @@ void leerComando(char* comando){
 
 	}else if(string_equals_ignore_case(comando, "disconnect")){
 
-		//todo: mando mensaje a kernel para matar a todos
 		msg_enviar_separado(DESCONECTAR, 0, 0, socket_kernel);
 
 	}else if(string_equals_ignore_case(comando, "clear")){

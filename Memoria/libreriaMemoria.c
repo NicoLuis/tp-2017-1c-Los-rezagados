@@ -359,9 +359,12 @@ void escucharCPU(void* socket_cpu) {
 
 					char* contenido_leido = obtenerContenidoSegunCache(pidPeticion, puntero);
 					msg_enviar_separado(LECTURA_PAGINA, puntero.size, contenido_leido, socketCPU);
-					if(puntero.size != sizeof(t_num))
+					if(puntero.size != sizeof(t_num)){
 						contenido_leido[puntero.size-1] = '\0';
-					log_info(log_memoria, "contenido_leido %s", contenido_leido);
+						log_info(log_memoria, "contenido_leido %s", contenido_leido);
+					}else
+						log_info(log_memoria, "contenido_leido %d", contenido_leido);
+
 					free(contenido_leido);
 
 				} else {
@@ -1026,13 +1029,12 @@ void escribirContenidoSegunCache(t_pid pid, t_posicion puntero, void* contenido_
 	entradaCache->ultimoAcceso = cantAccesosMemoria;
 	pthread_mutex_unlock(&mutexCantAccesosMemoria);
 
-	log_info(log_memoria, "Leo %d bytes - frame %d a partir de %d", puntero.size, entradaCache->numFrame, puntero.offset);
+	log_info(log_memoria, "Escribo %d bytes - frame %d a partir de %d", puntero.size, entradaCache->numFrame, puntero.offset);
 
-	void* contenido = malloc(puntero.size);
 	int desplazamiento = (entradaCache->numFrame * tamanioDeMarcos) + puntero.offset;
 
 	pthread_mutex_lock(&mutexMemoriaReal);
-	memcpy(memoria_real + desplazamiento, contenido, puntero.size);
+	memcpy(memoria_real + desplazamiento, contenido_escribir, puntero.size);
 	pthread_mutex_unlock(&mutexMemoriaReal);
 
 	pthread_mutex_unlock(&mutexCache);

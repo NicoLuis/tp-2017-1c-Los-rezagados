@@ -430,7 +430,6 @@ void leer(t_descriptor_archivo descriptor_archivo, t_puntero informacion, t_valo
 			t_posicion puntero;
 			puntero.pagina = informacion / tamanioPagina;
 			puntero.offset = (informacion % tamanioPagina);
-			//puntero.offset = (informacion % tamanioPagina) + sizeof(t_HeapMetadata);
 			puntero.size = msgDatosObtenidos->longitud;
 
 			escribirMemoria(puntero, msgDatosObtenidos->data);

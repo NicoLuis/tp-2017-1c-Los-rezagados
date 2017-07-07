@@ -1578,7 +1578,7 @@ t_puntero reservarMemoriaHeap(t_num cantBytes, t_PCB* pcb){
 	}
 	_sumarCantOpAlocar(pcb->pid, cantBytes);
 
-	return retorno;
+	return retorno + sizeof(t_HeapMetadata);
 }
 
 
@@ -1612,6 +1612,8 @@ int liberarMemoriaHeap(t_puntero posicion, t_PCB* pcb){
 		return h->pid == pcb->pid;
 	}
 	bool flag_se_libero_pag = 0;
+
+	posicion = posicion - sizeof(t_HeapMetadata);
 
 	//envio solicitud
 	t_posicion puntero;

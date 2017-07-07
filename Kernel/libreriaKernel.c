@@ -117,7 +117,7 @@ int handshake(int socket_cliente, int tipo){
 	return retorno;
 }
 
-void _sumarCantOpAlocar(t_num8 pid, t_num cantBytes){
+void _sumarCantOpAlocar(t_pid pid, t_num cantBytes){
 	_lockLista_infoProc();
 	int _espidproc(t_infoProceso* a){ return a->pid == pid; }
 	t_infoProceso* infP = list_remove_by_condition(infoProcs, (void*) _espidproc);
@@ -127,7 +127,7 @@ void _sumarCantOpAlocar(t_num8 pid, t_num cantBytes){
 	_unlockLista_infoProc();
 }
 
-void _sumarCantOpLiberar(t_num8 pid, t_num cantBytes){
+void _sumarCantOpLiberar(t_pid pid, t_num cantBytes){
 	_lockLista_infoProc();
 	int _espidproc(t_infoProceso* a){ return a->pid == pid; }
 	t_infoProceso* infP = list_remove_by_condition(infoProcs, (void*) _espidproc);
@@ -138,7 +138,7 @@ void _sumarCantOpLiberar(t_num8 pid, t_num cantBytes){
 }
 
 
-void _sumarCantPagsHeap(t_num8 pid, int cant){
+void _sumarCantPagsHeap(t_pid pid, int cant){
 	_lockLista_infoProc();
 	int _espidproc(t_infoProceso* a){ return a->pid == pid; }
 	t_infoProceso* infP = list_remove_by_condition(infoProcs, (void*) _espidproc);
@@ -147,7 +147,7 @@ void _sumarCantPagsHeap(t_num8 pid, int cant){
 	_unlockLista_infoProc();
 }
 
-int _cantPagsHeap(t_num8 pid){
+int _cantPagsHeap(t_pid pid){
 	int cant;
 	_lockLista_infoProc();
 	int _espidproc(t_infoProceso* a){ return a->pid == pid; }
@@ -157,7 +157,7 @@ int _cantPagsHeap(t_num8 pid){
 	return cant;
 }
 
-void _sumarCantOpPriv(t_num8 pid){
+void _sumarCantOpPriv(t_pid pid){
 	_lockLista_infoProc();
 	int _espidproc(t_infoProceso* a){ return a->pid == pid; }
 	t_infoProceso* infP = list_remove_by_condition(infoProcs, (void*) _espidproc);
@@ -229,7 +229,9 @@ void escucharCPU(int socket_cpu) {
 
 		_lockLista_PCB_cpu();
 		t_infosocket* aux = list_find(lista_PCB_cpu, (void*) _esCPU2);
-		t_num8 pidaux = aux->pidPCB;
+		t_pid pidaux = 0;
+		if(aux != NULL)
+			pidaux = aux->pidPCB;
 		_unlockLista_PCB_cpu();
 
 		int _es_PCB(t_PCB* p){
@@ -252,10 +254,15 @@ void escucharCPU(int socket_cpu) {
 		t_num tamanioNombre, offset = 0;
 		int tmpsize;
 
+//-------------- VARIABLES EMPLEADAS PARA LEER Y ESCRIBIR -------------------
+
+		t_valor_variable desplazamiento;
+		void* datos;
+
 //-------------- VARIABLES EMPLEADAS PARA BORRAR Y CERRAR --------------------
 
 		t_descriptor_archivo fdRecibido;
-		t_num8 pidRecibido;
+		t_pid pidRecibido;
 
 		t_tabla_proceso* TablaProceso = malloc(sizeof(t_tabla_proceso));
 		t_entrada_proceso* entradaProcesoBuscado = malloc(sizeof(t_entrada_proceso));
@@ -272,8 +279,12 @@ void escucharCPU(int socket_cpu) {
 
 			/*
 			memcpy(&fdRecibido, msgRecibido->data, sizeof(t_descriptor_archivo));
+<<<<<<< HEAD
 			memcpy(&pidRecibido, msgRecibido->data + sizeof(t_descriptor_archivo), sizeof(t_num8));
 			*/
+//=======
+			//memcpy(&pidRecibido, msgRecibido->data + sizeof(t_descriptor_archivo), sizeof(t_pid));
+//>>>>>>> 1ec17ef78a19e67ea7467a5c2a87d6461051fa8f
 
 			log_trace(logKernel, "fdRecibido %d pidRecibido %d", fdRecibido, pidRecibido);
 
@@ -318,10 +329,15 @@ void escucharCPU(int socket_cpu) {
 				_unlockLista_PCB_cpu();
 				if(info == NULL)
 					log_trace(logKernel, "No se encuentra consola asociada a pid %d", pcb->pid);
-				msg_enviar_separado(FINALIZAR_PROGRAMA, sizeof(t_num8), &info->pidPCB, info->socket);
+				msg_enviar_separado(FINALIZAR_PROGRAMA, sizeof(t_pid), &info->pidPCB, info->socket);
 				sem_post(&sem_gradoMp);
 				free(info);
-				finalizarPid(pcb->pid, 0);
+				finalizarPid(pcb->pid);
+				if((int)pcb->exitCode > 0){
+					pcb->exitCode = 0;
+					_ponerEnCola(pcb->pid, cola_Exit, mutex_Exit);
+					liberarPCB(pcb, true);
+				}
 			}
 			_lockLista_PCBs();
 			if(list_remove_by_condition(lista_PCBs, (void*) _es_PCB) == NULL) log_warning(logKernel, "No se encuentra pcb en ENVIO_PCB");
@@ -344,18 +360,20 @@ void escucharCPU(int socket_cpu) {
 			_lockLista_PCB_cpu();
 			list_remove_and_destroy_by_condition(lista_PCB_cpu, (void*) _esCPU2, free);
 			_unlockLista_PCB_cpu();
-			_sacarDeCola(pcb->pid, cola_Exec, mutex_Exec);
-			setearExitCode(pcb->pid, SIN_DEFINICION);
-			void _sacarDeSemaforos(t_VariableSemaforo* sem){
-				t_num8 encontrado = _sacarDeCola(pcb->pid, sem->colaBloqueados, sem->mutex_colaBloqueados);
-				if(encontrado == pcb->pid)
-					sem->valorSemaforo++;
+			if(pcb != NULL){
+				_sacarDeCola(pcb->pid, cola_Exec, mutex_Exec);
+				setearExitCode(pcb->pid, SIN_DEFINICION);
+				void _sacarDeSemaforos(t_VariableSemaforo* sem){
+					t_pid encontrado = _sacarDeCola(pcb->pid, sem->colaBloqueados, sem->mutex_colaBloqueados);
+					if(encontrado == pcb->pid)
+						sem->valorSemaforo++;
+				}
+				list_iterate(lista_variablesSemaforo, (void*) _sacarDeSemaforos);
+				_lockLista_PCBs();
+				if(list_remove_by_condition(lista_PCBs, (void*) _es_PCB) == NULL) log_warning(logKernel, "No se encuentra pcb en FIN_CPU");
+				list_add(lista_PCBs, pcb);
+				_unlockLista_PCBs();
 			}
-			list_iterate(lista_variablesSemaforo, (void*) _sacarDeSemaforos);
-			_lockLista_PCBs();
-			if(list_remove_by_condition(lista_PCBs, (void*) _es_PCB) == NULL) log_warning(logKernel, "No se encuentra pcb en FIN_CPU");
-			list_add(lista_PCBs, pcb);
-			_unlockLista_PCBs();
 			sem_post(&sem_gradoMp);
 			pthread_exit(NULL);
 			break;
@@ -366,7 +384,12 @@ void escucharCPU(int socket_cpu) {
 		case ERROR:
 			log_trace(logKernel, "Recibi ERROR de CPU");
 			pcb = recibir_pcb(socket_cpu, msgRecibido, 0, 0);
-			finalizarPid(pcb->pid, ERROR_SCRIPT);
+			finalizarPid(pcb->pid);
+			if((int)pcb->exitCode > 0){
+				pcb->exitCode = ERROR_SCRIPT;
+				_ponerEnCola(pcb->pid, cola_Exit, mutex_Exit);
+				liberarPCB(pcb, true);
+			}
 			_lockLista_PCBs();
 			if(list_remove_by_condition(lista_PCBs, (void*) _es_PCB) == NULL) log_warning(logKernel, "No se encuentra pcb en ERROR");
 			list_add(lista_PCBs, pcb);
@@ -374,7 +397,7 @@ void escucharCPU(int socket_cpu) {
 			_lockLista_PCB_consola();
 			t_infosocket* info = list_find(lista_PCB_consola, (void*) _esPid);
 			_unlockLista_PCB_consola();
-			msg_enviar_separado(ERROR, sizeof(t_num8), &pcb->pid, info->socket);
+			msg_enviar_separado(ERROR, sizeof(t_pid), &pcb->pid, info->socket);
 			sem_post(&sem_gradoMp);
 			liberarCPU(cpuUsada);
 			break;
@@ -449,12 +472,12 @@ void escucharCPU(int socket_cpu) {
 				semBuscado->valorSemaforo++;
 				log_trace(logKernel, "Valor %d", semBuscado->valorSemaforo);
 				if(semBuscado->valorSemaforo <= 0){
-					t_num8 pidADesbloquear;
-					void* tmp = malloc(sizeof(t_num8));
+					t_pid pidADesbloquear;
+					void* tmp = malloc(sizeof(t_pid));
 					pthread_mutex_lock(&semBuscado->mutex_colaBloqueados);
 					tmp = queue_pop(semBuscado->colaBloqueados);
 					pthread_mutex_unlock(&semBuscado->mutex_colaBloqueados);
-					memcpy(&pidADesbloquear, tmp, sizeof(t_num8));
+					memcpy(&pidADesbloquear, tmp, sizeof(t_pid));
 					free(tmp);
 					log_trace(logKernel, "Desbloqueo pid %d", pidADesbloquear);
 
@@ -491,8 +514,8 @@ void escucharCPU(int socket_cpu) {
 				msg_enviar_separado(WAIT, sizeof(t_num), &semBuscad->valorSemaforo, socket_cpu);
 
 				if(semBuscad->valorSemaforo < 0){
-					void* tmp = malloc(sizeof(t_num8));
-					memcpy(tmp, &pcb->pid, sizeof(t_num8));
+					void* tmp = malloc(sizeof(t_pid));
+					memcpy(tmp, &pcb->pid, sizeof(t_pid));
 					pthread_mutex_lock(&semBuscad->mutex_colaBloqueados);
 					queue_push(semBuscad->colaBloqueados, tmp);
 					pthread_mutex_unlock(&semBuscad->mutex_colaBloqueados);
@@ -566,9 +589,9 @@ void escucharCPU(int socket_cpu) {
 			log_trace(logKernel, "LIBERAR posicion %d", posicion);
 
 			if( liberarMemoriaHeap(posicion, pcb) < 0 )
-				msg_enviar_separado(LIBERAR, sizeof(t_puntero), &direccion, socket_cpu);
-			else
 				msg_enviar_separado(ERROR, 0, 0, socket_cpu);
+			else
+				msg_enviar_separado(LIBERAR, 1, 0, socket_cpu);
 
 			_lockLista_PCBs();
 			if(list_remove_by_condition(lista_PCBs, (void*) _es_PCB) == NULL) log_warning(logKernel, "No se encuentra pcb en LIBERAR");
@@ -584,7 +607,7 @@ void escucharCPU(int socket_cpu) {
 
 			memcpy(&fdRecibido, msgRecibido->data, sizeof(t_descriptor_archivo));
 			memcpy(&cursorRecibido, msgRecibido->data + sizeof(t_descriptor_archivo), sizeof(t_valor_variable));
-			memcpy(&pidRecibido, msgRecibido->data + sizeof(t_descriptor_archivo) + sizeof(t_valor_variable), sizeof(t_num8));
+			memcpy(&pidRecibido, msgRecibido->data + sizeof(t_descriptor_archivo) + sizeof(t_valor_variable), sizeof(t_pid));
 
 			_cargarEntradasxTabla();
 
@@ -592,6 +615,7 @@ void escucharCPU(int socket_cpu) {
 				log_trace(logKernel, "no existe la entrada buscada");
 			}else{
 				entradaProcesoBuscado->cursor = cursorRecibido;
+				log_trace(logKernel, "se seteo el cursor");
 			}
 
 			break;
@@ -599,37 +623,35 @@ void escucharCPU(int socket_cpu) {
 		case LEER_ANSISOP:
 			log_trace(logKernel, "Recibi ESCRIBIR_FD de CPU");
 
-			t_valor_variable tamanio;
-
-
 			memcpy(&fdRecibido, msgRecibido->data, sizeof(t_descriptor_archivo));
-			memcpy(&tamanio, msgRecibido->data + sizeof(t_descriptor_archivo), sizeof(t_valor_variable));
-			void* informacion = malloc(tamanio);
-			memcpy(informacion, msgRecibido->data + sizeof(t_valor_variable) + sizeof(t_descriptor_archivo), tamanio);
-			memcpy(&pidRecibido, msgRecibido->data + sizeof(t_valor_variable) + sizeof(t_descriptor_archivo) + tamanio, sizeof(t_num8));
+			memcpy(&desplazamiento, msgRecibido->data + sizeof(t_descriptor_archivo), sizeof(t_valor_variable));
+			memcpy(&pidRecibido, msgRecibido->data + sizeof(t_valor_variable) + sizeof(t_descriptor_archivo), sizeof(t_pid));
 
 			_cargarEntradasxTabla();
 
 			if(entradaGlobalBuscada == NULL){
 				log_trace(logKernel, "no existe la entrada buscada");
 			}else{
-				void* buffer = malloc(sizeof(t_num) + string_length(entradaGlobalBuscada->FilePath) + sizeof(t_valor_variable) + sizeof(t_valor_variable));
+				void* buffer = malloc(sizeof(t_num) + string_length(entradaGlobalBuscada->FilePath)
+							   + sizeof(t_valor_variable) + sizeof(t_valor_variable) + sizeof(t_valor_variable));
+
 				offset = 0;
 				tmpsize = 0;
-				memcpy(buffer, string_length(entradaGlobalBuscada->FilePath), tmpsize = sizeof(t_num));
+				memcpy(buffer, string_length(entradaGlobalBuscada->FilePath), tmpsize = sizeof(int));
 				offset += tmpsize;
 				memcpy(buffer + offset, entradaGlobalBuscada->FilePath, tmpsize = string_length(entradaGlobalBuscada->FilePath));
 				offset += tmpsize;
 				memcpy(buffer+ offset, entradaProcesoBuscado->cursor, tmpsize = sizeof(t_valor_variable));
 				offset += tmpsize;
-				memcpy(buffer+ offset, &tamanio, tmpsize = sizeof(t_valor_variable));
+				memcpy(buffer+ offset, &desplazamiento, tmpsize = sizeof(t_valor_variable));
 				offset += tmpsize;
-				memcpy(buffer+ offset, &informacion, tmpsize = sizeof(t_valor_variable));
+				memcpy(buffer+ offset, datos, tmpsize = sizeof(t_valor_variable));
 				offset += tmpsize;
 
 				msg_enviar_separado(OBTENER_DATOS, offset, buffer, socket_fs);
 
 				free(buffer);
+				free(datos);
 
 				t_msg* msgDatosObtenidos = msg_recibir(socket_fs);
 
@@ -643,7 +665,7 @@ void escucharCPU(int socket_cpu) {
 					//flag_error = 1; escribo algun flag??
 				}
 				msg_destruir(msgDatosObtenidos);
-				//free(buffer);
+
 			}
 
 
@@ -655,16 +677,11 @@ void escucharCPU(int socket_cpu) {
 
 			log_trace(logKernel, "Recibi ESCRIBIR_FD de CPU");
 
-			//t_descriptor_archivo fd;
-			//t_num8 pidActual;
-			t_valor_variable tamanio;
-
-
 			memcpy(&fdRecibido, msgRecibido->data, sizeof(t_descriptor_archivo));
-			memcpy(&tamanio, msgRecibido->data + sizeof(t_descriptor_archivo), sizeof(t_valor_variable));
-			void* informacion = malloc(tamanio);
-			memcpy(informacion, msgRecibido->data + sizeof(t_valor_variable) + sizeof(t_descriptor_archivo), tamanio);
-			memcpy(&pidRecibido, msgRecibido->data + sizeof(t_valor_variable) + sizeof(t_descriptor_archivo) + tamanio, sizeof(t_num8));
+			memcpy(&desplazamiento, msgRecibido->data + sizeof(t_descriptor_archivo), sizeof(t_valor_variable));
+			datos = malloc(desplazamiento);
+			memcpy(datos, msgRecibido->data + sizeof(t_valor_variable) + sizeof(t_descriptor_archivo), desplazamiento);
+			memcpy(&pidRecibido, msgRecibido->data + sizeof(t_valor_variable) + sizeof(t_descriptor_archivo) + desplazamiento, sizeof(t_pid));
 
 			//int size = msgRecibido->longitud - sizeof(t_puntero), fd;
 			//void* informacion = malloc(size);
@@ -674,37 +691,43 @@ void escucharCPU(int socket_cpu) {
 			//memcpy(informacion, msgRecibido->data + sizeof(t_puntero), size);
 
 			if(fd == 1){
-				log_trace(logKernel, "Imprimo por consola: %s", informacion);
+				log_trace(logKernel, "Imprimo por consola: %s", datos);
 				_lockLista_PCB_consola();
 				t_infosocket* info = list_find(lista_PCB_consola, (void*) _esPid);
 				_unlockLista_PCB_consola();
 				if(info == NULL)
 					log_trace(logKernel, "No se ecuentra consola asociada a pid %d", pcb->pid);
-				msg_enviar_separado(IMPRIMIR_TEXTO, /*size*/ tamanio, informacion, info->socket);
+				msg_enviar_separado(IMPRIMIR_TEXTO, /*size*/ desplazamiento, datos, info->socket);
 				msg_enviar_separado(ESCRIBIR_FD, 0, 0, socket_cpu);
 			}else{
-				log_trace(logKernel, "Escribo en fd %d: %s", fd, informacion);
+				log_trace(logKernel, "Escribo en fd %d: %s", fd, datos);
 
 				_cargarEntradasxTabla();
 
 				if(entradaGlobalBuscada == NULL){
 					log_trace(logKernel, "no existe la entrada buscada");
 				}else{
-					void* buffer = malloc(sizeof(t_num) + string_length(entradaGlobalBuscada->FilePath) + sizeof(t_valor_variable) + sizeof(t_valor_variable));
+					void* buffer = malloc(sizeof(int) + string_length(entradaGlobalBuscada->FilePath)
+								   + sizeof(t_valor_variable) + sizeof(t_valor_variable)) + desplazamiento;
 					offset = 0;
 					tmpsize = 0;
-					memcpy(buffer, string_length(entradaGlobalBuscada->FilePath), tmpsize = sizeof(t_num));
+					memcpy(buffer, string_length(entradaGlobalBuscada->FilePath), tmpsize = sizeof(int));
 					offset += tmpsize;
 					memcpy(buffer + offset, entradaGlobalBuscada->FilePath, tmpsize = string_length(entradaGlobalBuscada->FilePath));
 					offset += tmpsize;
 					memcpy(buffer+ offset, entradaProcesoBuscado->cursor, tmpsize = sizeof(t_valor_variable));
 					offset += tmpsize;
-					memcpy(buffer+ offset, &tamanio, tmpsize = sizeof(t_valor_variable));
+					memcpy(buffer+ offset, &desplazamiento, tmpsize = sizeof(t_valor_variable));
 					offset += tmpsize;
-					memcpy(buffer+ offset, &informacion, tmpsize = sizeof(t_valor_variable));
+					memcpy(buffer+ offset, datos, tmpsize = sizeof(t_valor_variable));
 					offset += tmpsize;
 
 					msg_enviar_separado(GUARDAR_DATOS, offset, buffer, socket_fs);
+
+					free(buffer);
+					free(datos);
+
+					t_msg* msgDatosObtenidos = msg_recibir(socket_fs);
 
 					if(msgRecibido->tipoMensaje == GUARDAR_DATOS){
 						log_trace(logKernel, "Escribio bien");
@@ -714,13 +737,13 @@ void escucharCPU(int socket_cpu) {
 						//flag_error = 1; escribo algun flag??
 					}
 					msg_destruir(msgRecibido);
-					free(buffer);
+
 				}
 				//todo: lo trato como si fuese del FS
 			}
 
 			_sumarCantOpPriv(pcb->pid);
-			free(informacion);
+			free(datos);
 			pthread_mutex_unlock(&cpuUsada->mutex);
 			break;
 
@@ -728,12 +751,12 @@ void escucharCPU(int socket_cpu) {
 //-----------------------------------------------------------------------------------------
 
 		case ABRIR_ANSISOP:
+			// fixme cuando ejecute 2do script q abre archivo exploto -> buscar porque
 			log_trace(logKernel, "Recibi la siguiente operacion ABRIR_ANSISOP de CPU");
-			//t_num longitud_msj = 0;
 			t_direccion_archivo pathArchivo;
 			t_num longitudPath;
 			t_banderas flags;
-			t_num8 pid;
+			t_pid pid;
 			offset = 0;
 			memcpy(&longitudPath, msgRecibido->data + offset, tmpsize = sizeof(t_num));
 			offset += tmpsize;
@@ -743,7 +766,7 @@ void escucharCPU(int socket_cpu) {
 			offset += tmpsize;
 			memcpy(&flags, msgRecibido->data + offset, tmpsize = sizeof(t_banderas));
 			offset += tmpsize;
-			memcpy(&pid, msgRecibido->data + offset, tmpsize = sizeof(t_num8));
+			memcpy(&pid, msgRecibido->data + offset, tmpsize = sizeof(t_pid));
 			offset += tmpsize;
 
 //-------------- busco si ya tengo este path en la tabla global ---------
@@ -763,7 +786,7 @@ void escucharCPU(int socket_cpu) {
 
 				entradaGlobalNew->Open = 1;
 				entradaGlobalNew->indiceGlobalTable = indiceGlobal; // indiceGlobal = 0 seteado en kernel.c
-				indiceActualGlobal = indiceGlobal;
+				indiceActualGlobal = indiceGlobal; //me guardo el indice antes de aumentarlo
 				indiceGlobal++;
 				list_add(lista_tabla_global, entradaGlobalNew);
 			} else {
@@ -800,7 +823,7 @@ void escucharCPU(int socket_cpu) {
 			//-------------- busco si ya tengo la tabla para este id de proceso -------------------------
 
 			int _espid(t_tabla_proceso* a){ return a->pid == pid; }
-			//poner un mutex lock lista_tabla_de_procesos
+			// todo: poner un mutex lock lista_tabla_de_procesos
 			t_tabla_proceso* tablaProceso = list_remove_by_condition(lista_tabla_de_procesos, (void*) _esPid);
 
 			if(tablaProceso == NULL){
@@ -816,13 +839,12 @@ void escucharCPU(int socket_cpu) {
 			// en este momento ya estan cargados los flags, el indice y la referencia a tabla global
 			list_add(tablaProceso->lista_entradas_de_proceso, entradaProcesoNew);
 			list_add(lista_tabla_de_procesos, tablaProceso);
-			//poner un mutex UNLOCK lista_tabla_de_procesos
+			// todo: poner un mutex UNLOCK lista_tabla_de_procesos
 
 			// le mando a cpu el fd asignado
 			msg_enviar_separado(ABRIR_ANSISOP, sizeof(t_descriptor_archivo), &entradaProcesoNew->fd, socket_cpu);
 
 			free(pathArchivo);
-			//free(entradaProcesoNew); fixme las cosas q agrego a una lista no se liberan (recien cuando lo saco lo libero)
 
 			_sumarCantOpPriv(pcb->pid);
 			break;
@@ -832,7 +854,7 @@ void escucharCPU(int socket_cpu) {
 			log_trace(logKernel, "Recibi la siguiente operacion BORRAR_ANSISOP de CPU");
 
 			memcpy(&fdRecibido, msgRecibido->data, sizeof(t_descriptor_archivo));
-			memcpy(&pidRecibido, msgRecibido->data + sizeof(t_descriptor_archivo), sizeof(t_num8));
+			memcpy(&pidRecibido, msgRecibido->data + sizeof(t_descriptor_archivo), sizeof(t_pid));
 
 			_cargarEntradasxTabla();
 
@@ -859,25 +881,27 @@ void escucharCPU(int socket_cpu) {
 			log_trace(logKernel, "Recibi la siguiente operacion CERRAR_ANSISOP de CPU");
 
 			memcpy(&fdRecibido, msgRecibido->data, sizeof(t_descriptor_archivo));
-			memcpy(&pidRecibido, msgRecibido->data + sizeof(t_descriptor_archivo), sizeof(t_num8));
+			memcpy(&pidRecibido, msgRecibido->data + sizeof(t_descriptor_archivo), sizeof(t_pid));
 
 			_cargarEntradasxTabla();
 
 			if(entradaGlobalBuscada == NULL){
 				log_trace(logKernel, "no existe la entrada buscada");
 			}else{
+				entradaGlobalBuscada = list_remove_by_condition(lista_tabla_global, (void*) _buscarPorIndice);
+				// saco la entrada global buscada
 				entradaGlobalBuscada->Open --;
 
 				//int _esFD(t_entrada_proceso *entradaP){return entradaP->indice == entradaProcesoBuscado->indice;}
 				list_remove_by_condition(TablaProceso->lista_entradas_de_proceso, (void*) _esFD);
 				if(entradaGlobalBuscada->Open == 0){
-					// sacar esta entrada de la tabla global
-					//int _esIndiceGlobal(t_entrada_GlobalFile *entradaG){return entradaG->indiceGlobalTable == entradaGlobalBuscada->indiceGlobalTable;}
-					list_remove_by_condition(lista_tabla_global, (void*) _esIndiceGlobal);
+					// no hago nada ya que la saque antes
+				} else {
+					// vuelvo a meter la entrada que modifique en la tabla global
+					list_add(lista_tabla_global, entradaGlobalBuscada);
 				}
-
-				list_add(lista_tabla_global, entradaGlobalBuscada);
 			}
+
 			_sumarCantOpPriv(pcb->pid);
 			break;
 		} //end switch
@@ -894,7 +918,7 @@ void escucharCPU(int socket_cpu) {
 
 
 typedef struct {
-	t_num8 pid;
+	t_pid pid;
 	t_num size;
 	char* script;
 }_t_hiloEspera;
@@ -923,9 +947,9 @@ void enviarScriptAMemoria(_t_hiloEspera* aux){
 	t_PCB* pcb = list_find(lista_PCBs, (void*) _buscarPCB);
 	_unlockLista_PCBs();
 
-	send(socket_memoria, &aux->pid, sizeof(t_num8), 0);
+	send(socket_memoria, &aux->pid, sizeof(t_pid), 0);
 	msg_enviar_separado(INICIALIZAR_PROGRAMA, aux->size, aux->script, socket_memoria);
-	send(socket_memoria, &pcb->cantPagsStack, sizeof(t_num8), 0);
+	send(socket_memoria, &pcb->cantPagsStack, sizeof(t_num16), 0);
 	t_num8 respuesta;
 	recv(socket_memoria, &respuesta, sizeof(t_num8), 0);
 
@@ -935,7 +959,7 @@ void enviarScriptAMemoria(_t_hiloEspera* aux){
 		pcb->cantPagsCodigo = (string_length(aux->script) / tamanioPag);
 		pcb->cantPagsCodigo = (string_length(aux->script) % tamanioPag) == 0? pcb->cantPagsCodigo: pcb->cantPagsCodigo + 1;
 		pcb->sp = pcb->cantPagsCodigo * tamanioPag;
-		msg_enviar_separado(respuesta, sizeof(t_num8), &pcb->pid, socketConsola);
+		msg_enviar_separado(respuesta, sizeof(t_pid), &pcb->pid, socketConsola);
 
 		_lockLista_infoProc();
 		t_infoProceso* infP = malloc(sizeof(t_infoProceso));
@@ -968,8 +992,10 @@ void atender_consola(int socket_consola){
 
 	void* script;	//si lo declaro adentro del switch se queja
 	void _finalizarPIDs(t_infosocket* i){
-		if(i->socket == socket_consola)
-			finalizarPid(i->pidPCB, DESCONEXION_CONSOLA);
+		if(i->socket == socket_consola){
+			finalizarPid(i->pidPCB);
+			setearExitCode(i->pidPCB, DESCONEXION_CONSOLA);
+		}
 	}
 
 
@@ -982,7 +1008,7 @@ void atender_consola(int socket_consola){
 		memcpy(script, msgRecibido->data, msgRecibido->longitud);
 		log_info(logKernel, "\n%s", script);
 
-		t_num8 pidActual = crearPCB(socket_consola, script);
+		t_pid pidActual = crearPCB(socket_consola, script);
 
 		_lockLista_PCB_consola();
 		t_infosocket* info = malloc(sizeof(t_infosocket));
@@ -1011,10 +1037,11 @@ void atender_consola(int socket_consola){
 	case FINALIZAR_PROGRAMA:
 		//msg_recibir_data(socket_consola, msgRecibido);
 		log_trace(logKernel, "Recibi FINALIZAR_PROGRAMA de consola %d", socket_consola);
-		t_num8 pidAFinalizar;
-		memcpy(&pidAFinalizar, msgRecibido->data, sizeof(t_num8));
+		t_pid pidAFinalizar;
+		memcpy(&pidAFinalizar, msgRecibido->data, sizeof(t_pid));
 		log_trace(logKernel, "FINALIZAR_PROGRAMA pid %d", pidAFinalizar);
-		finalizarPid(pidAFinalizar, COMANDO_FINALIZAR);
+		finalizarPid(pidAFinalizar);
+		setearExitCode(pidAFinalizar, COMANDO_FINALIZAR);
 		break;
 
 	case 0: case DESCONECTAR:
@@ -1127,7 +1154,7 @@ void consolaKernel(){
 					printf( "Cantidad de operaciones privilegiadas que ejecutó: %d \n", infP->cantOpPriv);
 					break;
 				case 'c':
-					printf( "Tabla de archivos abiertos por el proceso %d \n", infP->tablaArchivos);	//todo
+					printf( "Tabla de archivos abiertos por el proceso %d \n", infP->tablaArchivos);	// todo: implementar
 					break;
 				case 'd':
 					printf( "Cantidad de páginas de Heap utilizadas: %d \n", infP->cantPagsHeap);
@@ -1148,7 +1175,7 @@ void consolaKernel(){
 			_unlockLista_infoProc();
 		}else if(string_equals_ignore_case(comando, "tabla archivos")){
 
-			//todo: implementar
+			// todo: implementar
 
 		}else if(string_starts_with(comando, "grado mp ")){
 
@@ -1216,7 +1243,8 @@ void consolaKernel(){
 					log_trace(logKernel,  "El PID %d ya finalizo", pidKill);
 					fprintf(stderr, PRINT_COLOR_YELLOW "El PID %d ya finalizo" PRINT_COLOR_RESET "\n", pidKill);
 				}else{
-					finalizarPid(pidKill, COMANDO_FINALIZAR);
+					finalizarPid(pidKill);
+					setearExitCode(pidKill, COMANDO_FINALIZAR);
 					fprintf(stderr, PRINT_COLOR_BLUE "Finalizo PID %d" PRINT_COLOR_RESET "\n", pidKill);
 				}
 			}
@@ -1283,8 +1311,8 @@ void terminarKernel(){			//aca libero todos
 
 
 
-void finalizarPid(t_num8 pid, int exitCode){
-	log_trace(logKernel, "Finalizo pid %d con exitCode %d", pid, exitCode);
+void finalizarPid(t_pid pid){
+	log_trace(logKernel, "Finalizo pid %d", pid);
 	int _buscarPID(t_infosocket* i){
 		return i->pidPCB == pid;
 	}
@@ -1317,15 +1345,14 @@ void finalizarPid(t_num8 pid, int exitCode){
 
 	if(flag_hagoesto){
 		void _sacarDeSemaforos(t_VariableSemaforo* sem){
-			t_num8 encontrado = _sacarDeCola(pid, sem->colaBloqueados, sem->mutex_colaBloqueados);
+			t_pid encontrado = _sacarDeCola(pid, sem->colaBloqueados, sem->mutex_colaBloqueados);
 			if(encontrado == pid)
 				sem->valorSemaforo++;
 		}
 		list_iterate(lista_variablesSemaforo, (void*) _sacarDeSemaforos);
 
-		send(socket_memoria, &pid, sizeof(t_num8), 0);
+		send(socket_memoria, &pid, sizeof(t_pid), 0);
 		msg_enviar_separado(FINALIZAR_PROGRAMA, 0, 0, socket_memoria);
-		setearExitCode(pid, exitCode);
 		sem_post(&sem_gradoMp);
 	}
 }
@@ -1383,7 +1410,7 @@ void asignarNuevaPag(t_PCB* pcb){
 	}
 
 	log_trace(logKernel, "Asigno nueva pagina a proceso %d", pcb->pid);
-	send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
+	send(socket_memoria, &pcb->pid, sizeof(t_pid), 0);
 	msg_enviar_separado(ASIGNACION_MEMORIA, 0, 0, socket_memoria);
 	t_msg* msgRecibido = msg_recibir(socket_memoria);
 	if(msgRecibido->tipoMensaje != ASIGNACION_MEMORIA)
@@ -1410,7 +1437,7 @@ void asignarNuevaPag(t_PCB* pcb){
 	memcpy(buffer, &puntero, sizeof(t_posicion));
 	memcpy(buffer + sizeof(t_posicion), &metadata, sizeof(t_HeapMetadata));
 
-	send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
+	send(socket_memoria, &pcb->pid, sizeof(t_pid), 0);
 	msg_enviar_separado(ESCRITURA_PAGINA, sizeof(t_posicion) + sizeof(t_HeapMetadata), buffer, socket_memoria);
 	msgRecibido = msg_recibir(socket_memoria);
 	if(msgRecibido->tipoMensaje != ESCRITURA_PAGINA)
@@ -1435,7 +1462,7 @@ t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
 		return h1->nroPag <= h2->nroPag;
 	}
 
-	t_list* listAux = list_filter(tabla_heap, (void*) _esHeap);	//fixme: ver si explota por no tener 2 elementeos
+	t_list* listAux = list_filter(tabla_heap, (void*) _esHeap);
 	list_sort(tabla_heap, (void*) _menorPag);
 
 	int i=0, j=0, offset=0, tmpsize;
@@ -1450,7 +1477,7 @@ t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
 				puntero.pagina = pcb->cantPagsCodigo + pcb->cantPagsStack + i;
 				puntero.offset = j;
 				puntero.size = sizeof(t_HeapMetadata);
-				send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
+				send(socket_memoria, &pcb->pid, sizeof(t_pid), 0);
 				msg_enviar_separado(LECTURA_PAGINA, sizeof(t_posicion), &puntero, socket_memoria);
 
 				//recibo
@@ -1469,11 +1496,11 @@ t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
 
 				if(heapMetadata.isFree && cantBytes <= heapMetadata.size ){
 					//encontre hueco
-					heapMetadata.isFree = false;
-					heapMetadata.size = cantBytes;
 					t_HeapMetadata heapMetadataProx;
 					heapMetadataProx.isFree = true;
 					heapMetadataProx.size = heapMetadata.size - cantBytes - sizeof(t_HeapMetadata);
+					heapMetadata.isFree = false;
+					heapMetadata.size = cantBytes;
 
 					void* buffer = malloc(sizeof(t_posicion) + sizeof(t_HeapMetadata)*2);
 					memcpy(buffer + offset, &puntero, tmpsize = sizeof(t_posicion));
@@ -1483,7 +1510,7 @@ t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
 					memcpy(buffer + offset, &heapMetadataProx, tmpsize = sizeof(t_HeapMetadata));
 					offset += tmpsize;
 
-					send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
+					send(socket_memoria, &pcb->pid, sizeof(t_pid), 0);
 					msg_enviar_separado(ESCRITURA_PAGINA, offset, buffer, socket_memoria);
 
 					t_msg* msgRecibido2 = msg_recibir(socket_memoria);
@@ -1521,7 +1548,12 @@ t_puntero reservarMemoriaHeap(t_num cantBytes, t_PCB* pcb){
 
 	if(cantBytes > tamanioPag - sizeof(t_HeapMetadata)*2){
 		log_warning(logKernel, "Se quiere asignar mas que tamanio de pagina");
-		finalizarPid(pcb->pid, MAS_MEMORIA_TAMANIO_PAG);
+		finalizarPid(pcb->pid);
+		if((int)pcb->exitCode > 0){
+			pcb->exitCode = MAS_MEMORIA_TAMANIO_PAG;
+			_ponerEnCola(pcb->pid, cola_Exit, mutex_Exit);
+			liberarPCB(pcb, true);
+		}
 		return -1;
 	}
 
@@ -1543,6 +1575,25 @@ t_puntero reservarMemoriaHeap(t_num cantBytes, t_PCB* pcb){
 	return retorno;
 }
 
+
+t_HeapMetadata _recibirHeapMetadata(t_pid pid, t_posicion puntero){
+	t_HeapMetadata heapMetadata;
+	send(socket_memoria, &pid, sizeof(t_pid), 0);
+	msg_enviar_separado(LECTURA_PAGINA, sizeof(t_posicion), &puntero, socket_memoria);
+
+	//recibo
+	t_msg* msgRecibido = msg_recibir(socket_memoria);
+	if(msgRecibido->tipoMensaje != LECTURA_PAGINA){
+		log_error(logKernel, "No recibi LECTURA_PAGINA sino %d", msgRecibido->tipoMensaje);
+		return heapMetadata;
+	}
+	msg_recibir_data(socket_memoria, msgRecibido);
+	memcpy(&heapMetadata, msgRecibido->data, sizeof(t_HeapMetadata));
+	msg_destruir(msgRecibido);
+
+	return heapMetadata;
+}
+
 int liberarMemoriaHeap(t_puntero posicion, t_PCB* pcb){
 	int _esHeap(t_heap* h){
 		return h->pid == pcb->pid;
@@ -1552,52 +1603,40 @@ int liberarMemoriaHeap(t_puntero posicion, t_PCB* pcb){
 	//envio solicitud
 	t_posicion puntero;
 	puntero.pagina = posicion / tamanioPag;
-	puntero.offset = posicion % tamanioPag - sizeof(t_HeapMetadata);
+	puntero.offset = posicion % tamanioPag;
 	puntero.size = sizeof(t_HeapMetadata);
-	send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
-	msg_enviar_separado(LECTURA_PAGINA, sizeof(t_posicion), &puntero, socket_memoria);
 
-	//recibo
-	t_msg* msgRecibido = msg_recibir(socket_memoria);
-	if(msgRecibido->tipoMensaje != LECTURA_PAGINA){
-		log_error(logKernel, "No recibi LECTURA_PAGINA sino %d", msgRecibido->tipoMensaje);
-		if(msgRecibido->tipoMensaje == STACKOVERFLOW)
-			return -2;
-		else
-			return -1;
-	}
-	msg_recibir_data(socket_memoria, msgRecibido);
-	t_HeapMetadata heapMetadata, heapMetadataProx;
-	memcpy(&heapMetadata, msgRecibido->data, sizeof(t_HeapMetadata));
-	memcpy(&heapMetadataProx, msgRecibido->data + sizeof(t_HeapMetadata), sizeof(t_HeapMetadata));
-	msg_destruir(msgRecibido);
+	t_HeapMetadata heapMetadata = _recibirHeapMetadata(pcb->pid, puntero);
+	puntero.offset = (posicion % tamanioPag) + sizeof(t_HeapMetadata) + heapMetadata.size;
+	t_HeapMetadata heapMetadataProx = _recibirHeapMetadata(pcb->pid, puntero);
 
 	if(heapMetadata.isFree == true){
 		log_warning(logKernel, "Quiero liberar algo liberado");
 		return -1;
 	}
 
+	_sumarCantOpLiberar(pcb->pid, heapMetadata.size);
+
 	heapMetadata.isFree = true;
 	if(heapMetadataProx.isFree == true){
+		log_trace(logKernel, "El proximo esta libre, lo uno");
 		heapMetadata.size = heapMetadata.size + sizeof(t_HeapMetadata) + heapMetadataProx.size;
 	}
-
-	_sumarCantOpLiberar(pcb->pid, heapMetadata.size);
-	puntero.size = heapMetadata.size;
 
 	void* buffer = malloc(sizeof(t_posicion) + sizeof(t_HeapMetadata));
 	memcpy(buffer, &puntero, sizeof(t_posicion));
 	memcpy(buffer + sizeof(t_posicion), &heapMetadata, sizeof(t_HeapMetadata));
 
-	send(socket_memoria, &pcb->pid, sizeof(t_num8), 0);
+	send(socket_memoria, &pcb->pid, sizeof(t_pid), 0);
 
 	if(heapMetadata.size == tamanioPag - sizeof(t_HeapMetadata))
-		msg_enviar_separado(LIBERAR, sizeof(t_posicion) + sizeof(t_HeapMetadata), &puntero, socket_memoria);
+		msg_enviar_separado(LIBERAR, sizeof(t_posicion) + sizeof(t_HeapMetadata), buffer, socket_memoria);
 	else
-		msg_enviar_separado(ESCRITURA_PAGINA, sizeof(t_posicion) + sizeof(t_HeapMetadata), &puntero, socket_memoria);
+		msg_enviar_separado(ESCRITURA_PAGINA, sizeof(t_posicion) + sizeof(t_HeapMetadata), buffer, socket_memoria);
 
-	msgRecibido = msg_recibir(socket_memoria);
+	t_msg* msgRecibido = msg_recibir(socket_memoria);
 	if(msgRecibido->tipoMensaje == LIBERAR){
+		log_trace(logKernel, "Se LIBERO piola");
 		flag_se_libero_pag = 1;
 		_sumarCantPagsHeap(pcb->pid, -1);
 		list_remove_and_destroy_by_condition(tabla_heap, (void*) _esHeap, free);

@@ -44,12 +44,12 @@ void finalizarCPU(){
 	log_trace(logAnsisop, "  FIN CPU  ");
 
 	if(socket_kernel != 0){
-		msg_enviar_separado(FIN_CPU, 1, 0, socket_kernel);
+		msg_enviar_separado(FIN_CPU, 0, 0, socket_kernel);
 		close(socket_kernel);
 	}
 
 	if(socket_memoria != 0){
-		msg_enviar_separado(FIN_CPU, 1, 0, socket_memoria);
+		msg_enviar_separado(FIN_CPU, 0, 0, socket_memoria);
 		close(socket_memoria);
 	}
 
@@ -133,15 +133,11 @@ void ejecutarInstruccion(){
 
 void* _serializarPuntero(t_posicion puntero){
 	int offset = 0, tmpsize;
-	void* buffer = malloc(sizeof(t_num)*3 + sizeof(t_num8));
+	void* buffer = malloc(sizeof(t_posicion) + sizeof(t_pid));
 
-	memcpy(buffer + offset, &pcb->pid, tmpsize = sizeof(t_num8));
+	memcpy(buffer + offset, &pcb->pid, tmpsize = sizeof(t_pid));
 	offset += tmpsize;
-	memcpy(buffer + offset, &puntero.pagina, tmpsize = sizeof(t_num));
-	offset += tmpsize;
-	memcpy(buffer + offset, &puntero.offset, tmpsize = sizeof(t_num));
-	offset += tmpsize;
-	memcpy(buffer + offset, &puntero.size, tmpsize = sizeof(t_num));
+	memcpy(buffer + offset, &puntero, tmpsize = sizeof(t_posicion));
 	offset += tmpsize;
 
 	return buffer;
@@ -150,6 +146,7 @@ void* _serializarPuntero(t_posicion puntero){
 t_valor_variable leerMemoria(t_posicion puntero){
 
 	t_valor_variable valor;
+
 	void* buffer = _serializarPuntero(puntero);
 	msg_enviar_separado(LECTURA_PAGINA, sizeof(t_posicion) + sizeof(t_num8), buffer, socket_memoria);
 	free(buffer);
@@ -176,12 +173,20 @@ t_valor_variable leerMemoria(t_posicion puntero){
 	return valor;
 }
 
-t_posicion escribirMemoria(t_posicion puntero, t_valor_variable valor){
+t_posicion escribirMemoria(t_posicion puntero, void* valor){
 
-	void* buffer = _serializarPuntero(puntero);
-	buffer = realloc(buffer, sizeof(t_num)*3 + sizeof(t_num8) + sizeof(t_valor_variable));
-	memcpy(buffer + sizeof(t_num)*3 + sizeof(t_num8), &valor, sizeof(t_num));
-	msg_enviar_separado(ESCRITURA_PAGINA, sizeof(t_num)*3 + sizeof(t_num8) + sizeof(t_valor_variable), buffer, socket_memoria);
+	int offset = 0, tmpsize;
+	int sizeTotal = sizeof(t_pid) + sizeof(t_posicion) + puntero.size;
+	void* buffer = malloc(sizeTotal);
+
+	memcpy(buffer + offset, &pcb->pid, tmpsize = sizeof(t_pid));
+	offset += tmpsize;
+	memcpy(buffer + offset, &puntero, tmpsize = sizeof(t_posicion));
+	offset += tmpsize;
+	memcpy(buffer + offset, valor, tmpsize = puntero.size);
+	offset += tmpsize;
+
+	msg_enviar_separado(ESCRITURA_PAGINA, sizeTotal, buffer, socket_memoria);
 	free(buffer);
 
 	t_num header;
@@ -226,7 +231,7 @@ char* proximaInstruccion() {
 	log_info(logCPU, "pagina %d start %d size %d", puntero.pagina, puntero.offset, puntero.size);
 
 	void* buffer = _serializarPuntero(puntero);
-	msg_enviar_separado(LECTURA_PAGINA, sizeof(t_num)*3 + sizeof(t_num8), buffer, socket_memoria);
+	msg_enviar_separado(LECTURA_PAGINA, sizeof(t_posicion) + sizeof(t_num8), buffer, socket_memoria);
 	free(buffer);
 	free(instruction);
 

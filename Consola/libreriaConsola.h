@@ -33,7 +33,7 @@
 #include <herramientas/enum.h>
 
 typedef struct {
-	t_num8 pid;
+	t_pid pid;
 	char* horaInicio;
 	char* horaFin;
 	int cantImpresionesPantalla;

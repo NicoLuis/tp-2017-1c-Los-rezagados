@@ -58,7 +58,7 @@ typedef struct{
 }t_entrada_proceso;
 
 typedef struct{
-	t_num8 pid;
+	t_pid pid;
 	uint fdMax;
 	t_list* lista_entradas_de_proceso;
 
@@ -100,7 +100,7 @@ t_list* lista_variablesSemaforo;
 
 typedef struct {
 	int nroPag;
-	t_num8 pid;
+	t_pid pid;
 }t_heap;
 t_list* tabla_heap;
 
@@ -111,7 +111,7 @@ typedef struct HeapMetadata {
 
 typedef struct {
 	int socket;
-	t_num8 pidPCB;
+	t_pid pidPCB;
 }t_infosocket;
 
 typedef struct {
@@ -162,7 +162,7 @@ void _unlockLista_PCB_cpu();
 void _lockLista_infoProc();
 void _unlockLista_infoProc();
 
-t_num8 pid;
+t_pid pid;
 int indiceGlobal;
 
 //Archivo de Configuracion
@@ -179,7 +179,7 @@ int gradoMultiprogramacion;
 //t_list* identificadoresSemaforos;
 //t_list* inicializacionSemaforos;
 //t_list* identificadorVariables;
-t_num8 stackSize;
+t_num16 stackSize;
 
 
 
@@ -214,7 +214,7 @@ t_log* logKernel;
 t_num tamanioPag;
 
 void escucharCPU(int);
-void _sumarCantOpPriv(t_num8);
+void _sumarCantOpPriv(t_pid);
 
 int handshake(int socket_cliente, int tipo);
 void atender_consola(int socket_consola);
@@ -222,6 +222,6 @@ void atender_consola(int socket_consola);
 void consolaKernel();
 void terminarKernel();
 
-void finalizarPid(t_num8 pid, int exitCode);
+void finalizarPid(t_pid pid);
 
 #endif /* LIBRERIAKERNEL_H_ */

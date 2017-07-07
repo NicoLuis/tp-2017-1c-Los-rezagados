@@ -82,7 +82,9 @@ void escucharKERNEL(void* socket_kernel) {
 			break;
 		case OBTENER_DATOS:
 			log_info(logFS, "Obtener datos archivo");
+
 			tmpsize = msgRecibido->longitud - sizeof(t_num)*2;
+
 			path = malloc(tmpsize);
 			memcpy(path, msgRecibido->data, tmpsize);
 			path[tmpsize] = '\0';
@@ -101,16 +103,16 @@ void escucharKERNEL(void* socket_kernel) {
 		case GUARDAR_DATOS:
 			log_info(logFS, "Guardar datos archivo");
 
-			memcpy(&tmpsize, msgRecibido->data, sizeof(t_num));
-			tmpoffset += sizeof(t_num);
+			memcpy(&tmpsize, msgRecibido->data, sizeof(int));
+			tmpoffset = sizeof(int);       //tmpoffset += sizeof(int);
 			path = malloc(tmpsize);
 			memcpy(path, msgRecibido->data + tmpoffset, tmpsize);
 			path[tmpsize] = '\0';
 			tmpoffset += tmpsize;
-			memcpy(&offset, msgRecibido->data + tmpoffset, sizeof(t_num));
-			tmpoffset += sizeof(t_num);
-			memcpy(&size, msgRecibido->data + tmpoffset, sizeof(t_num));
-			tmpoffset += sizeof(t_num);
+			memcpy(&offset, msgRecibido->data + tmpoffset, sizeof(t_valor_variable));
+			tmpoffset += sizeof(t_valor_variable);
+			memcpy(&size, msgRecibido->data + tmpoffset, sizeof(t_valor_variable));
+			tmpoffset += sizeof(t_valor_variable);
 			buffer = malloc(size);
 			memcpy(buffer, msgRecibido->data + tmpoffset, size);
 			log_info(logFS, "Path: %s - offset: %d - size %d \n buffer %s", path, offset, size, buffer);

@@ -349,15 +349,15 @@ void cerrar(t_descriptor_archivo descriptor_archivo){
 }
 
 void mandarMSGaKernel_LE(t_descriptor_archivo descriptor_archivo, void* informacion, t_valor_variable tamanio, int tipoMsj){
-	int sizeFD = sizeof(t_descriptor_archivo);
+		int sizeFD = sizeof(t_descriptor_archivo);
 		void* buf = malloc(sizeFD + tamanio + sizeof(t_valor_variable));
 
 		memcpy(buf, &descriptor_archivo, sizeFD);
 		memcpy(buf + sizeFD, &tamanio, sizeof(t_valor_variable));
 		memcpy(buf + sizeFD + sizeof(t_valor_variable), informacion, tamanio);
-		memcpy(buf + sizeFD + sizeof(t_valor_variable) + tamanio, &pcb->pid, sizeof(t_num8));
+		memcpy(buf + sizeFD + sizeof(t_valor_variable) + tamanio, &pcb->pid, sizeof(t_pid));
 
-		msg_enviar_separado(tipoMsj, sizeFD + sizeof(t_valor_variable) + tamanio + sizeof(t_num8), buf, socket_kernel);
+		msg_enviar_separado(tipoMsj, sizeFD + sizeof(t_valor_variable) + tamanio + sizeof(t_pid), buf, socket_kernel);
 
 		free(buf);
 }
@@ -394,7 +394,18 @@ void leer(t_descriptor_archivo descriptor_archivo, t_puntero informacion, t_valo
 
 
 	log_trace(logAnsisop, "Leer fd %d en %d size %d", descriptor_archivo, informacion, tamanio);
-	mandarMSGaKernel_LE(descriptor_archivo,informacion,tamanio,	LEER_ANSISOP);
+
+	int sizeFD = sizeof(t_descriptor_archivo);
+	void* buff = malloc(sizeFD + tamanio + sizeof(t_valor_variable));
+
+	memcpy(buff, &descriptor_archivo, sizeFD);
+	memcpy(buff + sizeFD, &tamanio, sizeof(t_valor_variable));
+	//memcpy(buf + sizeFD + sizeof(t_valor_variable), informacion, tamanio);
+	memcpy(buff + sizeFD + sizeof(t_valor_variable), &pcb->pid, sizeof(t_pid));
+
+	msg_enviar_separado(LEER_ANSISOP, sizeFD + sizeof(t_valor_variable) + tamanio + sizeof(t_pid), buff, socket_kernel);
+
+	free(buff);
 
 	t_msg* msgDatosObtenidos = msg_recibir(socket_kernel);
 
@@ -402,8 +413,16 @@ void leer(t_descriptor_archivo descriptor_archivo, t_puntero informacion, t_valo
 
 		log_trace(logCPU, "lei bien");
 
-		escribirMemoria(t_posicion puntero, void* valor){
+		void * infoObtenida = malloc(msgDatosObtenidos->longitud);
 
+		if(informacion >= 0){
+		//log_trace(logAnsisop, "Asigno valor %d en direccion variable %d", valor, direccion_variable);
+		t_posicion puntero;
+		puntero.pagina = informacion / tamanioPagina;
+		puntero.offset = informacion % tamanioPagina;
+		puntero.size = msgDatosObtenidos->longitud;
+
+		escribirMemoria(puntero, infoObtenida);
 
 	}else{
 		log_error(logCPU, "Error al leer");

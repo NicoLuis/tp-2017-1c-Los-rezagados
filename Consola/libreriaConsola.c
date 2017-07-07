@@ -54,7 +54,7 @@ void leerComando(char* comando){
 
 	}else if(string_starts_with(comando, "kill")){
 
-		int pidAFinalizar = atoi(string_substring_from(comando, 5));
+		t_pid pidAFinalizar = atoi(string_substring_from(comando, 5));
 		//fprintf(stderr, "El pid es %d\n", pidAFinalizar);
 
 		int _esPid(t_programa* p){
@@ -62,7 +62,7 @@ void leerComando(char* comando){
 		}
 		t_programa* prog = list_find(lista_programas, (void*) _esPid);
 		if(prog != NULL){
-			msg_enviar_separado(FINALIZAR_PROGRAMA, sizeof(t_num8), &pidAFinalizar, socket_kernel);
+			msg_enviar_separado(FINALIZAR_PROGRAMA, sizeof(t_pid), &pidAFinalizar, socket_kernel);
 			//finalizarPrograma(prog, 0);
 		}
 		else
@@ -79,10 +79,10 @@ void leerComando(char* comando){
 
 	}else if(string_equals_ignore_case(comando, "help")){
 		printf("Comandos:\n"
-				"● start [path]: Iniciar Programa\n"
-				"● kill [pid]: Finalizar Programa\n"
-				"● disconnect: Desconectar Consola\n"
-				"● clear: Limpiar Mensajes\n");
+				PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "start [path]: " PRINT_COLOR_RESET "Iniciar Programa\n"
+				PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "kill [pid]: " PRINT_COLOR_RESET "Finalizar Programa\n"
+				PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "disconnect: " PRINT_COLOR_RESET "Desconectar Consola\n"
+				PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "clear: " PRINT_COLOR_RESET "Limpiar Mensajes\n");
 	}else
 		fprintf(stderr, PRINT_COLOR_YELLOW "El comando '%s' no es valido" PRINT_COLOR_RESET "\n", comando);
 
@@ -92,7 +92,7 @@ void leerComando(char* comando){
 
 void escucharKernel(){
 
-	t_num8 pidProg;
+	t_pid pidProg;
 	t_programa* programa = malloc(sizeof(t_programa));
 	int _programaSinPid(t_programa* p){
 		return p->pid == 0;
@@ -110,7 +110,7 @@ void escucharKernel(){
 		case OK:
 			log_trace(logConsola, "Recibi OK");
 			if(msg_recibir_data(socket_kernel, msgRecibido) > 0){
-				memcpy(&pidProg, msgRecibido->data, sizeof(t_num8));
+				memcpy(&pidProg, msgRecibido->data, sizeof(t_pid));
 				log_trace(logConsola, "PID %d", pidProg);
 
 				programa = list_find(lista_programas, (void*) _programaSinPid);
@@ -130,7 +130,7 @@ void escucharKernel(){
 		case FINALIZAR_PROGRAMA:
 			log_trace(logConsola, "Recibi FINALIZAR_PROGRAMA");
 			if(msg_recibir_data(socket_kernel, msgRecibido) > 0){
-				memcpy(&pidProg, msgRecibido->data, sizeof(t_num8));
+				memcpy(&pidProg, msgRecibido->data, sizeof(t_pid));
 				log_trace(logConsola, "El pid a finalizar es %d", pidProg);
 
 				programa = list_find(lista_programas, (void*) _esPrograma);
@@ -150,7 +150,7 @@ void escucharKernel(){
 		case ERROR:
 			log_trace(logConsola, "Recibi ERROR");
 			if(msg_recibir_data(socket_kernel, msgRecibido) > 0){
-				memcpy(&pidProg, msgRecibido->data, sizeof(t_num8));
+				memcpy(&pidProg, msgRecibido->data, sizeof(t_pid));
 				log_trace(logConsola, "El pid %d no pudo terminar su ejecucion", pidProg);
 				fprintf(stderr, PRINT_COLOR_YELLOW "El PID %d no pudo terminar su ejecucion" PRINT_COLOR_RESET "\n", pidProg);
 

@@ -49,7 +49,7 @@ t_posicion traducirSP();
 
 char* proximaInstruccion();
 t_valor_variable leerMemoria(t_posicion puntero);
-t_posicion escribirMemoria(t_posicion puntero, t_valor_variable valor);
+t_posicion escribirMemoria(t_posicion puntero, void* valor);
 
 int socket_kernel;
 int socket_memoria;

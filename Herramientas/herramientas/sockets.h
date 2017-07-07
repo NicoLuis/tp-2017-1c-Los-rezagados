@@ -46,6 +46,7 @@
 typedef uint32_t t_num;
 typedef uint16_t t_num16;
 typedef uint8_t t_num8;
+typedef uint8_t t_pid;
 
 typedef struct {
 	uint8_t tipoMensaje;

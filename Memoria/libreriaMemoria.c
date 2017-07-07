@@ -8,8 +8,6 @@
 #include "libreriaMemoria.h"
 
 // todo consideraciones grals:
-// - ver retardosMemoria, en q momento se tiene q usar?
-// 		esta mal usado ahora, ej: hay veces q hace el usleep y entra a una funcion q vuelve a hacer el usleep
 // - poner colores a consola
 // - agregar un comando help
 
@@ -132,12 +130,6 @@ void escucharKERNEL(void* socket_kernel) {
 
 			} else {
 
-				//-----Retardo
-				pthread_mutex_lock(&mutexRetardo);
-				usleep(retardoMemoria * 1000);
-				pthread_mutex_unlock(&mutexRetardo);
-				//------------
-
 				int nroFrame = buscarFramePorPidPag(pid, puntero.pagina);
 				char* contenido_leido = obtenerContenido(nroFrame, puntero.offset, puntero.size);
 				msg_enviar_separado(LECTURA_PAGINA, puntero.size, contenido_leido, socketKernel);
@@ -185,12 +177,6 @@ void escucharKERNEL(void* socket_kernel) {
 				msg_enviar_separado(ESCRITURA_PAGINA, 0, 0, socketKernel);
 
 			} else {
-
-				//-----Retardo
-				pthread_mutex_lock(&mutexRetardo);
-				usleep(retardoMemoria * 1000);
-				pthread_mutex_unlock(&mutexRetardo);
-				//------------
 
 				int nroFrame = buscarFramePorPidPag(pid, puntero.pagina);
 				escribirContenido(nroFrame, puntero.offset, sizeof(t_HeapMetadata), &metadata);
@@ -333,12 +319,6 @@ void escucharCPU(void* socket_cpu) {
 
 					log_info(log_memoria, "La pagina %d esta en Memoria Real", puntero.pagina);
 
-					//-----Retardo
-					pthread_mutex_lock(&mutexRetardo);
-					usleep(retardoMemoria * 1000);
-					pthread_mutex_unlock(&mutexRetardo);
-					//------------
-
 					int nroFrame = buscarFramePorPidPag(pidPeticion, puntero.pagina);
 					char* contenido_leido = obtenerContenido(nroFrame, puntero.offset, puntero.size);
 					msg_enviar_separado(LECTURA_PAGINA, puntero.size, contenido_leido, socketCPU);
@@ -413,13 +393,6 @@ void escucharCPU(void* socket_cpu) {
 				} else {
 
 						log_info(log_memoria, "La pagina %d esta en Memoria Real",puntero.pagina);
-
-						//-----Retardo
-						pthread_mutex_lock(&mutexRetardo);
-						usleep(retardoMemoria * 1000);
-						pthread_mutex_unlock(&mutexRetardo);
-						//------------
-
 
 						int nroFrame = buscarFramePorPidPag(pidPeticion, puntero.pagina);
 						escribirContenido(nroFrame, puntero.offset, puntero.size, contenido_escribir);
@@ -502,13 +475,6 @@ void eliminarProcesoDeListaDeProcesos(t_pid pid) {
 	lockProcesos();
 	list_remove_and_destroy_by_condition(listaProcesos, (void*) _soy_el_proceso_buscado, free);
 	unlockProcesos();
-
-	//-----Retardo
-	pthread_mutex_lock(&mutexRetardo);
-	usleep(retardoMemoria * 1000);
-	pthread_mutex_unlock(&mutexRetardo);
-	//------------
-
 }
 
 /*			LECTURA-ESCRITURA			*/
@@ -585,6 +551,12 @@ void inicializarFrames(){
 	log_trace(log_memoria, "El tamanio necesario para las estructuras administrativas es %d bytes, %d marcos",
 			cantBytesEA, cantidadFramesEstructurasAdministrativas);
 
+	//-----Retardo
+	pthread_mutex_lock(&mutexRetardo);
+	usleep(retardoMemoria * 1000);
+	pthread_mutex_unlock(&mutexRetardo);
+	//------------
+
 	int i=0;
 	for(; i < cantidadDeMarcos ; i++){
 		frameNuevo = malloc(sizeof(t_frame));
@@ -612,6 +584,12 @@ int hayFramesLibres(int cantidad) {
 	int cantidadLibres = 0;
 	t_frame* frame;
 
+	//-----Retardo
+	pthread_mutex_lock(&mutexRetardo);
+	usleep(retardoMemoria * 1000);
+	pthread_mutex_unlock(&mutexRetardo);
+	//------------
+
 	lockFrames();
 	int i=0;
 	for(; i < cantidadDeMarcos ; i++){
@@ -635,6 +613,12 @@ int buscarFrameLibre(t_pid pid) {
 	int _soy_el_pid_buscado(t_proceso* proceso) {
 		return (proceso->PID == pid);
 	}
+	//-----Retardo
+	pthread_mutex_lock(&mutexRetardo);
+	usleep(retardoMemoria * 1000);
+	pthread_mutex_unlock(&mutexRetardo);
+	//------------
+
 	lockProcesos();
 	t_proceso* proceso = list_remove_by_condition(listaProcesos, (void*) _soy_el_pid_buscado);
 
@@ -703,6 +687,12 @@ int buscarFramePorPidPag(t_pid pid, t_num16 nroPagina){
 
 	log_trace(log_memoria, "Busco frame de pid %d pag %d", pid, nroPagina);
 
+	//-----Retardo
+	pthread_mutex_lock(&mutexRetardo);
+	usleep(retardoMemoria * 1000);
+	pthread_mutex_unlock(&mutexRetardo);
+	//------------
+
 	int _soy_el_pid_buscado(t_proceso* proceso) {
 		return (proceso->PID == pid);
 	}
@@ -713,6 +703,7 @@ int buscarFramePorPidPag(t_pid pid, t_num16 nroPagina){
 	lockFrames();
 	int nroFrame = -1, i;
 	bool flag_sigo = 1;
+
 	for(i = indice; i < cantidadDeMarcos && flag_sigo; i++){
 		frame = malloc(sizeof(t_frame));
 		// i*sizeof(t_frame) es el offset
@@ -765,6 +756,13 @@ void liberarPagina(t_pid pid, t_num16 nroPagina){
 	int _soy_el_pid_buscado(t_proceso* proceso) {
 		return (proceso->PID == pid);
 	}
+
+	//-----Retardo
+	pthread_mutex_lock(&mutexRetardo);
+	usleep(retardoMemoria * 1000);
+	pthread_mutex_unlock(&mutexRetardo);
+	//------------
+
 	lockProcesos();
 	t_proceso* proceso = list_remove_by_condition(listaProcesos, (void*) _soy_el_pid_buscado);
 

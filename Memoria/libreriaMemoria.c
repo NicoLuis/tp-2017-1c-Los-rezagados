@@ -816,7 +816,7 @@ void liberarPagina(t_pid pid, t_num16 nroPagina){
 			frame->nroPag = 0;
 			flag_sigo = 0;
 			proceso->cantFramesAsignados--;
-			memcpy(frame, memoria_real + i*sizeof(t_frame), sizeof(t_frame));
+			memcpy(memoria_real + i*sizeof(t_frame), frame, sizeof(t_frame));
 			log_info(log_memoria,"Frame %d liberado", frame->nroFrame);
 		}
 		free(frame);
@@ -1279,7 +1279,7 @@ void dumpProcesoParticular(t_pid pid) {
 void dumpTablaPaginas(){
 
 	char* nombreArchivoDump = string_new();
-	string_append_with_format(&nombreArchivoDump, "%d_TablaPaginas.dump", string_itoa(process_getpid()));
+	string_append_with_format(&nombreArchivoDump, "%d_TablaPaginas.dump", process_getpid());
 	FILE* archivoDump = fopen(nombreArchivoDump, "w+");
 
 	fprintf(stderr, PRINT_COLOR_CYAN "   ····  Frame  ····   PID   ····  Pagina ···· " PRINT_COLOR_RESET "\n");

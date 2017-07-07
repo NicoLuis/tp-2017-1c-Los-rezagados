@@ -101,7 +101,7 @@ void eliminarProcesoDeListaDeProcesos(t_pid pid);
 
 /*			LECTURA-ESCRITURA			*/
 void* obtenerContenido(t_pid pid, t_posicion puntero);
-int escribirContenido(int frame, int offset, int tamanio_escribir,	void* contenido);
+int escribirContenido(t_pid pid, t_posicion puntero, void* contenido);
 
 /*			FRAMES			*/
 void inicializarFrames();
@@ -124,52 +124,43 @@ void terminarMemoria();
 
 
 
-/*			CACHE (y otros)			*/
+/*			CACHE 			*/
 
 t_list* crearCache();
-
-t_cache* buscarEntradaCache(t_pid pid, t_num16 numero_pagina);
-
-int estaEnCache(t_pid pid, t_num16 numero_pagina);
+void vaciarCache();
+void eliminarCache(t_list* unaCache);
 
 t_cache* crearRegistroCache(t_pid pid, t_num16 numPag, int numFrame);
 
-void eliminarCache(t_list* unaCache);
-
-int hayEspacioEnCache();
-
+int estaEnCache(t_pid pid, t_num16 numero_pagina);
 void agregarEntradaCache(t_pid pid, t_num16 numero_pagina, int nroFrame);
-
-void* obtenerContenidoSegunCache(t_pid pid, t_posicion puntero);
-
-void escribirContenidoSegunCache(t_pid pid, t_num16 numero_pagina, uint32_t offset, uint32_t tamanio_escritura, void* contenido_escribir);
-
-void vaciarCache();
-
+t_cache* buscarEntradaCache(t_pid pid, t_num16 numero_pagina);
 void borrarEntradasCacheSegunPID(t_pid pid);
-
 void borrarEntradaCacheSegunFrame(int nroFrame);
 
+int hayEspacioEnCache();
 int Cache_Activada();
 
 void algoritmoLRU();
 
+void* obtenerContenidoSegunCache(t_pid pid, t_posicion puntero);
+void escribirContenidoSegunCache(t_pid pid, t_posicion puntero, void* contenido_escribir);
+
+
+
+/*			COMANDOS			*/
 void ejecutarComandos();
 
-void dumpEstructurasMemoriaTodosLosProcesos(FILE* archivoDump);
-
 void dumpTodosLosProcesos();
-
+void dumpEstructurasMemoriaTodosLosProcesos(FILE* archivoDump);
 void dumpContenidoMemoriaProceso(t_pid pid, FILE* archivoDump);
-
 void dumpProcesoParticular(t_pid pid);
-
 void dumpTablaPaginas();
-
 t_proceso* buscarProcesoEnListaProcesosParaDump(t_pid pid);
 
-void mostrarContenidoTodosLosProcesos();
 
+
+void mostrarContenidoTodosLosProcesos();
 void mostrarContenidoDeUnProceso(t_pid pid);
 
 

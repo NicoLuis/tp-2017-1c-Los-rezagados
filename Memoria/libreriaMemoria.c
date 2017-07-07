@@ -59,7 +59,6 @@ void escucharKERNEL(void* socket_kernel) {
 		t_msg* msg = msg_recibir(socketKernel);
 		if(msg->longitud > 0)
 			msg_recibir_data(socketKernel, msg);
-		void* tmpBuffer;
 
 		header = msg->tipoMensaje;
 		t_num16 stackSize;
@@ -95,12 +94,13 @@ void escucharKERNEL(void* socket_kernel) {
 
 				int i = 0, nroFrame;
 				for(; i < cantidadDePaginas; i++){
-					tmpBuffer = malloc(tamanioDeMarcos);
-					memcpy(tmpBuffer, msg->data + i*tamanioDeMarcos, tamanioDeMarcos);
-
 					nroFrame = buscarFrameLibre(pid);
-					escribirContenido(nroFrame, 0, tamanioDeMarcos, tmpBuffer);
-					free(tmpBuffer);
+					int desplazamientoMemoria = (nroFrame * tamanioDeMarcos) + puntero.offset;
+
+					log_info(log_memoria, "Escribo %d bytes - frame %d a partir de %d", tamanioDeMarcos, nroFrame, puntero.offset);
+					pthread_mutex_lock(&mutexMemoriaReal);
+					memcpy(memoria_real + desplazamientoMemoria, msg->data + i*tamanioDeMarcos, tamanioDeMarcos);
+					pthread_mutex_unlock(&mutexMemoriaReal);
 				}
 				log_info(log_memoria, "Asigne correctamente");
 		 		header = OK;
@@ -176,13 +176,22 @@ void escucharKERNEL(void* socket_kernel) {
 				msg_enviar_separado(PAGINA_INVALIDA, 0, 0, socketKernel);
 
 			} else if ((Cache_Activada()) && (estaEnCache(pid, puntero.pagina))) {
-				escribirContenidoSegunCache(pid, puntero.pagina, puntero.offset, sizeof(t_HeapMetadata), &metadata);
-				escribirContenidoSegunCache(pid, puntero.pagina, puntero.offset + sizeof(t_HeapMetadata), metadata.size, basura);
+
+				//todo considerar nroPag
+				//fixme	offset > tamanioMarco
+				puntero.size = sizeof(t_HeapMetadata);
+				escribirContenidoSegunCache(pid, puntero, &metadata);
+				puntero.size = metadata.size;
+				puntero.offset = puntero.offset + sizeof(t_HeapMetadata);
+				escribirContenidoSegunCache(pid, puntero, basura);
 				free(basura);
 
-				if(msg->longitud == sizeof(t_posicion) + sizeof(t_HeapMetadata)*2)
+				if(msg->longitud == sizeof(t_posicion) + sizeof(t_HeapMetadata)*2){
 					// significa q tengo q guardar otro t_HeapMetadata
-					escribirContenidoSegunCache(pid, puntero.pagina, puntero.offset + sizeof(t_HeapMetadata) + metadata.size, sizeof(t_HeapMetadata), &metadata2);
+					puntero.size = sizeof(t_HeapMetadata);
+					puntero.offset = puntero.offset + sizeof(t_HeapMetadata) + metadata.size;
+					escribirContenidoSegunCache(pid, puntero, &metadata2);
+				}
 
 				msg_enviar_separado(ESCRITURA_PAGINA, 0, 0, socketKernel);
 
@@ -200,13 +209,21 @@ void escucharKERNEL(void* socket_kernel) {
 					log_error(log_memoria, "No se encueuntra el frame para pid %d pagina %d", pid, puntero.pagina);
 					msg_enviar_separado(ERROR, 0, 0, socketKernel);
 				}else{
-					escribirContenido(nroFrame, puntero.offset, sizeof(t_HeapMetadata), &metadata);
-					escribirContenido(nroFrame, puntero.offset + sizeof(t_HeapMetadata), metadata.size, basura);
+					//todo considerar nroPag
+					//fixme	offset > tamanioMarco
+					puntero.size = sizeof(t_HeapMetadata);
+					escribirContenido(pid, puntero, &metadata);
+					puntero.size = metadata.size;
+					puntero.offset = puntero.offset + sizeof(t_HeapMetadata);
+					escribirContenido(pid, puntero, basura);
 					free(basura);
 
-					if(msg->longitud == sizeof(t_posicion) + sizeof(t_HeapMetadata)*2)
+					if(msg->longitud == sizeof(t_posicion) + sizeof(t_HeapMetadata)*2){
 						// significa q tengo q guardar otro t_HeapMetadata
-						escribirContenido(nroFrame, puntero.offset + sizeof(t_HeapMetadata) + metadata.size, sizeof(t_HeapMetadata), &metadata2);
+						puntero.size = sizeof(t_HeapMetadata);
+						puntero.offset = puntero.offset + sizeof(t_HeapMetadata) + metadata.size;
+						escribirContenido(pid, puntero, &metadata2);
+					}
 
 					msg_enviar_separado(ESCRITURA_PAGINA, 0, 0, socketKernel);
 
@@ -416,7 +433,7 @@ void escucharCPU(void* socket_cpu) {
 
 				} else if ((Cache_Activada()) && (estaEnCache(pidPeticion, puntero.pagina))) {
 
-					escribirContenidoSegunCache(pidPeticion, puntero.pagina, puntero.offset, puntero.size, contenido_escribir);
+					escribirContenidoSegunCache(pidPeticion, puntero, contenido_escribir);
 					free(contenido_escribir);
 
 					//ENVIO ESCRITURA OK
@@ -447,7 +464,7 @@ void escucharCPU(void* socket_cpu) {
 						free(contenido_escribir);
 					}else{
 
-						escribirContenido(nroFrame, puntero.offset, puntero.size, contenido_escribir);
+						escribirContenido(pidPeticion, puntero, contenido_escribir);
 						free(contenido_escribir);
 
 						header = ESCRITURA_PAGINA; //OK
@@ -532,42 +549,39 @@ void eliminarProcesoDeListaDeProcesos(t_pid pid) {
 void* obtenerContenido(t_pid pid, t_posicion puntero) {
 
 	int nroFrame = buscarFramePorPidPag(pid, puntero.pagina);
-	int desplazamiento = (nroFrame * tamanioDeMarcos) + puntero.offset;
-	if(nroFrame == -1)
-		return NULL;
+	int desplazamientoMemoria = (nroFrame * tamanioDeMarcos) + puntero.offset;
 
 	if(nroFrame == -1){
 		log_error(log_memoria, "No se encuentra el frame para pid %d pagina %d", pid, puntero.pagina);
 		return NULL;
 	}
 
-	// fixme: no considera q offset + tamanio_leer > tamanioFrame
-	// 		en ese caso tengo q buscar un nuevo frame para seguir leyendo lo faltante (tamanio_leer - (tamanioFrame - offset)) <<--------------------------------------------------------------------------------
-
 	void* contenido = malloc(puntero.size);
 	int sizeRestante = puntero.size;
-	int i = 0;
-	while(sizeRestante > tamanioDeMarcos){
+	int i = 0, offsetLectura = 0;
+	while((sizeRestante > tamanioDeMarcos) || (puntero.offset + sizeRestante > tamanioDeMarcos)){
 
-		log_info(log_memoria, "Leo %d bytes - frame %d a partir de %d", tamanioDeMarcos, nroFrame, puntero.offset);
+		log_info(log_memoria, "Leo %d bytes - frame %d a partir de %d", (tamanioDeMarcos - puntero.offset), nroFrame, puntero.offset);
 
 		pthread_mutex_lock(&mutexMemoriaReal);
-		memcpy(contenido + i*tamanioDeMarcos, memoria_real + desplazamiento, tamanioDeMarcos);
+		memcpy(contenido + offsetLectura, memoria_real + desplazamientoMemoria, (tamanioDeMarcos - puntero.offset));
 		pthread_mutex_unlock(&mutexMemoriaReal);
 
 		if(Cache_Activada())
 			agregarEntradaCache(pid, puntero.pagina + i, nroFrame);
 
 		i++;
-		sizeRestante = sizeRestante - tamanioDeMarcos;
+		sizeRestante = sizeRestante - (tamanioDeMarcos - puntero.offset);
+		offsetLectura = puntero.size - sizeRestante;
 		nroFrame = buscarFramePorPidPag(pid, puntero.pagina + i);
-		desplazamiento = (nroFrame * tamanioDeMarcos);
+		desplazamientoMemoria = (nroFrame * tamanioDeMarcos);
+		puntero.offset = 0;
 	}
 
 	log_info(log_memoria, "Leo %d bytes - frame %d a partir de %d", sizeRestante, nroFrame, puntero.offset);
 
 	pthread_mutex_lock(&mutexMemoriaReal);
-	memcpy(contenido + i*tamanioDeMarcos, memoria_real + desplazamiento, sizeRestante);
+	memcpy(contenido + offsetLectura, memoria_real + desplazamientoMemoria, sizeRestante);
 	pthread_mutex_unlock(&mutexMemoriaReal);
 
 	if(Cache_Activada())
@@ -576,26 +590,45 @@ void* obtenerContenido(t_pid pid, t_posicion puntero) {
 	return contenido;
 }
 
-int escribirContenido(int frame, int offset, int tamanio_escribir,	void* contenido) {
+int escribirContenido(t_pid pid, t_posicion puntero, void* contenido) {
 
-	// fixme: no considera q offset + tamanio_escribir > tamanioFrame
-	// 		en ese caso tengo q buscar un nuevo frame para seguir escribiendo lo faltante (tamanio_escribir - (tamanioFrame - offset)) <<--------------------------------------------------------------------------------
-	// fixme: no considera q tamanio_escribir > tamanioFrame
-	// 		lo q significa q tendria q escribir 2 o + frames (buscar siguiente frame del pid)
-	//		pondria un int nroFrame = buscarPidPag(pidPeticion, puntero.pagina);
-	// 		y un for( tamanio_escribir > i*tamanioFrame, i++ ) o un do while, ver cual
+	int nroFrame = buscarFramePorPidPag(pid, puntero.pagina);
+	int desplazamientoMemoria = (nroFrame * tamanioDeMarcos) + puntero.offset;
 
-	if(frame == -1)
+	if(nroFrame == -1){
+		log_error(log_memoria, "No se encuentra el frame para pid %d pagina %d", pid, puntero.pagina);
 		return -1;
+	}
 
-	int desplazamiento = (frame * tamanioDeMarcos) + offset;
+	int sizeRestante = puntero.size;
+	int i = 0, offsetEscritura = 0;
+	while((sizeRestante > tamanioDeMarcos) || (puntero.offset + sizeRestante > tamanioDeMarcos)){
 
-	log_info(log_memoria, "Escribo %d bytes en (frame %d * tamanioDeMarcos %d) + offset %d = desplazamiento %d ",
-			tamanio_escribir, frame, tamanioDeMarcos, offset, desplazamiento);
+		log_info(log_memoria, "Escribo %d bytes - frame %d a partir de %d", (tamanioDeMarcos - puntero.offset), nroFrame, puntero.offset);
+
+		pthread_mutex_lock(&mutexMemoriaReal);
+		memcpy(memoria_real + desplazamientoMemoria, contenido + offsetEscritura, (tamanioDeMarcos - puntero.offset));
+		pthread_mutex_unlock(&mutexMemoriaReal);
+
+		if(Cache_Activada())
+			agregarEntradaCache(pid, puntero.pagina + i, nroFrame);
+
+		i++;
+		sizeRestante = sizeRestante - (tamanioDeMarcos - puntero.offset);
+		offsetEscritura = puntero.size - sizeRestante;
+		nroFrame = buscarFramePorPidPag(pid, puntero.pagina + i);
+		desplazamientoMemoria = (nroFrame * tamanioDeMarcos);
+		puntero.offset = 0;
+	}
+
+	log_info(log_memoria, "Escribo %d bytes - frame %d a partir de %d", sizeRestante, nroFrame, puntero.offset);
 
 	pthread_mutex_lock(&mutexMemoriaReal);
-	memcpy(memoria_real + desplazamiento, contenido, tamanio_escribir);
+	memcpy(memoria_real + desplazamientoMemoria, contenido + offsetEscritura, sizeRestante);
 	pthread_mutex_unlock(&mutexMemoriaReal);
+
+	if(Cache_Activada())
+		agregarEntradaCache(pid, puntero.pagina + i, nroFrame);
 
 	return 0;
 }
@@ -870,10 +903,32 @@ void terminarMemoria(){			//aca libero todos
 
 
 
-/*			CACHE (y otros)			*/
+/*					CACHE 					*/
 t_list* crearCache() {
 	t_list* cache = list_create();
 	return cache;
+}
+
+void eliminarCache(t_list* unaCache) {
+	list_destroy_and_destroy_elements(unaCache, free);
+}
+
+void vaciarCache() {
+
+	if (Cache_Activada()) {
+		pthread_mutex_lock(&mutexCache);
+		eliminarCache(Cache);
+		Cache = crearCache();
+		pthread_mutex_unlock(&mutexCache);
+
+		printf(PRINT_COLOR_BLUE "flush Cache realizado" PRINT_COLOR_RESET "\n");
+		log_info(log_memoria, "Flush Cache realizado");
+
+	} else {
+		printf(PRINT_COLOR_YELLOW "Cache no activada" PRINT_COLOR_RESET "\n");
+		log_error(log_memoria, "Se intento hacer flush cache pero no esta activada");
+	}
+
 }
 
 t_cache* buscarEntradaCache(t_pid pid, t_num16 numero_pagina) {
@@ -913,10 +968,6 @@ t_cache* crearRegistroCache(t_pid pid, t_num16 numPag, int numFrame) {
 	pthread_mutex_unlock(&mutexCantAccesosMemoria);
 
 	return unaEntradaCache;
-}
-
-void eliminarCache(t_list* unaCache) {
-	list_destroy_and_destroy_elements(unaCache, free);
 }
 
 int hayEspacioEnCache() {
@@ -967,35 +1018,24 @@ void* obtenerContenidoSegunCache(t_pid pid, t_posicion puntero){
 	return contenido;
 }
 
-void escribirContenidoSegunCache(t_pid pid, t_num16 numero_pagina, uint32_t offset, uint32_t tamanio_escritura, void* contenido_escribir) {
+void escribirContenidoSegunCache(t_pid pid, t_posicion puntero, void* contenido_escribir) {
 
-	t_cache* entradaCache = buscarEntradaCache(pid, numero_pagina);
+	t_cache* entradaCache = buscarEntradaCache(pid, puntero.pagina);
 
 	pthread_mutex_lock(&mutexCantAccesosMemoria);
 	entradaCache->ultimoAcceso = cantAccesosMemoria;
 	pthread_mutex_unlock(&mutexCantAccesosMemoria);
 
-	escribirContenido(entradaCache->numFrame, offset, tamanio_escritura,contenido_escribir);
+	log_info(log_memoria, "Leo %d bytes - frame %d a partir de %d", puntero.size, entradaCache->numFrame, puntero.offset);
+
+	void* contenido = malloc(puntero.size);
+	int desplazamiento = (entradaCache->numFrame * tamanioDeMarcos) + puntero.offset;
+
+	pthread_mutex_lock(&mutexMemoriaReal);
+	memcpy(memoria_real + desplazamiento, contenido, puntero.size);
+	pthread_mutex_unlock(&mutexMemoriaReal);
 
 	pthread_mutex_unlock(&mutexCache);
-
-}
-
-void vaciarCache() {
-
-	if (Cache_Activada()) {
-		pthread_mutex_lock(&mutexCache);
-		eliminarCache(Cache);
-		Cache = crearCache();
-		pthread_mutex_unlock(&mutexCache);
-
-		printf(PRINT_COLOR_BLUE "flush Cache realizado" PRINT_COLOR_RESET "\n");
-		log_info(log_memoria, "Flush Cache realizado");
-
-	} else {
-		printf(PRINT_COLOR_YELLOW "Cache no activada" PRINT_COLOR_RESET "\n");
-		log_error(log_memoria, "Se intento hacer flush cache pero no esta activada");
-	}
 
 }
 
@@ -1060,6 +1100,13 @@ void algoritmoLRU() {
 
 	free(entradaTLBreemplazada);
 }
+
+
+
+
+
+/*					COMANDOS					*/
+
 
 
 void ejecutarComandos() {

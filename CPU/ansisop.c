@@ -402,9 +402,11 @@ void leer(t_descriptor_archivo descriptor_archivo, t_puntero informacion, t_valo
 
 		log_trace(logCPU, "lei bien");
 
+		escribirMemoria(t_posicion puntero, void* valor){
+
 
 	}else{
-		log_error(logKernel, "Error al leer");
+		log_error(logCPU, "Error al leer");
 		//flag_error = 1; escribo algun flag??
 	}
 	msg_destruir(msgDatosObtenidos);

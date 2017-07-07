@@ -7,10 +7,6 @@
 
 #include "libreriaMemoria.h"
 
-// todo consideraciones grals:
-// - poner colores a consola
-// - agregar un comando help
-
 void mostrarArchivoConfig() {
 
 	printf("El puerto de la MEMORIA es: %d\n", puertoMemoria);
@@ -27,7 +23,7 @@ void mostrarArchivoConfig() {
 	log_info(log_memoria,"El algoritmo de reemplaco de la Cache es: %s", algoritmoReemplazo);
 	printf("El retardo de la memoria es de: %d\n",retardoMemoria);
 	log_info(log_memoria,"El retardo de la memoria es de: %d",retardoMemoria);
-	printf("La cantidad de Frames reservados para estructuras Administrtivas es de: %d",cantidadFramesEstructurasAdministrativas);
+	printf("La cantidad de Frames reservados para estructuras Administrtivas es de: %d \n",cantidadFramesEstructurasAdministrativas);
 	log_info(log_memoria,"La cantidad de Frames reservados para estructuras Administrtivas es de: %d",cantidadFramesEstructurasAdministrativas);
 
 }
@@ -951,11 +947,11 @@ void vaciarCache() {
 		Cache = crearCache();
 		pthread_mutex_unlock(&mutexCache);
 
-		printf("Flush Cache realizado\n");
+		printf(PRINT_COLOR_BLUE "flush Cache realizado" PRINT_COLOR_RESET "\n");
 		log_info(log_memoria, "Flush Cache realizado");
 
 	} else {
-		printf("Se intento hacer flush cache pero no esta activada\n");
+		printf(PRINT_COLOR_YELLOW "Cache no activada" PRINT_COLOR_RESET "\n");
 		log_error(log_memoria, "Se intento hacer flush cache pero no esta activada");
 	}
 
@@ -1025,106 +1021,109 @@ void algoritmoLRU() {
 
 
 void ejecutarComandos() {
-	char buffer[1000];
+
+	char* comando = malloc(200);
 
 	while (1) {
-		printf("Ingrese comando:\n\n");
-		scanf("%s", buffer);
+		fgets(comando, 200, stdin);
+		comando[strlen(comando)-1] = '\0';
+		log_error(log_memoria, "Comando: %s", comando);
 
-		if (!strcmp(buffer, "retardo")) {
+		if (string_starts_with(comando,"retardo ")) {
 
-			log_error(log_memoria, "Comando: retardo");
-			int retardoNuevo;
+				int retardoNuevo = atoi(string_substring_from(comando, 8));
 
-			printf("\nIngrese nuevo valor de retardo:\n\n");
-			scanf("%d", &retardoNuevo);
+				pthread_mutex_lock(&mutexRetardo);
+				retardoMemoria = retardoNuevo;
+				pthread_mutex_unlock(&mutexRetardo);
 
-			pthread_mutex_lock(&mutexRetardo);
-			retardoMemoria = retardoNuevo;
-			pthread_mutex_unlock(&mutexRetardo);
+				fprintf(stderr, PRINT_COLOR_BLUE "Nuevo retardo: %d ms" PRINT_COLOR_RESET "\n", retardoNuevo);
+				log_info(log_memoria, "Retardo modificado correctamente a %d ms",retardoMemoria);
 
-			printf("Retardo modificado correctamente a %d ms\n\n", retardoMemoria);
+		} else if (string_equals_ignore_case(comando, "dump")) {
 
-			log_info(log_memoria, "Retardo modificado correctamente a %d ms",retardoMemoria);
+				printf("Elegir opcion: \n"
+						PRINT_COLOR_BLUE "  a -" PRINT_COLOR_RESET " Dump completo de la memoria Caché \n"
+						PRINT_COLOR_BLUE "  b -" PRINT_COLOR_RESET " Tabla de Páginas y Listado de procesos Activos \n"
+						PRINT_COLOR_BLUE "  c -" PRINT_COLOR_RESET " Datos almacenados en la memoria de todos los procesos [0] o de un proceso en particular [pid] \n");
 
-		} else if (!strcmp(buffer, "dump")) {
+				switch(getchar()){
+				case 'a':
+					lockFramesYProcesos();
+					// todo: implementar
+					unlockFramesYProcesos();
+					break;
 
-			log_error(log_memoria, "Comando: dump");
-			int pid;
+				case 'b':
+					lockFramesYProcesos();
+					// todo: implementar
+					unlockFramesYProcesos();
+					break;
 
-			printf("Ingrese 0 si quiere un reporte de todos los procesos o ingrese el pid del proceso para un reporte particular\n\n");
-			scanf("%d", &pid);
-
-			/* fixme no responde a enunciado
-				○ Caché:​ Este comando hará un dump completo de la memoria Caché.
-				○ Estructuras de memoria​: Tabla de Páginas y Listado de procesos Activos
-				○ Contenido de memoria​: Datos almacenados en la memoria de todos los procesos o de un proceso en particular.
-			*/
-
-
-			lockFramesYProcesos();
-
-			if (pid == 0) {
-				dumpTodosLosProcesos();
-
-			} else {
-				dumpProcesoParticular(pid);
-			}
-
-			unlockFramesYProcesos();
-
-			}else if (!strcmp(buffer, "flush")) {
-
-				log_error(log_memoria, "Comando: flush");
-					vaciarCache();
-
-			} else if(!strcmp(buffer,"size")) {
-
-				printf("Ingrese memoria o pid\n\n");
-				scanf("%s",buffer);
-
-				if(!strcmp(buffer,"memoria")){
-					printf("La cantidad de frames en memoria es de : %d\n\n",cantidadDeMarcos);
-
-					/*
-					 todo: rehacer considerando q no hay listFrames
-					int cantidadDeFrames = list_size(listaFrames);
-					printf("La cantidad de frames segun lista de frames es de : %d\n\n",cantidadDeFrames);
-
-					int frameUsado(t_frame* frame) {
-							return (frame->bit_modif != 0);
-						}
-
-					int cantidadDeFramesLlenos = list_size(list_filter(listaFrames,(void*) frameUsado));
-					printf("La cantidad de frames usados es de : %d\n\n",cantidadDeFramesLlenos);
-
-
-					int cantidadDeFramesVacios = cantidadDeFrames - cantidadDeFramesLlenos;
-					printf("La cantidad de frames vacios es de %d\n\n",cantidadDeFramesVacios);
-					*/
-
-				}else if(!strcmp(buffer,"pid")){
+				case 'c':
+					lockFramesYProcesos();
 
 					int pid;
-					printf("Ingrese el numero de PID:\n\n");
-					scanf("%d",&pid);
-
-					t_proceso* proceso = buscarProcesoEnListaProcesosParaDump(pid);
-
-					if (proceso == NULL)
-						printf("No existe ese proceso\n\n");
+					printf("Ingrese pid: ");
+					scanf("%d", &pid);
+					if (pid == 0)
+						dumpTodosLosProcesos();
 					else
-						printf("El tamaño es de %d frames\n\n",proceso->cantFramesAsignados);
+						dumpProcesoParticular(pid);
 
-			}
-			else{
-				printf("Comando Incorrecto\n\n");
-			}
-		}
-		else{
-			printf("Comando Incorrecto\n\n");
-		}
+					unlockFramesYProcesos();
+					break;
 
+				default:
+					fprintf(stderr, PRINT_COLOR_YELLOW "Capo que me tiraste?" PRINT_COLOR_RESET "\n");
+				}
+
+		}else if (string_equals_ignore_case(comando, "flush")) {
+
+				vaciarCache();
+
+		} else if(string_equals_ignore_case(comando, "size memory")) {
+
+				printf("La cantidad de frames en memoria es de : %d\n\n",cantidadDeMarcos);
+
+				/*
+				 todo: rehacer considerando q no hay listFrames
+				int cantidadDeFrames = list_size(listaFrames);
+				printf("La cantidad de frames segun lista de frames es de : %d\n\n",cantidadDeFrames);
+
+				int frameUsado(t_frame* frame) {
+						return (frame->bit_modif != 0);
+					}
+
+				int cantidadDeFramesLlenos = list_size(list_filter(listaFrames,(void*) frameUsado));
+				printf("La cantidad de frames usados es de : %d\n\n",cantidadDeFramesLlenos);
+
+
+				int cantidadDeFramesVacios = cantidadDeFrames - cantidadDeFramesLlenos;
+				printf("La cantidad de frames vacios es de %d\n\n",cantidadDeFramesVacios);
+				*/
+
+		}else if(string_starts_with(comando,"size pid")){
+
+				int pid = atoi(string_substring_from(comando, 9));
+
+				t_proceso* proceso = buscarProcesoEnListaProcesosParaDump(pid);
+
+				if (proceso == NULL)
+					printf(PRINT_COLOR_YELLOW "No existe ese proceso" PRINT_COLOR_RESET "\n");
+				else
+					printf("El tamaño es de %d frames\n",proceso->cantFramesAsignados);
+
+		}else if(string_equals_ignore_case(comando, "help")){
+				printf("Comandos:\n"
+						PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "retardo [milisegundos]: " PRINT_COLOR_RESET "Modificar tiempo de espera ante un acceso a MP \n"
+						PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "dump: " PRINT_COLOR_RESET "Reporte en pantalla y en disco de cache, tabla de paginas o contenido en memoria\n"
+						PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "flush: " PRINT_COLOR_RESET "Limpiar completamente el contenido de la Caché\n"
+						PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "size memory: " PRINT_COLOR_RESET "Tamaño de la memoria en cantidad de frames, frames ocupados y frames libres\n"
+						PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "size pid [pid]: " PRINT_COLOR_RESET "Tamaño total de un proceso\n");
+		}else if(string_equals_ignore_case(comando, "\0")){
+		}else
+			printf("Comando Incorrecto\n");
 	}
 }
 
@@ -1208,8 +1207,7 @@ void dumpProcesoParticular(t_pid pid) {
 	t_proceso* proceso = buscarProcesoEnListaProcesosParaDump(pid);
 
 	if (proceso == NULL) {
-		printf("No existe ese proceso\n");
-
+		printf(PRINT_COLOR_YELLOW "No existe ese proceso" PRINT_COLOR_RESET "\n");
 	} else {
 
 		char nombreArchivoDump[30] = "dumpProceso";

@@ -55,7 +55,7 @@ typedef struct {
 }__attribute__  ((packed)) t_msg;
 
 typedef struct{
-	t_num pagina;
+	t_num16 pagina;
 	t_num offset;
 	t_num size;
 }t_posicion;

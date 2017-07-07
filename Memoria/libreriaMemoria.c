@@ -86,6 +86,13 @@ void escucharKERNEL(void* socket_kernel) {
 			log_info(log_memoria, "\n%s", msg->data);
 
 			if(hayFramesLibres(cantidadDePaginas)){
+
+				//-----Retardo
+				pthread_mutex_lock(&mutexRetardo);
+				usleep(retardoMemoria * 1000);
+				pthread_mutex_unlock(&mutexRetardo);
+				//------------
+
 				int i = 0, nroFrame;
 				for(; i < cantidadDePaginas; i++){
 					tmpBuffer = malloc(tamanioDeMarcos);
@@ -120,19 +127,26 @@ void escucharKERNEL(void* socket_kernel) {
 				msg_enviar_separado(PAGINA_INVALIDA, 0, 0, socketKernel);
 
 			} else if ((Cache_Activada()) && (estaEnCache(pid, puntero.pagina))) {
-				void* contenido_leido = obtenerContenidoSegunCache(pid, puntero.pagina, puntero.offset, puntero.size);
+
+				void* contenido_leido = obtenerContenidoSegunCache(pid, puntero);
 				msg_enviar_separado(LECTURA_PAGINA, puntero.size, contenido_leido, socketKernel);
 				free(contenido_leido);
 
 			} else {
 
-				int nroFrame = buscarFramePorPidPag(pid, puntero.pagina);
-				char* contenido_leido = obtenerContenido(nroFrame, puntero.offset, puntero.size);
-				msg_enviar_separado(LECTURA_PAGINA, puntero.size, contenido_leido, socketKernel);
-				free(contenido_leido);
+				//-----Retardo
+				pthread_mutex_lock(&mutexRetardo);
+				usleep(retardoMemoria * 1000);
+				pthread_mutex_unlock(&mutexRetardo);
+				//------------
 
-				if (Cache_Activada()) {
-					agregarEntradaCache(pid, puntero.pagina, nroFrame);
+				void* contenido_leido = obtenerContenido(pid, puntero);
+
+				if(contenido_leido == NULL)
+					msg_enviar_separado(LECTURA_PAGINA, puntero.size, contenido_leido, socketKernel);
+				else{
+					msg_enviar_separado(LECTURA_PAGINA, puntero.size, contenido_leido, socketKernel);
+					free(contenido_leido);
 				}
 
 			}
@@ -174,23 +188,34 @@ void escucharKERNEL(void* socket_kernel) {
 
 			} else {
 
+				//-----Retardo
+				pthread_mutex_lock(&mutexRetardo);
+				usleep(retardoMemoria * 1000);
+				pthread_mutex_unlock(&mutexRetardo);
+				//------------
+
 				int nroFrame = buscarFramePorPidPag(pid, puntero.pagina);
-				escribirContenido(nroFrame, puntero.offset, sizeof(t_HeapMetadata), &metadata);
-				escribirContenido(nroFrame, puntero.offset + sizeof(t_HeapMetadata), metadata.size, basura);
-				free(basura);
 
-				if(msg->longitud == sizeof(t_posicion) + sizeof(t_HeapMetadata)*2)
-					// significa q tengo q guardar otro t_HeapMetadata
-					escribirContenido(nroFrame, puntero.offset + sizeof(t_HeapMetadata) + metadata.size, sizeof(t_HeapMetadata), &metadata2);
+				if(nroFrame == -1){
+					log_error(log_memoria, "No se encueuntra el frame para pid %d pagina %d", pid, puntero.pagina);
+					msg_enviar_separado(ERROR, 0, 0, socketKernel);
+				}else{
+					escribirContenido(nroFrame, puntero.offset, sizeof(t_HeapMetadata), &metadata);
+					escribirContenido(nroFrame, puntero.offset + sizeof(t_HeapMetadata), metadata.size, basura);
+					free(basura);
 
-				msg_enviar_separado(ESCRITURA_PAGINA, 0, 0, socketKernel);
+					if(msg->longitud == sizeof(t_posicion) + sizeof(t_HeapMetadata)*2)
+						// significa q tengo q guardar otro t_HeapMetadata
+						escribirContenido(nroFrame, puntero.offset + sizeof(t_HeapMetadata) + metadata.size, sizeof(t_HeapMetadata), &metadata2);
 
-				if(Cache_Activada()){
-					agregarEntradaCache(pid,puntero.pagina,nroFrame);
+					msg_enviar_separado(ESCRITURA_PAGINA, 0, 0, socketKernel);
+
+					if(Cache_Activada()){
+						agregarEntradaCache(pid,puntero.pagina,nroFrame);
+					}
+
+					log_info(log_memoria, "Escribi correctamente");
 				}
-
-				log_info(log_memoria, "Escribi correctamente");
-
 			}
 
 			break;
@@ -203,6 +228,11 @@ void escucharKERNEL(void* socket_kernel) {
 			cantAccesosMemoria++;
 			pthread_mutex_unlock(&mutexCantAccesosMemoria);
 
+			//-----Retardo
+			pthread_mutex_lock(&mutexRetardo);
+			usleep(retardoMemoria * 1000);
+			pthread_mutex_unlock(&mutexRetardo);
+			//------------
 
 			buscarFrameLibre(pid);
 
@@ -215,6 +245,12 @@ void escucharKERNEL(void* socket_kernel) {
 			pthread_mutex_lock(&mutexCantAccesosMemoria);
 			cantAccesosMemoria++;
 			pthread_mutex_unlock(&mutexCantAccesosMemoria);
+
+			//-----Retardo
+			pthread_mutex_lock(&mutexRetardo);
+			usleep(retardoMemoria * 1000);
+			pthread_mutex_unlock(&mutexRetardo);
+			//------------
 
 			memcpy(&puntero, msg->data, sizeof(t_posicion));
 			log_info(log_memoria, "Solicitud liberar Pag:%d", puntero.pagina);
@@ -304,7 +340,7 @@ void escucharCPU(void* socket_cpu) {
 
 				} else if ((Cache_Activada()) && (estaEnCache(pidPeticion, puntero.pagina))) {
 
-					char* contenido_leido = obtenerContenidoSegunCache(pidPeticion,puntero.pagina, puntero.offset, puntero.size);
+					char* contenido_leido = obtenerContenidoSegunCache(pidPeticion, puntero);
 					msg_enviar_separado(LECTURA_PAGINA, puntero.size, contenido_leido, socketCPU);
 					if(puntero.size != sizeof(t_num))
 						contenido_leido[puntero.size-1] = '\0';
@@ -313,18 +349,24 @@ void escucharCPU(void* socket_cpu) {
 
 				} else {
 
+					//-----Retardo
+					pthread_mutex_lock(&mutexRetardo);
+					usleep(retardoMemoria * 1000);
+					pthread_mutex_unlock(&mutexRetardo);
+					//------------
+
 					log_info(log_memoria, "La pagina %d esta en Memoria Real", puntero.pagina);
 
-					int nroFrame = buscarFramePorPidPag(pidPeticion, puntero.pagina);
-					char* contenido_leido = obtenerContenido(nroFrame, puntero.offset, puntero.size);
-					msg_enviar_separado(LECTURA_PAGINA, puntero.size, contenido_leido, socketCPU);
-					if(puntero.size != sizeof(t_num))
-						contenido_leido[puntero.size-1] = '\0';
-					log_info(log_memoria, "contenido_leido %s", contenido_leido);
-					free(contenido_leido);
+					char* contenido_leido = obtenerContenido(pidPeticion, puntero);
 
-					if (Cache_Activada()) {
-						agregarEntradaCache(pidPeticion, puntero.pagina, nroFrame);
+					if(contenido_leido == NULL)
+						msg_enviar_separado(ERROR, 0, 0, socketCPU);
+					else{
+						msg_enviar_separado(LECTURA_PAGINA, puntero.size, contenido_leido, socketCPU);
+						if(puntero.size != sizeof(t_num))
+							contenido_leido[puntero.size-1] = '\0';
+						log_info(log_memoria, "contenido_leido %s", contenido_leido);
+						free(contenido_leido);
 					}
 
 				}
@@ -388,30 +430,41 @@ void escucharCPU(void* socket_cpu) {
 
 				} else {
 
-						log_info(log_memoria, "La pagina %d esta en Memoria Real",puntero.pagina);
+				//-----Retardo
+				pthread_mutex_lock(&mutexRetardo);
+				usleep(retardoMemoria * 1000);
+				pthread_mutex_unlock(&mutexRetardo);
+				//------------
 
-						int nroFrame = buscarFramePorPidPag(pidPeticion, puntero.pagina);
+					log_info(log_memoria, "La pagina %d esta en Memoria Real",puntero.pagina);
+
+					int nroFrame = buscarFramePorPidPag(pidPeticion, puntero.pagina);
+
+					if(nroFrame == -1){
+						log_error(log_memoria, "No se encueuntra el frame para pid %d pagina %d", pidPeticion, puntero.pagina);
+						header = ERROR;
+						send(socketCPU, &header, sizeof(uint32_t), 0);
+						free(contenido_escribir);
+					}else{
+
 						escribirContenido(nroFrame, puntero.offset, puntero.size, contenido_escribir);
 						free(contenido_escribir);
 
-						//ENVIO ESCRITURA OK
-						header = ESCRITURA_PAGINA;//OK
-
+						header = ESCRITURA_PAGINA; //OK
 						bytesEnviados = send(socketCPU, &header, sizeof(uint32_t), 0);
 						if (bytesEnviados <= 0) {
 							log_error(log_memoria, "Error send CPU");
 							pthread_exit(NULL);
 						}
 
-						if(Cache_Activada()){
+						if(Cache_Activada())
 							agregarEntradaCache(pidPeticion, puntero.pagina, nroFrame);
-						}
 
 						log_info(log_memoria, "Escribi correctamente");
-
 					}
-				}
 
+				}
+			}
 			break;
 
 			case 0:
@@ -457,6 +510,7 @@ void crearProcesoYAgregarAListaDeProcesos(t_pid pid) {
 	t_proceso* procesoNuevo = malloc(sizeof(t_proceso));
 	procesoNuevo->PID = pid;
 	procesoNuevo->cantFramesAsignados = 0;
+	procesoNuevo->cantFramesUsados = 0;
 
 	list_add(listaProcesos, procesoNuevo);
 
@@ -475,42 +529,54 @@ void eliminarProcesoDeListaDeProcesos(t_pid pid) {
 
 /*			LECTURA-ESCRITURA			*/
 
-void* obtenerContenido(int frame, int offset, int tamanio_leer) {
+void* obtenerContenido(t_pid pid, t_posicion puntero) {
 
-	//-----Retardo
-	pthread_mutex_lock(&mutexRetardo);
-	usleep(retardoMemoria * 1000);
-	pthread_mutex_unlock(&mutexRetardo);
-	//------------
+	int nroFrame = buscarFramePorPidPag(pid, puntero.pagina);
+	int desplazamiento = (nroFrame * tamanioDeMarcos) + puntero.offset;
+	if(nroFrame == -1)
+		return NULL;
+
+	if(nroFrame == -1){
+		log_error(log_memoria, "No se encuentra el frame para pid %d pagina %d", pid, puntero.pagina);
+		return NULL;
+	}
 
 	// fixme: no considera q offset + tamanio_leer > tamanioFrame
 	// 		en ese caso tengo q buscar un nuevo frame para seguir leyendo lo faltante (tamanio_leer - (tamanioFrame - offset)) <<--------------------------------------------------------------------------------
-	// fixme: no considera q tamanio_leer > tamanioFrame
-	// 		lo q significa q tendria q leer 2 o + frames (buscar siguiente frame del pid)
-	//		pondria un int nroFrame = buscarPidPag(pidPeticion, puntero.pagina);
-	// 		y un for( tamanio_leer > i*tamanioFrame, i++ ) o un do while, ver cual
-	// fixme: no considera frame == -1
-	//		osea q no se encontro el frame
 
-	log_info(log_memoria, "Leo %d bytes - frame %d a partir de %d", tamanio_leer, frame, offset);
+	void* contenido = malloc(puntero.size);
+	int sizeRestante = puntero.size;
+	int i = 0;
+	while(sizeRestante > tamanioDeMarcos){
 
-	void* contenido = malloc(tamanio_leer);
-	int desplazamiento = (frame * tamanioDeMarcos) + offset;
+		log_info(log_memoria, "Leo %d bytes - frame %d a partir de %d", tamanioDeMarcos, nroFrame, puntero.offset);
+
+		pthread_mutex_lock(&mutexMemoriaReal);
+		memcpy(contenido + i*tamanioDeMarcos, memoria_real + desplazamiento, tamanioDeMarcos);
+		pthread_mutex_unlock(&mutexMemoriaReal);
+
+		if(Cache_Activada())
+			agregarEntradaCache(pid, puntero.pagina + i, nroFrame);
+
+		i++;
+		sizeRestante = sizeRestante - tamanioDeMarcos;
+		nroFrame = buscarFramePorPidPag(pid, puntero.pagina + i);
+		desplazamiento = (nroFrame * tamanioDeMarcos);
+	}
+
+	log_info(log_memoria, "Leo %d bytes - frame %d a partir de %d", sizeRestante, nroFrame, puntero.offset);
 
 	pthread_mutex_lock(&mutexMemoriaReal);
-	memcpy(contenido, memoria_real + desplazamiento, tamanio_leer);
+	memcpy(contenido + i*tamanioDeMarcos, memoria_real + desplazamiento, sizeRestante);
 	pthread_mutex_unlock(&mutexMemoriaReal);
+
+	if(Cache_Activada())
+		agregarEntradaCache(pid, puntero.pagina + i, nroFrame);
 
 	return contenido;
 }
 
-void escribirContenido(int frame, int offset, int tamanio_escribir,	void* contenido) {
-
-	//-----Retardo
-	pthread_mutex_lock(&mutexRetardo);
-	usleep(retardoMemoria * 1000);
-	pthread_mutex_unlock(&mutexRetardo);
-	//------------
+int escribirContenido(int frame, int offset, int tamanio_escribir,	void* contenido) {
 
 	// fixme: no considera q offset + tamanio_escribir > tamanioFrame
 	// 		en ese caso tengo q buscar un nuevo frame para seguir escribiendo lo faltante (tamanio_escribir - (tamanioFrame - offset)) <<--------------------------------------------------------------------------------
@@ -518,8 +584,9 @@ void escribirContenido(int frame, int offset, int tamanio_escribir,	void* conten
 	// 		lo q significa q tendria q escribir 2 o + frames (buscar siguiente frame del pid)
 	//		pondria un int nroFrame = buscarPidPag(pidPeticion, puntero.pagina);
 	// 		y un for( tamanio_escribir > i*tamanioFrame, i++ ) o un do while, ver cual
-	// fixme: no considera frame == -1
-	//		osea q no se encontro el frame
+
+	if(frame == -1)
+		return -1;
 
 	int desplazamiento = (frame * tamanioDeMarcos) + offset;
 
@@ -530,6 +597,7 @@ void escribirContenido(int frame, int offset, int tamanio_escribir,	void* conten
 	memcpy(memoria_real + desplazamiento, contenido, tamanio_escribir);
 	pthread_mutex_unlock(&mutexMemoriaReal);
 
+	return 0;
 }
 
 
@@ -546,12 +614,6 @@ void inicializarFrames(){
 
 	log_trace(log_memoria, "El tamanio necesario para las estructuras administrativas es %d bytes, %d marcos",
 			cantBytesEA, cantidadFramesEstructurasAdministrativas);
-
-	//-----Retardo
-	pthread_mutex_lock(&mutexRetardo);
-	usleep(retardoMemoria * 1000);
-	pthread_mutex_unlock(&mutexRetardo);
-	//------------
 
 	int i=0;
 	for(; i < cantidadDeMarcos ; i++){
@@ -580,12 +642,6 @@ int hayFramesLibres(int cantidad) {
 	int cantidadLibres = 0;
 	t_frame* frame;
 
-	//-----Retardo
-	pthread_mutex_lock(&mutexRetardo);
-	usleep(retardoMemoria * 1000);
-	pthread_mutex_unlock(&mutexRetardo);
-	//------------
-
 	lockFrames();
 	int i=0;
 	for(; i < cantidadDeMarcos ; i++){
@@ -609,18 +665,11 @@ int buscarFrameLibre(t_pid pid) {
 	int _soy_el_pid_buscado(t_proceso* proceso) {
 		return (proceso->PID == pid);
 	}
-	//-----Retardo
-	pthread_mutex_lock(&mutexRetardo);
-	usleep(retardoMemoria * 1000);
-	pthread_mutex_unlock(&mutexRetardo);
-	//------------
 
 	lockProcesos();
 	t_proceso* proceso = list_remove_by_condition(listaProcesos, (void*) _soy_el_pid_buscado);
 
-	int nroPagNueva = proceso->cantFramesAsignados;
-	// fixme mal uso, deberia buscar el mayor nroFrame
-	// 	 no considera un nro de pag > cantFramesAsignados
+	int nroPagNueva = proceso->cantFramesUsados;
 
 	log_trace(log_memoria, "nroPagNueva %d", nroPagNueva);
 	int indice = funcionHashing(pid, nroPagNueva);
@@ -641,6 +690,7 @@ int buscarFrameLibre(t_pid pid) {
 			frame->nroPag = nroPagNueva;
 			memcpy(memoria_real + i*sizeof(t_frame), frame, sizeof(t_frame));
 			proceso->cantFramesAsignados++;
+			proceso->cantFramesUsados++;
 			nroFrame = i;
 			flag_sigo = 0;
 		}
@@ -672,8 +722,7 @@ int paginaInvalida(t_pid pid, t_num16 nroPagina) {
 	lockProcesos();
 	t_proceso* proceso = list_find(listaProcesos, (void*) _soy_el_pid_buscado);
 
-	int esPagInvalida = (nroPagina >= proceso->cantFramesAsignados);
-	// fixme mal uso, deberia buscar el mayor nroFrame ...
+	int esPagInvalida = (nroPagina >= proceso->cantFramesUsados);
 	unlockProcesos();
 
 	return esPagInvalida;
@@ -682,12 +731,6 @@ int paginaInvalida(t_pid pid, t_num16 nroPagina) {
 int buscarFramePorPidPag(t_pid pid, t_num16 nroPagina){
 
 	log_trace(log_memoria, "Busco frame de pid %d pag %d", pid, nroPagina);
-
-	//-----Retardo
-	pthread_mutex_lock(&mutexRetardo);
-	usleep(retardoMemoria * 1000);
-	pthread_mutex_unlock(&mutexRetardo);
-	//------------
 
 	int _soy_el_pid_buscado(t_proceso* proceso) {
 		return (proceso->PID == pid);
@@ -734,7 +777,7 @@ int agregarNuevaPagina(t_num8 pid){
 		frame = malloc(sizeof(t_frame));
 		frame->nroFrame = nroFrame;
 		frame->nroPag = proceso->cantFramesAsignados - 1;
-		// fixme mal uso, deberia buscar el mayor nroFrame
+		// mal uso, deberia buscar el mayor nroFrame
 		frame->pid = pid;
 		memcpy(memoria_real + nroFrame*sizeof(t_frame), frame, sizeof(t_frame));
 
@@ -752,12 +795,6 @@ void liberarPagina(t_pid pid, t_num16 nroPagina){
 	int _soy_el_pid_buscado(t_proceso* proceso) {
 		return (proceso->PID == pid);
 	}
-
-	//-----Retardo
-	pthread_mutex_lock(&mutexRetardo);
-	usleep(retardoMemoria * 1000);
-	pthread_mutex_unlock(&mutexRetardo);
-	//------------
 
 	lockProcesos();
 	t_proceso* proceso = list_remove_by_condition(listaProcesos, (void*) _soy_el_pid_buscado);
@@ -797,8 +834,7 @@ void liberarFramesDeProceso(t_pid pid){
 	}
 	lockProcesos();
 	t_proceso* proceso = list_find(listaProcesos, (void*) _soy_el_pid_buscado);
-	int cantPagsALiberar = proceso->cantFramesAsignados, i;
-	// fixme mal uso, deberia buscar el mayor nroFrame
+	int cantPagsALiberar = proceso->cantFramesUsados, i;
 	unlockProcesos();
 
 	for(i = 0; i < cantPagsALiberar; i++){
@@ -814,7 +850,7 @@ void liberarFramesDeProceso(t_pid pid){
 /*			MISC			*/
 void terminarMemoria(){			//aca libero todos
 
-	// todo list_destroy(listaCPUs);
+	list_destroy_and_destroy_elements(lista_cpus, free);
 
 	list_destroy_and_destroy_elements(listaProcesos, free);
 
@@ -880,7 +916,7 @@ t_cache* crearRegistroCache(t_pid pid, t_num16 numPag, int numFrame) {
 }
 
 void eliminarCache(t_list* unaCache) {
-	list_destroy(unaCache);
+	list_destroy_and_destroy_elements(unaCache, free);
 }
 
 int hayEspacioEnCache() {
@@ -909,20 +945,26 @@ void agregarEntradaCache(t_pid pid, t_num16 numero_pagina, int nroFrame) {
 	pthread_mutex_unlock(&mutexCache);
 }
 
-void* obtenerContenidoSegunCache(t_pid pid, t_num16 numero_pagina, uint32_t offset, uint32_t tamanio_leer) {
+void* obtenerContenidoSegunCache(t_pid pid, t_posicion puntero){
 
-	t_cache* entradaCache = buscarEntradaCache(pid, numero_pagina);
+	t_cache* entradaCache = buscarEntradaCache(pid, puntero.pagina);
 
 	pthread_mutex_lock(&mutexCantAccesosMemoria);
 	entradaCache->ultimoAcceso = cantAccesosMemoria;
 	pthread_mutex_unlock(&mutexCantAccesosMemoria);
 
-	void* contenido = obtenerContenido(entradaCache->numFrame, offset,tamanio_leer);
+	log_info(log_memoria, "Leo %d bytes - frame %d a partir de %d", puntero.size, entradaCache->numFrame, puntero.offset);
+
+	void* contenido = malloc(puntero.size);
+	int desplazamiento = (entradaCache->numFrame * tamanioDeMarcos) + puntero.offset;
+
+	pthread_mutex_lock(&mutexMemoriaReal);
+	memcpy(contenido, memoria_real + desplazamiento, puntero.size);
+	pthread_mutex_unlock(&mutexMemoriaReal);
 
 	pthread_mutex_unlock(&mutexCache);
 
 	return contenido;
-
 }
 
 void escribirContenidoSegunCache(t_pid pid, t_num16 numero_pagina, uint32_t offset, uint32_t tamanio_escritura, void* contenido_escribir) {
@@ -1056,7 +1098,7 @@ void ejecutarComandos() {
 
 				case 'b':
 					lockFramesYProcesos();
-					// todo: implementar
+						dumpTablaPaginas();
 					unlockFramesYProcesos();
 					break;
 
@@ -1084,24 +1126,15 @@ void ejecutarComandos() {
 
 		} else if(string_equals_ignore_case(comando, "size memory")) {
 
-				printf("La cantidad de frames en memoria es de : %d\n\n",cantidadDeMarcos);
+				int cantUsados = 0;
+				void _listarProcs(t_proceso* p){
+					cantUsados = cantUsados + p->cantFramesAsignados;
+				}
+				list_iterate(listaProcesos, (void*) _listarProcs);
 
-				/*
-				 todo: rehacer considerando q no hay listFrames
-				int cantidadDeFrames = list_size(listaFrames);
-				printf("La cantidad de frames segun lista de frames es de : %d\n\n",cantidadDeFrames);
-
-				int frameUsado(t_frame* frame) {
-						return (frame->bit_modif != 0);
-					}
-
-				int cantidadDeFramesLlenos = list_size(list_filter(listaFrames,(void*) frameUsado));
-				printf("La cantidad de frames usados es de : %d\n\n",cantidadDeFramesLlenos);
-
-
-				int cantidadDeFramesVacios = cantidadDeFrames - cantidadDeFramesLlenos;
-				printf("La cantidad de frames vacios es de %d\n\n",cantidadDeFramesVacios);
-				*/
+				printf("Cantidad de frames en memoria: %d\n", cantidadDeMarcos);
+				printf("Cantidad de frames usados: %d\n", cantUsados);
+				printf("Cantidad de frames libre: %d\n", cantidadDeMarcos - cantUsados);
 
 		}else if(string_starts_with(comando,"size pid")){
 
@@ -1179,27 +1212,29 @@ void dumpTodosLosProcesos() {
 
 void dumpContenidoMemoriaProceso(t_pid pid, FILE* archivoDump) {
 
-	int i = 0, nroFrame;
+	int nroPag = 0;
 	void* contenidoFrame;
 	t_proceso* proceso = buscarProcesoEnListaProcesosParaDump(pid);
+	t_posicion p;
+	p.offset = 0;
+	p.size = tamanioDeMarcos;
 
 	fprintf(archivoDump,
 			"\n//////////////////MEMORIA PRINCIPAL//////////////////\n");
 
 	printf("\n//////////////////MEMORIA PRINCIPAL//////////////////\n\n");
 
-	// fixme mal uso, deberia buscar el mayor nroFrame
-	while (i < proceso->cantFramesAsignados) {
+	while (nroPag < proceso->cantFramesUsados) {
+		p.pagina = nroPag;
+		contenidoFrame = obtenerContenido(pid, p);
+		if(contenidoFrame != NULL){
+			hexdump(contenidoFrame, tamanioDeMarcos, archivoDump);
+		}
 
-		nroFrame = buscarFramePorPidPag(pid, i);
-		contenidoFrame = obtenerContenido(nroFrame, 0, tamanioDeMarcos);
-		hexdump(contenidoFrame, tamanioDeMarcos, archivoDump);
-
-		i++;
+		nroPag++;
 	}
 
-	printf("\nDUMP DE MEMORIA PRINCIPAL PARA EL PROCESO %d REALIZADO\n",
-			proceso->PID);
+	printf("\nDUMP DE MEMORIA PRINCIPAL PARA EL PROCESO %d REALIZADO\n", proceso->PID);
 }
 
 void dumpProcesoParticular(t_pid pid) {
@@ -1239,6 +1274,59 @@ void dumpProcesoParticular(t_pid pid) {
 }
 
 
+
+
+void dumpTablaPaginas(){
+
+	char* nombreArchivoDump = string_new();
+	string_append_with_format(&nombreArchivoDump, "%d_TablaPaginas.dump", string_itoa(process_getpid()));
+	FILE* archivoDump = fopen(nombreArchivoDump, "w+");
+
+	fprintf(stderr, PRINT_COLOR_CYAN "   ····  Frame  ····   PID   ····  Pagina ···· " PRINT_COLOR_RESET "\n");
+	fprintf(archivoDump, "   ····  Frame  ····   PID   ····  Pagina ···· \n");
+
+	char* nrof, *nrop, *procActivos = string_new();
+	t_frame* frame;
+	int nroFrame = 0;
+	for(; nroFrame < cantidadDeMarcos; nroFrame++){
+
+		frame = malloc(sizeof(t_frame));
+		memcpy(frame, memoria_real + nroFrame*sizeof(t_frame), sizeof(t_frame));
+
+		if(frame->pid == 0){
+			nrof = " - ";
+			nrop = " - ";
+		}else{
+			nrof = string_itoa(frame->pid);
+			nrop = string_itoa(frame->nroPag);
+		}
+
+		fprintf(stderr, "   ····   %3d   ····   %3s   ····   %3s   ···· \n",
+			frame->nroFrame, nrof, nrop);
+
+		fprintf(archivoDump, "  ····   %3d   ····   %3s   ····   %3s   ···· \n",
+			frame->nroFrame, nrof, nrop);
+
+		free(frame);
+	}
+
+
+	void _listarProcs(t_proceso* p){
+		string_append_with_format(&procActivos, " %d,", p->PID);
+	}
+	list_iterate(listaProcesos, (void*) _listarProcs);
+
+	if(procActivos[string_length(procActivos)-1] == ',')
+		procActivos[string_length(procActivos)-1] = '\0';
+	if(string_length(procActivos) == 0)
+		procActivos = "No hay procesos activos";
+	fprintf(stderr, PRINT_COLOR_CYAN "\nProcesos activos: " PRINT_COLOR_RESET "%s\n", procActivos);
+	fprintf(archivoDump, "\nProcesos activos: %s\n", procActivos);
+
+
+}
+
+
 t_proceso* buscarProcesoEnListaProcesosParaDump(t_pid pid) {
 
 	int _soy_el_pid_buscado(t_proceso* proceso) {
@@ -1263,19 +1351,22 @@ void mostrarContenidoDeUnProceso(t_pid pid){
 	}
 	lockProcesos();
 	t_proceso* proceso = list_find(listaProcesos, (void*) _soy_el_pid_buscado);
-	int cantPagsAMostrar = proceso->cantFramesAsignados;
-	// fixme mal uso, deberia buscar el mayor nroFrame
+	int cantPagsAMostrar = proceso->cantFramesUsados;
 	unlockProcesos();
 
-	int numeroPagina, nroFrame;
-	for(numeroPagina = 0; numeroPagina <= cantPagsAMostrar; numeroPagina++){
+	t_posicion p;
+	p.offset = 0;
+	p.size = tamanioDeMarcos;
 
-		nroFrame = buscarFramePorPidPag(pid, numeroPagina);
-		char* contenido_leido = obtenerContenido(nroFrame, 0, tamanioDeMarcos);
+	int nroPag;
+	for(nroPag = 0; nroPag <= cantPagsAMostrar; nroPag++){
 
-		printf("Numero de Pagina: %d \n\n", numeroPagina);
-		printf("Contenido: %s",contenido_leido);
-
+		p.pagina = nroPag;
+		char* contenido_leido = obtenerContenido(pid, p);
+		if(contenido_leido != NULL){
+			printf("Numero de Pagina: %d \n\n", nroPag);
+			printf("Contenido: %s",contenido_leido);
+		}
 	}
 
 }

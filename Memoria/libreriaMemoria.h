@@ -51,6 +51,7 @@ t_log* log_memoria;
 typedef struct {
 	t_pid PID;
 	int cantFramesAsignados;
+	int cantFramesUsados;
 } t_proceso;
 
 //FRAME
@@ -99,8 +100,8 @@ void crearProcesoYAgregarAListaDeProcesos(t_pid pid);
 void eliminarProcesoDeListaDeProcesos(t_pid pid);
 
 /*			LECTURA-ESCRITURA			*/
-void* obtenerContenido(int frame, int offset, int tamanio_leer);
-void escribirContenido(int frame, int offset, int tamanio_escribir,	void* contenido);
+void* obtenerContenido(t_pid pid, t_posicion puntero);
+int escribirContenido(int frame, int offset, int tamanio_escribir,	void* contenido);
 
 /*			FRAMES			*/
 void inicializarFrames();
@@ -139,7 +140,7 @@ int hayEspacioEnCache();
 
 void agregarEntradaCache(t_pid pid, t_num16 numero_pagina, int nroFrame);
 
-void* obtenerContenidoSegunCache(t_pid pid, t_num16 numero_pagina, uint32_t offset, uint32_t tamanio_leer);
+void* obtenerContenidoSegunCache(t_pid pid, t_posicion puntero);
 
 void escribirContenidoSegunCache(t_pid pid, t_num16 numero_pagina, uint32_t offset, uint32_t tamanio_escritura, void* contenido_escribir);
 
@@ -162,6 +163,8 @@ void dumpTodosLosProcesos();
 void dumpContenidoMemoriaProceso(t_pid pid, FILE* archivoDump);
 
 void dumpProcesoParticular(t_pid pid);
+
+void dumpTablaPaginas();
 
 t_proceso* buscarProcesoEnListaProcesosParaDump(t_pid pid);
 

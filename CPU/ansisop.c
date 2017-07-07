@@ -420,24 +420,24 @@ void leer(t_descriptor_archivo descriptor_archivo, t_puntero informacion, t_valo
 
 	t_msg* msgDatosObtenidos = msg_recibir(socket_kernel);
 
-	if(msgDatosObtenidos->tipoMensaje == OBTENER_DATOS && msgDatosObtenidos->data != NULL){
+	if(msgDatosObtenidos->tipoMensaje == OBTENER_DATOS){
+		msg_recibir_data(socket_kernel, msgDatosObtenidos);
 
 		log_trace(logCPU, "lei bien");
-
-		void * infoObtenida = malloc(msgDatosObtenidos->longitud);
 
 		if(informacion >= 0){
 			//log_trace(logAnsisop, "Asigno valor %d en direccion variable %d", valor, direccion_variable);
 			t_posicion puntero;
 			puntero.pagina = informacion / tamanioPagina;
-			puntero.offset = informacion % tamanioPagina;
+			puntero.offset = (informacion % tamanioPagina);
+			//puntero.offset = (informacion % tamanioPagina) + sizeof(t_HeapMetadata);
 			puntero.size = msgDatosObtenidos->longitud;
 
-			escribirMemoria(puntero, infoObtenida);
+			escribirMemoria(puntero, msgDatosObtenidos->data);
 		}
 	}else{
 		log_error(logCPU, "Error al leer");
-		//flag_error = 1; escribo algun flag??
+		flag_error = 1;
 	}
 	msg_destruir(msgDatosObtenidos);
 

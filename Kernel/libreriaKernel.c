@@ -816,6 +816,7 @@ void escucharCPU(int socket_cpu) {
 				// si no exite crearlo
 				msg_enviar_separado(CREAR_ARCHIVO, longitudPath, pathArchivo, socket_fs);
 
+				// todo: esperar ok de fs
 			}
 
 			entradaProcesoNew->referenciaGlobalTable = indiceActualGlobal;
@@ -893,6 +894,7 @@ void escucharCPU(int socket_cpu) {
 			if(entradaGlobalBuscada == NULL){
 				log_trace(logKernel, "no existe la entrada buscada");
 			}else{
+				// todo: poner un mutex lock lista_tabla_global
 				entradaGlobalBuscada = list_remove_by_condition(lista_tabla_global, (void*) _buscarPorIndice);
 				// saco la entrada global buscada
 				entradaGlobalBuscada->Open --;
@@ -901,19 +903,18 @@ void escucharCPU(int socket_cpu) {
 				list_remove_by_condition(TablaProceso->lista_entradas_de_proceso, (void*) _esFD);
 				if(entradaGlobalBuscada->Open == 0){
 					// no hago nada ya que la saque antes
+					free(entradaGlobalBuscada);
 				} else {
 					// vuelvo a meter la entrada que modifique en la tabla global
 					list_add(lista_tabla_global, entradaGlobalBuscada);
 				}
+				// todo: poner un mutex unlock lista_tabla_global
 			}
 
 			_sumarCantOpPriv(pcb->pid);
 			break;
 		} //end switch
 
-		free(TablaProceso);
-		free(entradaProcesoBuscado);
-		free(entradaGlobalBuscada);
 		free(varCompartida);
 		free(varSemaforo);
 		msg_destruir(msgRecibido);
@@ -1583,6 +1584,13 @@ t_puntero reservarMemoriaHeap(t_num cantBytes, t_PCB* pcb){
 
 t_HeapMetadata _recibirHeapMetadata(t_pid pid, t_posicion puntero){
 	t_HeapMetadata heapMetadata;
+	heapMetadata.isFree = false;
+
+	log_error(logKernel, "LECTURA_PAGINA HEAP %d %d %d", puntero.pagina, puntero.offset, puntero.size);
+
+	if(puntero.offset + sizeof(t_HeapMetadata) >= tamanioPag)
+		return heapMetadata;
+
 	send(socket_memoria, &pid, sizeof(t_pid), 0);
 	msg_enviar_separado(LECTURA_PAGINA, sizeof(t_posicion), &puntero, socket_memoria);
 

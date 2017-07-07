@@ -36,6 +36,11 @@ char* algoritmo;
 t_num quantum;
 t_num quantumSleep;
 
+typedef struct HeapMetadata {
+	t_num size;
+	bool isFree;
+}t_HeapMetadata;
+
 t_log* logCPU;
 t_log* logAnsisop;
 

@@ -129,6 +129,13 @@ void escucharKERNEL(void* socket_kernel) {
 			} else if ((Cache_Activada()) && (estaEnCache(pid, puntero.pagina))) {
 
 				void* contenido_leido = obtenerContenidoSegunCache(pid, puntero);
+
+				t_HeapMetadata h;
+				memcpy(&h, contenido_leido, sizeof(t_HeapMetadata) );
+
+				log_info(log_memoria, "Heap %d %d", h.isFree, h.size);
+
+
 				msg_enviar_separado(LECTURA_PAGINA, puntero.size, contenido_leido, socketKernel);
 				free(contenido_leido);
 
@@ -166,6 +173,7 @@ void escucharKERNEL(void* socket_kernel) {
 				memcpy(&metadata2, msg->data + sizeof(t_posicion)+sizeof(t_HeapMetadata), sizeof(t_HeapMetadata));
 
 			log_info(log_memoria, "Solicitud de escritura. Pag:%d Offset:%d Size:%d", puntero.pagina, puntero.offset, puntero.size);
+			log_info(log_memoria, "Heap %d %d", metadata.isFree, metadata.size);
 
 			void* basura = malloc(metadata.size);
 			bzero(basura, metadata.size);
@@ -189,7 +197,7 @@ void escucharKERNEL(void* socket_kernel) {
 				if(msg->longitud == sizeof(t_posicion) + sizeof(t_HeapMetadata)*2){
 					// significa q tengo q guardar otro t_HeapMetadata
 					puntero.size = sizeof(t_HeapMetadata);
-					puntero.offset = puntero.offset + sizeof(t_HeapMetadata) + metadata.size;
+					puntero.offset = puntero.offset + metadata.size;
 					escribirContenidoSegunCache(pid, puntero, &metadata2);
 				}
 
@@ -210,7 +218,6 @@ void escucharKERNEL(void* socket_kernel) {
 					msg_enviar_separado(ERROR, 0, 0, socketKernel);
 				}else{
 					//todo considerar nroPag
-					//fixme	offset > tamanioMarco
 					puntero.size = sizeof(t_HeapMetadata);
 					escribirContenido(pid, puntero, &metadata);
 					puntero.size = metadata.size;
@@ -221,7 +228,7 @@ void escucharKERNEL(void* socket_kernel) {
 					if(msg->longitud == sizeof(t_posicion) + sizeof(t_HeapMetadata)*2){
 						// significa q tengo q guardar otro t_HeapMetadata
 						puntero.size = sizeof(t_HeapMetadata);
-						puntero.offset = puntero.offset + sizeof(t_HeapMetadata) + metadata.size;
+						puntero.offset = puntero.offset + metadata.size;
 						escribirContenido(pid, puntero, &metadata2);
 					}
 

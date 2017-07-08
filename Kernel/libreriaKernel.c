@@ -1160,7 +1160,36 @@ void consolaKernel(){
 					printf( "Cantidad de operaciones privilegiadas que ejecutó: %d \n", infP->cantOpPriv);
 					break;
 				case 'c':
-					printf( "Tabla de archivos abiertos por el proceso %d \n", infP->tablaArchivos);	// todo: implementar
+
+					printf( PRINT_COLOR_RESET );
+					int fdActual;
+					int _buscarPid(t_tabla_proceso* tabla){ return pidPCB == tabla->pid; }
+					int _buscarFD(t_entrada_proceso* entradaP){ return fdActual == entradaP->fd; }
+
+					printf(PRINT_COLOR_CYAN "   ····    FD    ····   Flags  ···· GlobalFD ···· " PRINT_COLOR_RESET "\n");
+
+					t_tabla_proceso* tablaProceso = list_find(lista_tabla_de_procesos, (void*) _buscarPid);
+					if(tablaProceso != NULL){
+						for(fdActual = 3; fdActual <= tablaProceso->fdMax; fdActual++){
+
+							t_entrada_proceso* entradaProcesoBuscado = list_find(tablaProceso->lista_entradas_de_proceso, (void*) _buscarFD);
+							if(entradaProcesoBuscado != NULL){
+
+								char* flags = string_new();
+								if(entradaProcesoBuscado->bandera.lectura)
+									string_append(&flags,"r");
+								if(entradaProcesoBuscado->bandera.escritura)
+									string_append(&flags,"w");
+								if(entradaProcesoBuscado->bandera.creacion)
+									string_append(&flags,"c");
+
+								printf("   ····    %2d    ····    %3s   ····   %3d    ····  \n",  fdActual, flags, entradaProcesoBuscado->referenciaGlobalTable);
+
+							}
+						}
+					}
+
+
 					break;
 				case 'd':
 					printf( "Cantidad de páginas de Heap utilizadas: %d \n", infP->cantPagsHeap);
@@ -1181,7 +1210,38 @@ void consolaKernel(){
 			_unlockLista_infoProc();
 		}else if(string_equals_ignore_case(comando, "tabla archivos")){
 
-			// todo: implementar
+			int maxPID = 0;
+			void _maxPID(t_PCB* p){ if(p->pid > maxPID) maxPID = p->pid; }
+			_lockLista_PCBs();
+			list_iterate(lista_PCBs, (void*) _maxPID);
+			_unlockLista_PCBs();
+
+			int fdActual, pidActual;
+			int _buscarPid(t_tabla_proceso* tabla){ return pidActual == tabla->pid; }
+			int _buscarFD(t_entrada_proceso* entradaP){ return fdActual == entradaP->fd; }
+
+			printf(PRINT_COLOR_CYAN "   ····  Indice  ····   Open   ····      File " PRINT_COLOR_RESET "\n");
+
+			for(pidActual = 1; pidActual <= maxPID; pidActual++){
+				t_tabla_proceso* tablaProceso = list_find(lista_tabla_de_procesos, (void*) _buscarPid);
+				if(tablaProceso != NULL){
+					for(fdActual = 3; fdActual <= tablaProceso->fdMax; fdActual++){
+
+						t_entrada_proceso* entradaProcesoBuscado = list_find(tablaProceso->lista_entradas_de_proceso, (void*) _buscarFD);
+						if(entradaProcesoBuscado != NULL){
+
+							int _buscarPorIndice(t_entrada_GlobalFile* entradaGlobal){return entradaGlobal->indiceGlobalTable == entradaProcesoBuscado->referenciaGlobalTable;}
+							t_entrada_GlobalFile* entradaGlobalBuscada = list_find(lista_tabla_global, (void*) _buscarPorIndice);
+
+							if(entradaGlobalBuscada != NULL)
+								printf("   ····   %3d    ····   %3d    ····   %s \n",
+									entradaGlobalBuscada->indiceGlobalTable, entradaGlobalBuscada->Open, entradaGlobalBuscada->FilePath);
+
+						}
+					}
+				}
+			}
+
 
 		}else if(string_starts_with(comando, "grado mp ")){
 
@@ -1269,7 +1329,7 @@ void consolaKernel(){
 			printf("Comandos:\n"
 					PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "list procs: " PRINT_COLOR_RESET "Obtener listado de procesos\n"
 					PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "info [pid]: " PRINT_COLOR_RESET "Obtener informacion de proceso\n"
-					PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "tabla archivos: " PRINT_COLOR_RESET "Obtener informacion de proceso\n"
+					PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "tabla archivos: " PRINT_COLOR_RESET "Obtener tabla global de archivos\n"
 					PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "grado mp [grado]: " PRINT_COLOR_RESET "Setear grado de multiprogramacion\n"
 					PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "kill [pid]: " PRINT_COLOR_RESET "Finalizar proceso\n"
 					PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "detener: " PRINT_COLOR_RESET "Detener la planificación\n"

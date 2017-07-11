@@ -28,6 +28,8 @@ int main(int argc, char* argv[]) {
 	flag_ultimaEjecucionTotal = 0;
 	flag_ultimaEjecucion = 0;
 	flag_finalizado = 0;
+	flag_error = 0;
+	tipoError = ERROR;
 
 	//Cargo archivo de configuracion
 	configuracion = config_create(argv[1]);

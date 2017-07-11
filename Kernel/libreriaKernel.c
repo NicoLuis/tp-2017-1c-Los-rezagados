@@ -368,6 +368,7 @@ void escucharCPU(int socket_cpu) {
 			break;
 
 
+			// todo: considerar errores cpu
 
 
 		case ERROR:
@@ -666,6 +667,7 @@ void escucharCPU(int socket_cpu) {
 				}else{
 					log_error(logKernel, "No tiene permisos de escritura");
 					// todo: hacer algo mas tipo enviar un error
+					// settear exit code correspondiente
 				}
 
 			}
@@ -744,6 +746,7 @@ void escucharCPU(int socket_cpu) {
 				}else{
 					log_error(logKernel, "No tiene permisos de lectura");
 					// todo: hacer algo mas tipo enviar un error
+					// settear exit code correspondiente
 				}
 
 			}
@@ -1479,9 +1482,10 @@ void asignarNuevaPag(t_PCB* pcb){
 	send(socket_memoria, &pcb->pid, sizeof(t_pid), 0);
 	msg_enviar_separado(ASIGNACION_MEMORIA, 0, 0, socket_memoria);
 	t_msg* msgRecibido = msg_recibir(socket_memoria);
-	if(msgRecibido->tipoMensaje != ASIGNACION_MEMORIA)
+	if(msgRecibido->tipoMensaje != ASIGNACION_MEMORIA){
 		log_error(logKernel, "No recibi ASIGNACION_MEMORIA sino %d", msgRecibido->tipoMensaje);
-	//msg_recibir_data(socket_memoria, msgRecibido);
+		// todo: manejar error
+	}
 	msg_destruir(msgRecibido);
 
 	t_heap* nuevaHeap = malloc(sizeof(t_heap));
@@ -1506,8 +1510,10 @@ void asignarNuevaPag(t_PCB* pcb){
 	send(socket_memoria, &pcb->pid, sizeof(t_pid), 0);
 	msg_enviar_separado(ESCRITURA_PAGINA, sizeof(t_posicion) + sizeof(t_HeapMetadata), buffer, socket_memoria);
 	msgRecibido = msg_recibir(socket_memoria);
-	if(msgRecibido->tipoMensaje != ESCRITURA_PAGINA)
+	if(msgRecibido->tipoMensaje != ESCRITURA_PAGINA){
 		log_error(logKernel, "No recibi ESCRITURA_PAGINA sino %d", msgRecibido->tipoMensaje);
+		// todo: manejar error
+	}
 	msg_destruir(msgRecibido);
 
 	_sumarCantPagsHeap(pcb->pid, 1);
@@ -1550,6 +1556,8 @@ t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
 				t_msg* msgRecibido = msg_recibir(socket_memoria);
 				if(msgRecibido->tipoMensaje != LECTURA_PAGINA){
 					log_error(logKernel, "No recibi LECTURA_PAGINA sino %d", msgRecibido->tipoMensaje);
+					if(msgRecibido->tipoMensaje == EXCEPCION_MEMORIA)
+						return -4;
 					if(msgRecibido->tipoMensaje == STACKOVERFLOW)
 						return -3;	//todo: considerar error de stackoverflow
 					else
@@ -1582,7 +1590,12 @@ t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
 					t_msg* msgRecibido2 = msg_recibir(socket_memoria);
 					if(msgRecibido2->tipoMensaje != ESCRITURA_PAGINA){
 						log_error(logKernel, "No recibi ESCRITURA_PAGINA sino %d", msgRecibido2->tipoMensaje);
-						return -2;
+						if(msgRecibido->tipoMensaje == EXCEPCION_MEMORIA)
+							return -4;
+						if(msgRecibido->tipoMensaje == STACKOVERFLOW)
+							return -3;	//todo: considerar error de stackoverflow
+						else
+							return -2;
 					}
 					msg_destruir(msgRecibido2);
 
@@ -1629,13 +1642,12 @@ t_puntero reservarMemoriaHeap(t_num cantBytes, t_PCB* pcb){
 	}
 
 	int retorno = encontrarHueco(cantBytes, pcb);
-	if( retorno == -2 )
-		return -1;
 	if( retorno == -1 ){
 		log_trace(logKernel, "No encontre hueco");
 		asignarNuevaPag(pcb);
 		retorno = encontrarHueco(cantBytes, pcb);
-	}
+	}else if( retorno < 0 )
+		return retorno;
 	_sumarCantOpAlocar(pcb->pid, cantBytes);
 
 	return retorno + sizeof(t_HeapMetadata);
@@ -1658,6 +1670,12 @@ t_HeapMetadata _recibirHeapMetadata(t_pid pid, t_posicion puntero){
 	t_msg* msgRecibido = msg_recibir(socket_memoria);
 	if(msgRecibido->tipoMensaje != LECTURA_PAGINA){
 		log_error(logKernel, "No recibi LECTURA_PAGINA sino %d", msgRecibido->tipoMensaje);
+		if(msgRecibido->tipoMensaje == EXCEPCION_MEMORIA)
+			return heapMetadata;
+		if(msgRecibido->tipoMensaje == STACKOVERFLOW)
+			return heapMetadata;	//todo: considerar error de stackoverflow
+		else
+			return heapMetadata;
 		return heapMetadata;
 	}
 	msg_recibir_data(socket_memoria, msgRecibido);
@@ -1717,10 +1735,12 @@ int liberarMemoriaHeap(t_puntero posicion, t_PCB* pcb){
 		list_remove_and_destroy_by_condition(tabla_heap, (void*) _esHeap, free);
 	}else if(msgRecibido->tipoMensaje != ESCRITURA_PAGINA){
 		log_error(logKernel, "No recibi ESCRITURA_PAGINA o LIBERAR sino %d", msgRecibido->tipoMensaje);
+		if(msgRecibido->tipoMensaje == EXCEPCION_MEMORIA)
+			return -4;
 		if(msgRecibido->tipoMensaje == STACKOVERFLOW)
-			return -2;
+			return -3;	//todo: considerar error de stackoverflow
 		else
-			return -1;
+			return -2;
 	}
 	msg_destruir(msgRecibido);
 

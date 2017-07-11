@@ -10,12 +10,14 @@
 
 
 t_puntero definirVariable(t_nombre_variable identificador_variable){
+	if(flag_error) return -1;
 
 	log_trace(logAnsisop, "Definir variable %c", identificador_variable);
 
 	if( pcb->sp + sizeof(t_StackMetadata) >= (pcb->cantPagsCodigo + pcb->cantPagsStack)*tamanioPagina ){
 		log_error(logAnsisop, "STACKOVERFLOW");
 		flag_error = true;
+		tipoError = STACKOVERFLOW;
 		return -1;
 	}
 	t_StackMetadata* metadata = malloc(sizeof(t_StackMetadata));
@@ -43,6 +45,7 @@ t_puntero definirVariable(t_nombre_variable identificador_variable){
 }
 
 t_valor_variable dereferenciar(t_puntero direccion_variable){
+	if(flag_error) return -1;
 
 	if(direccion_variable >= 0){
 		log_trace(logAnsisop, "Dereferenciar direccion variable %d", direccion_variable);
@@ -52,18 +55,21 @@ t_valor_variable dereferenciar(t_puntero direccion_variable){
 		puntero.offset = direccion_variable % tamanioPagina;
 		puntero.size = sizeof(t_valor_variable);
 
-		return leerMemoria(puntero);
-	}else{
-		log_error(logAnsisop, "No se puede obtener valor de %d", direccion_variable);
-		flag_error = true;
-		return -1;
+		int valor = leerMemoria(puntero);
+		if(valor >= 0)
+			return valor;
 	}
+	log_error(logAnsisop, "No se puede obtener valor de %d", direccion_variable);
+	flag_error = true;
+	tipoError = EXCEPCION_MEMORIA;
+	return -1;
 }
 
 
 t_puntero obtenerPosicionVariable(t_nombre_variable identificador_variable){
-	int i;
+	if(flag_error) return -1;
 
+	int i;
 	log_trace(logAnsisop, "Obtener posicion variable %c", identificador_variable);
 
 	t_Stack* stackActual = list_get(pcb->indiceStack, list_size(pcb->indiceStack)-1 );
@@ -97,6 +103,7 @@ t_puntero obtenerPosicionVariable(t_nombre_variable identificador_variable){
 }
 
 void asignar(t_puntero direccion_variable, t_valor_variable valor){
+	if(flag_error) return;
 
 	if(direccion_variable >= 0){
 		log_trace(logAnsisop, "Asigno valor %d en direccion variable %d", valor, direccion_variable);
@@ -118,6 +125,8 @@ void asignar(t_puntero direccion_variable, t_valor_variable valor){
 
 
 void irAlLabel(t_nombre_etiqueta etiqueta){
+	if(flag_error) return;
+
 	log_trace(logAnsisop, "Voy al label %s", etiqueta);
 
 	t_puntero nro = metadata_buscar_etiqueta(etiqueta, pcb->indiceEtiquetas.bloqueSerializado, pcb->indiceEtiquetas.size);
@@ -130,6 +139,7 @@ void irAlLabel(t_nombre_etiqueta etiqueta){
 }
 
 void llamarSinRetorno(t_nombre_etiqueta etiqueta){
+	if(flag_error) return;
 
 	log_trace(logAnsisop, "Llamar sin retorno %s", etiqueta);
 
@@ -149,6 +159,7 @@ void llamarSinRetorno(t_nombre_etiqueta etiqueta){
 }
 
 void llamarConRetorno(t_nombre_etiqueta etiqueta, t_puntero donde_retornar){
+	if(flag_error) return;
 
 	log_trace(logAnsisop, "Llamar con retorno %s en %d", etiqueta, donde_retornar);
 
@@ -173,6 +184,7 @@ void llamarConRetorno(t_nombre_etiqueta etiqueta, t_puntero donde_retornar){
 }
 
 void retornar(t_valor_variable retorno){
+	if(flag_error) return;
 
 	log_trace(logAnsisop, "Retorno valor %d", retorno);
 
@@ -185,6 +197,7 @@ void retornar(t_valor_variable retorno){
 }
 
 void finalizar(){
+	if(flag_error) return;
 
 	log_trace(logAnsisop, "Finalizar contexto");
 
@@ -218,6 +231,7 @@ void finalizar(){
  */
 
 t_valor_variable asignarValorCompartida(t_nombre_compartida variable, t_valor_variable valor){
+	if(flag_error) return -1;
 	//ariel
 	log_trace(logAnsisop, "Asignar valor %d a variable %s", valor, variable);
 
@@ -253,6 +267,7 @@ t_valor_variable asignarValorCompartida(t_nombre_compartida variable, t_valor_va
 }
 
 t_valor_variable obtenerValorCompartida(t_nombre_compartida variable){
+	if(flag_error) return -1;
 	log_trace(logAnsisop, "Obtener valor de variable %s", variable);
 	msg_enviar_separado(VALOR_VARIABLE_COMPARTIDA, string_length(variable), variable, socket_kernel);
 
@@ -276,6 +291,7 @@ t_valor_variable obtenerValorCompartida(t_nombre_compartida variable){
 }
 
 t_descriptor_archivo abrir(t_direccion_archivo direccion, t_banderas flags){
+	if(flag_error) return -1;
 	
 	u_int fd = 0;
 	int offset = 0, tmpsize;
@@ -309,6 +325,11 @@ t_descriptor_archivo abrir(t_direccion_archivo direccion, t_banderas flags){
 	}else{
 		log_error(logAnsisop, "Error - se recibio %d", msgRecibido->tipoMensaje);
 		flag_error = 1;
+
+		//todo: definir errores posibles
+		// de forma q quede por ej: tipoError = EXCEPCION_MEMORIA;
+
+
 	}
 
 	msg_destruir(msgRecibido);
@@ -331,6 +352,7 @@ void mandarMsgaKernel(int tipoMensaje, t_descriptor_archivo fd){
 }
 
 void borrar(t_descriptor_archivo direccion){
+	if(flag_error) return;
 
 	log_trace(logAnsisop, "borrar el siguiente archivo ubicado en el siguiente file descriptor: %d", direccion);
 
@@ -340,18 +362,36 @@ void borrar(t_descriptor_archivo direccion){
 
 	if(msgRecibido->tipoMensaje == BORRAR)
 		log_trace(logAnsisop, "Borro correctamente");
-	else
+	else{
 		log_error(logAnsisop, "Error al borrar");
+
+		//todo: definir errores posibles
+		// de forma q quede por ej: tipoError = EXCEPCION_MEMORIA;
+	}
 
 	msg_destruir(msgRecibido);
 }
 
 void cerrar(t_descriptor_archivo descriptor_archivo){
+	if(flag_error) return;
 
 	mandarMsgaKernel(CERRAR_ANSISOP, descriptor_archivo);
 
-	//todo recibir confirmacion
+	//todo: recibir confirmacion
 
+	/*
+	t_msg* msgRecibido = msg_recibir(socket_kernel);
+
+	if(msgRecibido->tipoMensaje == CERRAR_ANSISOP)
+		log_trace(logAnsisop, "Cerre correctamente");
+	else{
+		log_error(logAnsisop, "Error al cerrar");
+
+		//todo: definir errores posibles
+		// de forma q quede por ej: tipoError = EXCEPCION_MEMORIA;
+	}
+
+	 */
 }
 
 void mandarMSGaKernel_LE(t_descriptor_archivo descriptor_archivo, void* informacion, t_valor_variable tamanio, int tipoMsj){
@@ -373,6 +413,7 @@ void mandarMSGaKernel_LE(t_descriptor_archivo descriptor_archivo, void* informac
 }
 
 void escribir(t_descriptor_archivo descriptor_archivo, void* informacion, t_valor_variable tamanio){
+	if(flag_error) return;
 
 	log_trace(logAnsisop, "Escribir en fd %d: %s", descriptor_archivo, informacion);
 
@@ -385,6 +426,8 @@ void escribir(t_descriptor_archivo descriptor_archivo, void* informacion, t_valo
 	else{
 		log_error(logAnsisop, "Error al escribir");
 		flag_error = 1;
+		//todo: definir errores posibles
+		// de forma q quede por ej: tipoError = EXCEPCION_MEMORIA;
 	}
 
 	msg_destruir(msgRecibido);
@@ -401,6 +444,7 @@ void escribir(t_descriptor_archivo descriptor_archivo, void* informacion, t_valo
 }
 
 void leer(t_descriptor_archivo descriptor_archivo, t_puntero informacion, t_valor_variable tamanio){
+	if(flag_error) return;
 
 
 	log_trace(logAnsisop, "Leer fd %d en %d size %d", descriptor_archivo, informacion, tamanio);
@@ -437,12 +481,15 @@ void leer(t_descriptor_archivo descriptor_archivo, t_puntero informacion, t_valo
 	}else{
 		log_error(logCPU, "Error al leer");
 		flag_error = 1;
+		//todo: definir errores posibles
+		// de forma q quede por ej: tipoError = EXCEPCION_MEMORIA;
 	}
 	msg_destruir(msgDatosObtenidos);
 
 }
 
 void moverCursor(t_descriptor_archivo descriptor_archivo, t_valor_variable posicion){
+	if(flag_error) return;
 
 	log_trace(logAnsisop, "Mover Cursor fd %d posicion %d", descriptor_archivo,posicion );
 
@@ -457,25 +504,29 @@ void moverCursor(t_descriptor_archivo descriptor_archivo, t_valor_variable posic
 
 
 
+	//todo: recibir confirmacion
 
 	/*
-	* MOVER CURSOR DE ARCHIVO
-	*
-	* Informa al Kernel que el proceso requiere que se mueva el cursor a la posicion indicada.
-	*
-	* @syntax TEXT_SEEK_FILE (buscar)
-	* @param descriptor_archivo Descriptor de archivo del archivo abierto
-	* @param posicion Posicion a donde mover el cursor
-	* @return void
-	*/
+	t_msg* msgRecibido = msg_recibir(socket_kernel);
 
+	if(msgRecibido->tipoMensaje == MOVER_ANSISOP)
+		log_trace(logAnsisop, "... correctamente");
+	else{
+		log_error(logAnsisop, "Error al ...");
 
+		//todo: definir errores posibles
+		// de forma q quede por ej: tipoError = EXCEPCION_MEMORIA;
+	}
+
+	 */
 
 }
 
 
 
 t_puntero reservar(t_valor_variable espacio){
+	if(flag_error) return -1;
+
 	log_trace(logAnsisop, "Reservo %d bytes", espacio);
 	/*	no necesitaba pasarle el pcb
 	int tmpsize = tamanioTotalPCB(pcb);
@@ -502,12 +553,16 @@ t_puntero reservar(t_valor_variable espacio){
 	else{
 		log_error(logAnsisop, "Error al reservar memoria - se recibio %d", msgRecibido->tipoMensaje);
 		flag_error = true;
+
+		//todo: definir errores posibles
+		// de forma q quede por ej: tipoError = EXCEPCION_MEMORIA;
 	}
 	msg_destruir(msgRecibido);
 	return direccion;
 }
 
 void liberar(t_puntero puntero){
+	if(flag_error) return;
 	log_trace(logAnsisop, "Libero posicion %d", puntero);
 	msg_enviar_separado(LIBERAR, sizeof(t_puntero), &puntero, socket_kernel);
 	t_msg* msgRecibido = msg_recibir(socket_kernel);
@@ -522,11 +577,15 @@ void liberar(t_puntero puntero){
 	else{
 		log_error(logAnsisop, "Error al liberar memoria - se recibio %d", msgRecibido->tipoMensaje);
 		flag_error = true;
+
+		//todo: definir errores posibles
+		// de forma q quede por ej: tipoError = EXCEPCION_MEMORIA;
 	}
 	msg_destruir(msgRecibido);
 }
 
 void ansisop_signal(t_nombre_semaforo identificador_semaforo){
+	if(flag_error) return;
 	log_trace(logAnsisop, "Signal semaforo %s", identificador_semaforo);
 	msg_enviar_separado(SIGNAL, string_length(identificador_semaforo), identificador_semaforo, socket_kernel);
 
@@ -540,6 +599,7 @@ void ansisop_signal(t_nombre_semaforo identificador_semaforo){
 }
 
 void ansisop_wait(t_nombre_semaforo identificador_semaforo){
+	if(flag_error) return;
 	log_trace(logAnsisop, "Wait semaforo %s", identificador_semaforo);
 	msg_enviar_separado(WAIT, string_length(identificador_semaforo), identificador_semaforo, socket_kernel);
 

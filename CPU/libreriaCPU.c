@@ -112,11 +112,12 @@ void ejecutarInstruccion(){
 		log_trace(logCPU, "Devuelvo ERROR");
 		uint32_t size = tamanioTotalPCB(pcb);
 		void* pcbSerializado = serializarPCB(pcb);
-		msg_enviar_separado(ERROR, size, pcbSerializado, socket_kernel);
+		msg_enviar_separado(tipoError, size, pcbSerializado, socket_kernel);
 		free(pcbSerializado);
 		flag_finalizado = 1;
 		flag_ultimaEjecucion = 1;
 		flag_error = 0;
+		tipoError = ERROR;
 	}
 	else
 	if(flag_ultimaEjecucion){
@@ -145,7 +146,7 @@ void* _serializarPuntero(t_posicion puntero){
 
 t_valor_variable leerMemoria(t_posicion puntero){
 
-	t_valor_variable valor;
+	t_valor_variable valor = -1;
 
 	void* buffer = _serializarPuntero(puntero);
 	msg_enviar_separado(LECTURA_PAGINA, sizeof(t_posicion) + sizeof(t_num8), buffer, socket_memoria);

@@ -95,9 +95,9 @@ void escucharKERNEL(void* socket_kernel) {
 				int i = 0, nroFrame;
 				for(; i < cantidadDePaginas; i++){
 					nroFrame = buscarFrameLibre(pid);
-					int desplazamientoMemoria = (nroFrame * tamanioDeMarcos) + puntero.offset;
+					int desplazamientoMemoria = (nroFrame * tamanioDeMarcos);
 
-					log_info(log_memoria, "Escribo %d bytes - frame %d a partir de %d", tamanioDeMarcos, nroFrame, puntero.offset);
+					log_info(log_memoria, "Escribo %d bytes - frame %d a partir de %d", tamanioDeMarcos, nroFrame, 0);
 					pthread_mutex_lock(&mutexMemoriaReal);
 					memcpy(memoria_real + desplazamientoMemoria, msg->data + i*tamanioDeMarcos, tamanioDeMarcos);
 					pthread_mutex_unlock(&mutexMemoriaReal);
@@ -382,8 +382,6 @@ void escucharCPU(void* socket_cpu) {
 					pthread_mutex_unlock(&mutexRetardo);
 					//------------
 
-					log_info(log_memoria, "La pagina %d esta en Memoria Real", puntero.pagina);
-
 					char* contenido_leido = obtenerContenido(pidPeticion, puntero);
 
 					if(contenido_leido == NULL)
@@ -463,7 +461,6 @@ void escucharCPU(void* socket_cpu) {
 				pthread_mutex_unlock(&mutexRetardo);
 				//------------
 
-					log_info(log_memoria, "La pagina %d esta en Memoria Real",puntero.pagina);
 
 					int nroFrame = buscarFramePorPidPag(pidPeticion, puntero.pagina);
 
@@ -672,7 +669,7 @@ void inicializarFrames(){
 
 		// i*sizeof(t_frame) es el offset
 		memcpy(memoria_real + i*sizeof(t_frame), frameNuevo, sizeof(t_frame));
-		log_info(log_memoria, "Cree frame %d", frameNuevo->nroFrame);
+		//log_info(log_memoria, "Cree frame %d", frameNuevo->nroFrame);
 		free(frameNuevo);
 		// fixme ver si tamanioMarcoRestante < sizeof(t_frame) afecta en algo
 		// (si arranco en un frame nuevo o lo guardo por la mitad)

@@ -53,6 +53,7 @@ t_posicion escribirMemoria(t_posicion puntero, void* valor);
 
 int socket_kernel;
 int socket_memoria;
+int tipoError;
 
 bool flag_ultimaEjecucionTotal;
 bool flag_finalizado;

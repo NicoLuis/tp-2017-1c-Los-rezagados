@@ -554,6 +554,11 @@ t_puntero reservar(t_valor_variable espacio){
 		log_error(logAnsisop, "Error al reservar memoria - se recibio %d", msgRecibido->tipoMensaje);
 		flag_error = true;
 
+		if(msgRecibido->tipoMensaje == ERROR){
+			msg_recibir_data(socket_kernel, msgRecibido);
+			memcpy(&pcb->exitCode, msgRecibido->data, sizeof(t_num));
+		}
+
 		//todo: definir errores posibles
 		// de forma q quede por ej: tipoError = EXCEPCION_MEMORIA;
 	}

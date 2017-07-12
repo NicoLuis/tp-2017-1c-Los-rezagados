@@ -375,8 +375,9 @@ void escucharCPU(int socket_cpu) {
 			log_trace(logKernel, "Recibi ERROR de CPU");
 			pcb = recibir_pcb(socket_cpu, msgRecibido, 0, 0);
 			finalizarPid(pcb->pid);
-			if((int)pcb->exitCode > 0){
+			if((int)pcb->exitCode > 0)
 				pcb->exitCode = ERROR_SCRIPT;
+			if((int)pcb->exitCode < 0){
 				_ponerEnCola(pcb->pid, cola_Exit, mutex_Exit);
 				liberarPCB(pcb, true);
 			}
@@ -559,8 +560,9 @@ void escucharCPU(int socket_cpu) {
 			if((int)direccion > 0)
 				msg_enviar_separado(ASIGNACION_MEMORIA, sizeof(t_puntero) + sizeof(bool), tmpb, socket_cpu);
 			else
-				msg_enviar_separado(ERROR, 0, 0, socket_cpu);
+				msg_enviar_separado(ERROR, sizeof(t_puntero), &direccion, socket_cpu);
 			free(tmpb);
+
 
 			_lockLista_PCBs();
 			if(list_remove_by_condition(lista_PCBs, (void*) _es_PCB) == NULL) log_warning(logKernel, "No se encuentra pcb en ASIGNACION_MEMORIA");
@@ -1204,7 +1206,7 @@ void consolaKernel(){
 					printf( "Cantidad de operaciones liberar: %d \n", infP->cantOp_liberar);
 					printf( "Se liberaron %d bytes \n", infP->canrBytes_liberar);
 					if(infP->canrBytes_alocar > infP->canrBytes_liberar)
-						printf( "No se liberaron todas las estructuras del heap");
+						printf( "No se liberaron todas las estructuras del heap \n");
 					break;
 				default:
 					fprintf(stderr, PRINT_COLOR_YELLOW "Capo que me tiraste?" PRINT_COLOR_RESET "\n");
@@ -1573,7 +1575,7 @@ t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
 					if(msgRecibido->tipoMensaje == EXCEPCION_MEMORIA)
 						return -4;
 					if(msgRecibido->tipoMensaje == STACKOVERFLOW)
-						return -3;	//todo: considerar error de stackoverflow
+						return -3;	//todo: solo aca meto el exitcod
 					else
 						return -2;
 				}
@@ -1605,7 +1607,7 @@ t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
 						if(msgRecibido->tipoMensaje == EXCEPCION_MEMORIA)
 							return -4;
 						if(msgRecibido->tipoMensaje == STACKOVERFLOW)
-							return -3;	//todo: considerar error de stackoverflow
+							return -3;	//todo: solo aca meto el exitcod
 						else
 							return -2;
 					}
@@ -1641,9 +1643,9 @@ t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
 					if(msgRecibido2->tipoMensaje != ESCRITURA_PAGINA){
 						log_error(logKernel, "No recibi ESCRITURA_PAGINA sino %d", msgRecibido2->tipoMensaje);
 						if(msgRecibido->tipoMensaje == EXCEPCION_MEMORIA)
-							return -4;
+							return -4; 	//todo: solo aca meto el exitcod
 						if(msgRecibido->tipoMensaje == STACKOVERFLOW)
-							return -3;	//todo: considerar error de stackoverflow
+							return -3;
 						else
 							return -2;
 					}
@@ -1664,7 +1666,7 @@ t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
 	}
 	list_destroy(listAux);
 	// no encontre hueco
-	return -1;
+	return SIN_DEFINICION;
 }
 
 
@@ -1680,13 +1682,7 @@ t_puntero reservarMemoriaHeap(t_num cantBytes, t_PCB* pcb){
 
 	if(cantBytes > tamanioPag - sizeof(t_HeapMetadata)*2){
 		log_warning(logKernel, "Se quiere asignar mas que tamanio de pagina");
-		finalizarPid(pcb->pid);
-		if((int)pcb->exitCode > 0){
-			pcb->exitCode = MAS_MEMORIA_TAMANIO_PAG;
-			_ponerEnCola(pcb->pid, cola_Exit, mutex_Exit);
-			liberarPCB(pcb, true);
-		}
-		return -1;
+		return MAS_MEMORIA_TAMANIO_PAG;
 	}
 
 	if( list_count_satisfying(tabla_heap, (void*)_esHeap) == 0 ){

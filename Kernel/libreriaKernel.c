@@ -1204,7 +1204,7 @@ void consolaKernel(){
 					printf( "Cantidad de operaciones liberar: %d \n", infP->cantOp_liberar);
 					printf( "Se liberaron %d bytes \n", infP->canrBytes_liberar);
 					if(infP->canrBytes_alocar > infP->canrBytes_liberar)
-						printf( "El proceso genero un memory leak");
+						printf( "No se liberaron todas las estructuras del heap");
 					break;
 				default:
 					fprintf(stderr, PRINT_COLOR_YELLOW "Capo que me tiraste?" PRINT_COLOR_RESET "\n");
@@ -1547,6 +1547,9 @@ t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
 	t_list* listAux = list_filter(tabla_heap, (void*) _esHeap);
 	list_sort(tabla_heap, (void*) _menorPag);
 
+	void* buffer;
+	t_posicion punteroAnterior;
+	t_HeapMetadata heapMetadataAnterior = {0, 0};
 	int i=0, j=0, offset=0, tmpsize;
 
 	for(; i < list_size(listAux); i++){
@@ -1577,18 +1580,51 @@ t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
 				msg_recibir_data(socket_memoria, msgRecibido);
 				t_HeapMetadata heapMetadata;
 				memcpy(&heapMetadata, msgRecibido->data, sizeof(t_HeapMetadata));
+				log_trace(logKernel, "	busco hueco heapMetadata -> size %d free %d", heapMetadata.size, heapMetadata.isFree);
 				msg_destruir(msgRecibido);
 				_unlockMemoria();
 
+				if(heapMetadataAnterior.isFree && heapMetadata.isFree && punteroAnterior.pagina == puntero.pagina){
+					puntero.offset = punteroAnterior.offset;
+					heapMetadata.size = heapMetadata.size + sizeof(t_HeapMetadata) + heapMetadataAnterior.size;
+
+					buffer = malloc(sizeof(t_posicion) + sizeof(t_HeapMetadata));
+					memcpy(buffer + offset, &puntero, tmpsize = sizeof(t_posicion));
+					offset += tmpsize;
+					memcpy(buffer + offset, &heapMetadata, tmpsize = sizeof(t_HeapMetadata));
+					offset += tmpsize;
+
+					_lockMemoria();
+					send(socket_memoria, &pcb->pid, sizeof(t_pid), 0);
+					msg_enviar_separado(ESCRITURA_PAGINA, offset, buffer, socket_memoria);
+					offset = 0;
+
+					t_msg* msgRecibido3 = msg_recibir(socket_memoria);
+					if(msgRecibido3->tipoMensaje != ESCRITURA_PAGINA){
+						log_error(logKernel, "No recibi ESCRITURA_PAGINA sino %d", msgRecibido3->tipoMensaje);
+						if(msgRecibido->tipoMensaje == EXCEPCION_MEMORIA)
+							return -4;
+						if(msgRecibido->tipoMensaje == STACKOVERFLOW)
+							return -3;	//todo: considerar error de stackoverflow
+						else
+							return -2;
+					}
+					msg_destruir(msgRecibido3);
+
+					_unlockMemoria();
+					free(buffer);
+				}
+
+
 				if(heapMetadata.isFree && cantBytes <= heapMetadata.size ){
-					//encontre hueco
+					log_error(logKernel, "Encontre hueco");
 					t_HeapMetadata heapMetadataProx;
 					heapMetadataProx.isFree = true;
 					heapMetadataProx.size = heapMetadata.size - cantBytes - sizeof(t_HeapMetadata);
 					heapMetadata.isFree = false;
 					heapMetadata.size = cantBytes;
 
-					void* buffer = malloc(sizeof(t_posicion) + sizeof(t_HeapMetadata)*2);
+					buffer = malloc(sizeof(t_posicion) + sizeof(t_HeapMetadata)*2);
 					memcpy(buffer + offset, &puntero, tmpsize = sizeof(t_posicion));
 					offset += tmpsize;
 					memcpy(buffer + offset, &heapMetadata, tmpsize = sizeof(t_HeapMetadata));
@@ -1596,8 +1632,10 @@ t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
 					memcpy(buffer + offset, &heapMetadataProx, tmpsize = sizeof(t_HeapMetadata));
 					offset += tmpsize;
 
+					_lockMemoria();
 					send(socket_memoria, &pcb->pid, sizeof(t_pid), 0);
 					msg_enviar_separado(ESCRITURA_PAGINA, offset, buffer, socket_memoria);
+					offset = 0;
 
 					t_msg* msgRecibido2 = msg_recibir(socket_memoria);
 					if(msgRecibido2->tipoMensaje != ESCRITURA_PAGINA){
@@ -1610,6 +1648,7 @@ t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
 							return -2;
 					}
 					msg_destruir(msgRecibido2);
+					_unlockMemoria();
 
 					free(buffer);
 					list_destroy(listAux);
@@ -1618,6 +1657,8 @@ t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
 				}else
 					//sigo buscando
 					j = j + sizeof(t_HeapMetadata) + heapMetadata.size;
+					punteroAnterior = puntero;
+					heapMetadataAnterior = heapMetadata;
 			}
 		}
 	}
@@ -1714,21 +1755,27 @@ int liberarMemoriaHeap(t_puntero posicion, t_PCB* pcb){
 	puntero.size = sizeof(t_HeapMetadata);
 
 	t_HeapMetadata heapMetadata = _recibirHeapMetadata(pcb->pid, puntero);
-	puntero.offset = (posicion % tamanioPag) + sizeof(t_HeapMetadata) + heapMetadata.size;
-	t_HeapMetadata heapMetadataProx = _recibirHeapMetadata(pcb->pid, puntero);
+	log_error(logKernel, "		heapMetadata size %d free %d", heapMetadata.size, heapMetadata.isFree);
 
 	if(heapMetadata.isFree == true){
 		log_warning(logKernel, "Quiero liberar algo liberado");
 		return -1;
 	}
 
+	heapMetadata.isFree = true;
 	_sumarCantOpLiberar(pcb->pid, heapMetadata.size);
 
-	heapMetadata.isFree = true;
+	/* no tengo q buscar el proximo
+	puntero.offset = (posicion % tamanioPag) + sizeof(t_HeapMetadata) + heapMetadata.size;
+	t_HeapMetadata heapMetadataProx = _recibirHeapMetadata(pcb->pid, puntero);
+	log_error(logKernel, "		heapMetadataProx size %d free %d", heapMetadataProx.size, heapMetadataProx.isFree);
+
 	if(heapMetadataProx.isFree == true){
 		log_trace(logKernel, "El proximo esta libre, lo uno");
 		heapMetadata.size = heapMetadata.size + sizeof(t_HeapMetadata) + heapMetadataProx.size;
 	}
+	puntero.offset = posicion % tamanioPag;
+	*/
 
 	void* buffer = malloc(sizeof(t_posicion) + sizeof(t_HeapMetadata));
 	memcpy(buffer, &puntero, sizeof(t_posicion));

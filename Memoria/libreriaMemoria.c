@@ -1383,13 +1383,13 @@ void dumpCache(){
 
 	void _dump(t_cache* entradaCache){
 
-		fprintf(archivoDump, "\n//////////////////////       ENTRADA CACHE %2d       /////////////////////\n\n", i);
+		fprintf(archivoDump, "\n//////////////////////       ENTRADA CACHE %2d        /////////////////////\n\n", i);
 		fprintf(archivoDump,
 				" PID %d \n nº Pagina: %d \n",
 				entradaCache->pid, entradaCache->numPag);
 
 		fprintf(stderr, PRINT_COLOR_CYAN "\n//////////////////////" PRINT_COLOR_RESET
-				"       ENTRADA CACHE %2d       "
+				"       ENTRADA CACHE %2d        "
 				PRINT_COLOR_CYAN "/////////////////////\n\n" PRINT_COLOR_RESET, i);
 
 		fprintf(stderr,

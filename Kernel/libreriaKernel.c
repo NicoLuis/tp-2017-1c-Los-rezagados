@@ -956,11 +956,13 @@ void enviarScriptAMemoria(_t_hiloEspera* aux){
 	t_PCB* pcb = list_find(lista_PCBs, (void*) _buscarPCB);
 	_unlockLista_PCBs();
 
+	_lockMemoria();
 	send(socket_memoria, &aux->pid, sizeof(t_pid), 0);
 	msg_enviar_separado(INICIALIZAR_PROGRAMA, aux->size, aux->script, socket_memoria);
 	send(socket_memoria, &pcb->cantPagsStack, sizeof(t_num16), 0);
 	t_num8 respuesta;
 	recv(socket_memoria, &respuesta, sizeof(t_num8), 0);
+	_unlockMemoria();
 
 	switch(respuesta){
 	case OK:
@@ -1152,8 +1154,7 @@ void consolaKernel(){
 						PRINT_COLOR_BLUE "  b -" PRINT_COLOR_RESET " Cantidad de operaciones privilegiadas que ejecutó \n"
 						PRINT_COLOR_BLUE "  c -" PRINT_COLOR_RESET " Tabla de archivos abiertos por el proceso \n"
 						PRINT_COLOR_BLUE "  d -" PRINT_COLOR_RESET " Cantidad de páginas de Heap utilizadas \n"
-						PRINT_COLOR_BLUE "  e -" PRINT_COLOR_RESET " Cantidad de acciones alocar realizadas \n"
-						PRINT_COLOR_BLUE "  f -" PRINT_COLOR_RESET " Cantidad de acciones liberar realizadas \n" );
+						PRINT_COLOR_BLUE "  e -" PRINT_COLOR_RESET " Cantidad de acciones alocar/liberar realizadas \n");
 
 				switch(getchar()){
 				case 'a':
@@ -1200,10 +1201,10 @@ void consolaKernel(){
 				case 'e':
 					printf( "Cantidad de operaciones alocar: %d \n", infP->cantOp_alocar);
 					printf( "Se alocaron %d bytes \n", infP->canrBytes_alocar);
-					break;
-				case 'f':
 					printf( "Cantidad de operaciones liberar: %d \n", infP->cantOp_liberar);
 					printf( "Se liberaron %d bytes \n", infP->canrBytes_liberar);
+					if(infP->canrBytes_alocar > infP->canrBytes_liberar)
+						printf( "El proceso genero un memory leak");
 					break;
 				default:
 					fprintf(stderr, PRINT_COLOR_YELLOW "Capo que me tiraste?" PRINT_COLOR_RESET "\n");
@@ -1463,7 +1464,12 @@ void _unlockLista_infoProc(){
 	pthread_mutex_unlock(&mutex_infoProcs);
 }
 
-
+void _lockMemoria(){
+	pthread_mutex_lock(&mutex_Solicitud_Memoria);
+}
+void _unlockMemoria(){
+	pthread_mutex_unlock(&mutex_Solicitud_Memoria);
+}
 
 
 
@@ -1479,6 +1485,7 @@ void asignarNuevaPag(t_PCB* pcb){
 	}
 
 	log_trace(logKernel, "Asigno nueva pagina a proceso %d", pcb->pid);
+	_lockMemoria();
 	send(socket_memoria, &pcb->pid, sizeof(t_pid), 0);
 	msg_enviar_separado(ASIGNACION_MEMORIA, 0, 0, socket_memoria);
 	t_msg* msgRecibido = msg_recibir(socket_memoria);
@@ -1487,6 +1494,7 @@ void asignarNuevaPag(t_PCB* pcb){
 		// todo: manejar error
 	}
 	msg_destruir(msgRecibido);
+	_unlockMemoria();
 
 	t_heap* nuevaHeap = malloc(sizeof(t_heap));
 	nuevaHeap->pid = pcb->pid;
@@ -1507,6 +1515,7 @@ void asignarNuevaPag(t_PCB* pcb){
 	memcpy(buffer, &puntero, sizeof(t_posicion));
 	memcpy(buffer + sizeof(t_posicion), &metadata, sizeof(t_HeapMetadata));
 
+	_lockMemoria();
 	send(socket_memoria, &pcb->pid, sizeof(t_pid), 0);
 	msg_enviar_separado(ESCRITURA_PAGINA, sizeof(t_posicion) + sizeof(t_HeapMetadata), buffer, socket_memoria);
 	msgRecibido = msg_recibir(socket_memoria);
@@ -1515,6 +1524,7 @@ void asignarNuevaPag(t_PCB* pcb){
 		// todo: manejar error
 	}
 	msg_destruir(msgRecibido);
+	_unlockMemoria();
 
 	_sumarCantPagsHeap(pcb->pid, 1);
 
@@ -1549,6 +1559,7 @@ t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
 				puntero.pagina = pcb->cantPagsCodigo + pcb->cantPagsStack + i;
 				puntero.offset = j;
 				puntero.size = sizeof(t_HeapMetadata);
+				_lockMemoria();
 				send(socket_memoria, &pcb->pid, sizeof(t_pid), 0);
 				msg_enviar_separado(LECTURA_PAGINA, sizeof(t_posicion), &puntero, socket_memoria);
 
@@ -1567,6 +1578,7 @@ t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
 				t_HeapMetadata heapMetadata;
 				memcpy(&heapMetadata, msgRecibido->data, sizeof(t_HeapMetadata));
 				msg_destruir(msgRecibido);
+				_unlockMemoria();
 
 				if(heapMetadata.isFree && cantBytes <= heapMetadata.size ){
 					//encontre hueco
@@ -1663,6 +1675,7 @@ t_HeapMetadata _recibirHeapMetadata(t_pid pid, t_posicion puntero){
 	if(puntero.offset + sizeof(t_HeapMetadata) >= tamanioPag)
 		return heapMetadata;
 
+	_lockMemoria();
 	send(socket_memoria, &pid, sizeof(t_pid), 0);
 	msg_enviar_separado(LECTURA_PAGINA, sizeof(t_posicion), &puntero, socket_memoria);
 
@@ -1681,6 +1694,7 @@ t_HeapMetadata _recibirHeapMetadata(t_pid pid, t_posicion puntero){
 	msg_recibir_data(socket_memoria, msgRecibido);
 	memcpy(&heapMetadata, msgRecibido->data, sizeof(t_HeapMetadata));
 	msg_destruir(msgRecibido);
+	_unlockMemoria();
 
 	return heapMetadata;
 }
@@ -1720,6 +1734,7 @@ int liberarMemoriaHeap(t_puntero posicion, t_PCB* pcb){
 	memcpy(buffer, &puntero, sizeof(t_posicion));
 	memcpy(buffer + sizeof(t_posicion), &heapMetadata, sizeof(t_HeapMetadata));
 
+	_lockMemoria();
 	send(socket_memoria, &pcb->pid, sizeof(t_pid), 0);
 
 	if(heapMetadata.size == tamanioPag - sizeof(t_HeapMetadata))
@@ -1743,6 +1758,7 @@ int liberarMemoriaHeap(t_puntero posicion, t_PCB* pcb){
 			return -2;
 	}
 	msg_destruir(msgRecibido);
+	_unlockMemoria();
 
 	return flag_se_libero_pag;
 }

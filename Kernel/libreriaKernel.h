@@ -161,6 +161,8 @@ void _lockLista_PCB_cpu();
 void _unlockLista_PCB_cpu();
 void _lockLista_infoProc();
 void _unlockLista_infoProc();
+void _lockMemoria();
+void _unlockMemoria();
 
 t_pid pid;
 int indiceGlobal;
@@ -199,6 +201,7 @@ sem_t sem_gradoMp;
 sem_t sem_cantColaReady;
 sem_t sem_cantCPUs;
 
+pthread_mutex_t mutex_Solicitud_Memoria;
 
 
 

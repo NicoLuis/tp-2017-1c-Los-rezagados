@@ -830,7 +830,7 @@ void escucharCPU(int socket_cpu) {
 
 			int _espid(t_tabla_proceso* a){ return a->pid == pid; }
 			// todo: poner un mutex lock lista_tabla_de_procesos
-			t_tabla_proceso* tablaProceso = list_remove_by_condition(lista_tabla_de_procesos, (void*) _esPid);
+			t_tabla_proceso* tablaProceso = list_remove_by_condition(lista_tabla_de_procesos, (void*) _espid);
 
 			if(tablaProceso == NULL){
 				//significa q no existe la tabla buscada => la creo

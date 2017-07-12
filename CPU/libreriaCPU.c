@@ -158,8 +158,16 @@ t_valor_variable leerMemoria(t_posicion puntero){
 	case LECTURA_PAGINA:
 		if(msg_recibir_data(socket_memoria, msgRecibido) > 0)
 			memcpy(&valor, msgRecibido->data, sizeof(t_valor_variable));
-		else
+		else{
 			log_warning(logCPU, "No recibi nada");
+			flag_error = 1;
+			tipoError = EXCEPCION_MEMORIA;
+		}
+		break;
+	case EXCEPCION_MEMORIA:
+		log_trace(logCPU, "EXCEPCION_MEMORIA");
+		flag_error = 1;
+		tipoError = EXCEPCION_MEMORIA;
 		break;
 	case 0:
 		log_error(logCPU, "Se desconecto Memoria");
@@ -196,6 +204,11 @@ t_posicion escribirMemoria(t_posicion puntero, void* valor){
 	switch(header){
 	case ESCRITURA_PAGINA:
 		log_trace(logCPU, "Asigno correctamente");
+		break;
+	case EXCEPCION_MEMORIA:
+		log_trace(logCPU, "EXCEPCION_MEMORIA");
+		flag_error = 1;
+		tipoError = EXCEPCION_MEMORIA;
 		break;
 	case 0:
 		log_error(logCPU, "Se desconecto Memoria");

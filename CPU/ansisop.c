@@ -56,7 +56,7 @@ t_valor_variable dereferenciar(t_puntero direccion_variable){
 		puntero.size = sizeof(t_valor_variable);
 
 		int valor = leerMemoria(puntero);
-		if(valor >= 0)
+		if(!flag_error)
 			return valor;
 	}
 	log_error(logAnsisop, "No se puede obtener valor de %d", direccion_variable);

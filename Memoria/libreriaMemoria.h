@@ -105,7 +105,7 @@ int escribirContenido(t_pid pid, t_posicion puntero, void* contenido);
 
 /*			FRAMES			*/
 void inicializarFrames();
-int hayFramesLibres(int cantidad);
+int cantFramesLibres();
 int buscarFrameLibre(t_pid pid);
 
 /*			FRAMES POR PAGINA DE PROCESO			*/

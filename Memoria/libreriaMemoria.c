@@ -84,7 +84,7 @@ void escucharKERNEL(void* socket_kernel) {
 
 			log_info(log_memoria, "\n%s", msg->data);
 
-			if(hayFramesLibres(cantidadDePaginas)){
+			if(cantFramesLibres() >= cantidadDePaginas){
 
 				//-----Retardo
 				pthread_mutex_lock(&mutexRetardo);
@@ -335,6 +335,10 @@ void escucharCPU(void* socket_cpu) {
 				pthread_exit(NULL);
 			}
 			break;
+
+
+
+
 			case LECTURA_PAGINA: {
 				pthread_mutex_lock(&mutexCantAccesosMemoria);
 				cantAccesosMemoria++;
@@ -385,7 +389,7 @@ void escucharCPU(void* socket_cpu) {
 					char* contenido_leido = obtenerContenido(pidPeticion, puntero);
 
 					if(contenido_leido == NULL)
-						msg_enviar_separado(ERROR, 0, 0, socketCPU);
+						msg_enviar_separado(EXCEPCION_MEMORIA, 0, 0, socketCPU);
 					else{
 						msg_enviar_separado(LECTURA_PAGINA, puntero.size, contenido_leido, socketCPU);
 						if(puntero.size != sizeof(t_num))
@@ -400,7 +404,9 @@ void escucharCPU(void* socket_cpu) {
 			break;
 
 
-			case ESCRITURA_PAGINA: {
+
+
+			case ESCRITURA_PAGINA:
 
 				pthread_mutex_lock(&mutexCantAccesosMemoria);
 				cantAccesosMemoria++;
@@ -455,41 +461,33 @@ void escucharCPU(void* socket_cpu) {
 
 				} else {
 
-				//-----Retardo
-				pthread_mutex_lock(&mutexRetardo);
-				usleep(retardoMemoria * 1000);
-				pthread_mutex_unlock(&mutexRetardo);
-				//------------
+					//-----Retardo
+					pthread_mutex_lock(&mutexRetardo);
+					usleep(retardoMemoria * 1000);
+					pthread_mutex_unlock(&mutexRetardo);
+					//------------
 
-
-					int nroFrame = buscarFramePorPidPag(pidPeticion, puntero.pagina);
-
-					if(nroFrame == -1){
-						log_error(log_memoria, "No se encueuntra el frame para pid %d pagina %d", pidPeticion, puntero.pagina);
-						header = ERROR;
-						send(socketCPU, &header, sizeof(uint32_t), 0);
-						free(contenido_escribir);
+					if( escribirContenido(pidPeticion, puntero, contenido_escribir) == -1){
+						header = EXCEPCION_MEMORIA;
+						bytesEnviados = send(socketCPU, &header, sizeof(uint32_t), 0);
 					}else{
-
-						escribirContenido(pidPeticion, puntero, contenido_escribir);
-						free(contenido_escribir);
-
 						header = ESCRITURA_PAGINA; //OK
 						bytesEnviados = send(socketCPU, &header, sizeof(uint32_t), 0);
-						if (bytesEnviados <= 0) {
-							log_error(log_memoria, "Error send CPU");
-							pthread_exit(NULL);
-						}
-
-						if(Cache_Activada())
-							agregarEntradaCache(pidPeticion, puntero.pagina, nroFrame);
 
 						log_info(log_memoria, "Escribi correctamente");
 					}
-
+					if (bytesEnviados <= 0) {
+						log_error(log_memoria, "Error send CPU");
+						pthread_exit(NULL);
+					}
+					free(contenido_escribir);
 				}
-			}
+
 			break;
+
+
+
+
 
 			case 0:
 				log_trace(log_memoria, "Se desconecto cpu %d", socketCPU);
@@ -556,6 +554,7 @@ void eliminarProcesoDeListaDeProcesos(t_pid pid) {
 void* obtenerContenido(t_pid pid, t_posicion puntero) {
 
 	int nroFrame = buscarFramePorPidPag(pid, puntero.pagina);
+
 	int desplazamientoMemoria = (nroFrame * tamanioDeMarcos) + puntero.offset;
 
 	if(nroFrame == -1){
@@ -568,7 +567,7 @@ void* obtenerContenido(t_pid pid, t_posicion puntero) {
 	int i = 0, offsetLectura = 0;
 	while((sizeRestante > tamanioDeMarcos) || (puntero.offset + sizeRestante > tamanioDeMarcos)){
 
-		log_info(log_memoria, "Leo %d bytes - frame %d a partir de %d", (tamanioDeMarcos - puntero.offset), nroFrame, puntero.offset);
+		log_info(log_memoria, "		READ %d bytes -> (frame, offset) %d, %d", (tamanioDeMarcos - puntero.offset), nroFrame, puntero.offset);
 
 		pthread_mutex_lock(&mutexMemoriaReal);
 		memcpy(contenido + offsetLectura, memoria_real + desplazamientoMemoria, (tamanioDeMarcos - puntero.offset));
@@ -585,7 +584,7 @@ void* obtenerContenido(t_pid pid, t_posicion puntero) {
 		puntero.offset = 0;
 	}
 
-	log_info(log_memoria, "Leo %d bytes - frame %d a partir de %d", sizeRestante, nroFrame, puntero.offset);
+	log_info(log_memoria, "		READ %d bytes -> (frame, offset) %d, %d", sizeRestante, nroFrame, puntero.offset);
 
 	pthread_mutex_lock(&mutexMemoriaReal);
 	memcpy(contenido + offsetLectura, memoria_real + desplazamientoMemoria, sizeRestante);
@@ -611,7 +610,7 @@ int escribirContenido(t_pid pid, t_posicion puntero, void* contenido) {
 	int i = 0, offsetEscritura = 0;
 	while((sizeRestante > tamanioDeMarcos) || (puntero.offset + sizeRestante > tamanioDeMarcos)){
 
-		log_info(log_memoria, "Escribo %d bytes - frame %d a partir de %d", (tamanioDeMarcos - puntero.offset), nroFrame, puntero.offset);
+		log_info(log_memoria, "		WRITE %d bytes -> (frame, offset) %d, %d", (tamanioDeMarcos - puntero.offset), nroFrame, puntero.offset);
 
 		pthread_mutex_lock(&mutexMemoriaReal);
 		memcpy(memoria_real + desplazamientoMemoria, contenido + offsetEscritura, (tamanioDeMarcos - puntero.offset));
@@ -628,7 +627,7 @@ int escribirContenido(t_pid pid, t_posicion puntero, void* contenido) {
 		puntero.offset = 0;
 	}
 
-	log_info(log_memoria, "Escribo %d bytes - frame %d a partir de %d", sizeRestante, nroFrame, puntero.offset);
+	log_info(log_memoria, "		WRITE %d bytes -> (frame, offset) %d, %d", sizeRestante, nroFrame, puntero.offset);
 
 	pthread_mutex_lock(&mutexMemoriaReal);
 	memcpy(memoria_real + desplazamientoMemoria, contenido + offsetEscritura, sizeRestante);
@@ -662,7 +661,7 @@ void inicializarFrames(){
 		frameNuevo->nroPag = 0;
 
 		if(i < cantidadFramesEstructurasAdministrativas)
-			frameNuevo->pid = -1;			//frame reservado para EA
+			frameNuevo->pid = cantidadDeMarcos-1;			//frame reservado para EA
 		else
 			frameNuevo->pid = 0;
 
@@ -671,14 +670,12 @@ void inicializarFrames(){
 		memcpy(memoria_real + i*sizeof(t_frame), frameNuevo, sizeof(t_frame));
 		//log_info(log_memoria, "Cree frame %d", frameNuevo->nroFrame);
 		free(frameNuevo);
-		// fixme ver si tamanioMarcoRestante < sizeof(t_frame) afecta en algo
-		// (si arranco en un frame nuevo o lo guardo por la mitad)
 	}
 
 	log_trace(log_memoria, "Memoria reservada y frames inicializados");
 }
 
-int hayFramesLibres(int cantidad) {
+int cantFramesLibres() {
 	int cantidadLibres = 0;
 	t_frame* frame;
 
@@ -688,7 +685,6 @@ int hayFramesLibres(int cantidad) {
 		frame = malloc(sizeof(t_frame));
 		// i*sizeof(t_frame) es el offset
 		memcpy(frame, memoria_real + i*sizeof(t_frame), sizeof(t_frame));
-		// fixme ver tamanioMarcoRestante < sizeof(t_frame) ...
 
 		if(frame->pid == 0)
 			cantidadLibres++;
@@ -697,7 +693,7 @@ int hayFramesLibres(int cantidad) {
 	unlockFrames();
 
 	log_trace(log_memoria, "Cantidad libres %d", cantidadLibres);
-	return cantidad <= cantidadLibres;
+	return cantidadLibres;
 }
 
 int buscarFrameLibre(t_pid pid) {
@@ -722,7 +718,6 @@ int buscarFrameLibre(t_pid pid) {
 		frame = malloc(sizeof(t_frame));
 		// i*sizeof(t_frame) es el offset
 		memcpy(frame, memoria_real + i*sizeof(t_frame), sizeof(t_frame));
-		// fixme ver tamanioMarcoRestante < sizeof(t_frame) ...
 
 		if(frame->pid == 0){
 			log_trace(log_memoria, "Asigno a frame %d pid %d pag %d", frame->nroFrame, pid, nroPagNueva);
@@ -787,7 +782,6 @@ int buscarFramePorPidPag(t_pid pid, t_num16 nroPagina){
 		frame = malloc(sizeof(t_frame));
 		// i*sizeof(t_frame) es el offset
 		memcpy(frame, memoria_real + i*sizeof(t_frame), sizeof(t_frame));
-		// fixme ver tamanioMarcoRestante < sizeof(t_frame) ...
 
 		if(frame->pid == pid && frame->nroPag == nroPagina){
 			nroFrame = i;
@@ -849,7 +843,6 @@ void liberarPagina(t_pid pid, t_num16 nroPagina){
 		frame = malloc(sizeof(t_frame));
 		// i*sizeof(t_frame) es el offset
 		memcpy(frame, memoria_real + i*sizeof(t_frame), sizeof(t_frame));
-		// fixme ver tamanioMarcoRestante < sizeof(t_frame) ...
 
 		if(frame->pid == pid && frame->nroPag == nroPagina){
 			frame->pid = 0;
@@ -1011,7 +1004,7 @@ void* obtenerContenidoSegunCache(t_pid pid, t_posicion puntero){
 	entradaCache->ultimoAcceso = cantAccesosMemoria;
 	pthread_mutex_unlock(&mutexCantAccesosMemoria);
 
-	log_info(log_memoria, "Leo %d bytes - frame %d a partir de %d", puntero.size, entradaCache->numFrame, puntero.offset);
+	log_info(log_memoria, "		READ %d bytes -> (frame, offset) %d, %d", puntero.size, entradaCache->numFrame, puntero.offset);
 
 	void* contenido = malloc(puntero.size);
 	int desplazamiento = (entradaCache->numFrame * tamanioDeMarcos) + puntero.offset;
@@ -1033,7 +1026,7 @@ void escribirContenidoSegunCache(t_pid pid, t_posicion puntero, void* contenido_
 	entradaCache->ultimoAcceso = cantAccesosMemoria;
 	pthread_mutex_unlock(&mutexCantAccesosMemoria);
 
-	log_info(log_memoria, "Escribo %d bytes - frame %d a partir de %d", puntero.size, entradaCache->numFrame, puntero.offset);
+	log_info(log_memoria, "		WRITE %d bytes -> (frame, offset) %d, %d", puntero.size, entradaCache->numFrame, puntero.offset);
 
 	int desplazamiento = (entradaCache->numFrame * tamanioDeMarcos) + puntero.offset;
 
@@ -1156,7 +1149,7 @@ void ejecutarComandos() {
 					break;
 
 				case 'c':
-					lockFramesYProcesos();
+					lockProcesos();
 
 					int pid;
 					printf("Ingrese pid: ");
@@ -1166,7 +1159,7 @@ void ejecutarComandos() {
 					else
 						dumpProcesoParticular(pid);
 
-					unlockFramesYProcesos();
+					unlockProcesos();
 					break;
 
 				default:
@@ -1179,15 +1172,11 @@ void ejecutarComandos() {
 
 		} else if(string_equals_ignore_case(comando, "size memory")) {
 
-				int cantUsados = 0;
-				void _listarProcs(t_proceso* p){
-					cantUsados = cantUsados + p->cantFramesAsignados;
-				}
-				list_iterate(listaProcesos, (void*) _listarProcs);
+				int cantLibres = cantFramesLibres();
 
 				printf("Cantidad de frames en memoria: %d\n", cantidadDeMarcos);
-				printf("Cantidad de frames usados: %d\n", cantUsados);
-				printf("Cantidad de frames libre: %d\n", cantidadDeMarcos - cantUsados);
+				printf("Cantidad de frames usados: %d\n", cantidadDeMarcos - cantLibres);
+				printf("Cantidad de frames libre: %d\n", cantLibres);
 
 		}else if(string_starts_with(comando,"size pid")){
 
@@ -1248,17 +1237,19 @@ void dumpTodosLosProcesos() {
 	dumpEstructurasMemoriaTodosLosProcesos(archivoDump);
 
 	fprintf(archivoDump,
-			"\n//////////////////MEMORIA PRINCIPAL//////////////////\n");
+			"\n//////////////////          MEMORIA PRINCIPAL           //////////////////\n");
 
-	printf("\n//////////////////MEMORIA PRINCIPAL//////////////////\n\n");
+	printf("\n"
+			PRINT_COLOR_CYAN "//////////////////" PRINT_COLOR_RESET
+			"          MEMORIA PRINCIPAL           " PRINT_COLOR_CYAN
+			"//////////////////" PRINT_COLOR_RESET "\n\n");
 
 	pthread_mutex_lock(&mutexMemoriaReal);
-	//hexdump(memoria_real, tamanioTotalMemoria, archivoDump); todo q onda esto?
+	hexdump(memoria_real, tamanioDeMarcos * tamanioDeMarcos, archivoDump);
+	hexdump(memoria_real, tamanioDeMarcos * tamanioDeMarcos, stderr);
 	pthread_mutex_unlock(&mutexMemoriaReal);
 
 	printf("\nDUMP DE MEMORIA PRINCIPAL PARA TODOS LOS PROCESOS REALIZADO\n");
-	fprintf(archivoDump,
-			"\n//////////////////MEMORIA PRINCIPAL//////////////////\n");
 
 	fclose(archivoDump);
 }
@@ -1273,15 +1264,21 @@ void dumpContenidoMemoriaProceso(t_pid pid, FILE* archivoDump) {
 	p.size = tamanioDeMarcos;
 
 	fprintf(archivoDump,
-			"\n//////////////////MEMORIA PRINCIPAL//////////////////\n");
+			"\n//////////////////          MEMORIA PRINCIPAL           //////////////////\n");
 
-	printf("\n//////////////////MEMORIA PRINCIPAL//////////////////\n\n");
+	printf("\n"
+			PRINT_COLOR_CYAN "//////////////////" PRINT_COLOR_RESET
+			"          MEMORIA PRINCIPAL           " PRINT_COLOR_CYAN
+			"//////////////////" PRINT_COLOR_RESET "\n\n");
 
 	while (nroPag < proceso->cantFramesUsados) {
+		log_trace(log_memoria, "nroPag %d proceso->cantFramesUsados %d", nroPag, proceso->cantFramesUsados);
 		p.pagina = nroPag;
 		contenidoFrame = obtenerContenido(pid, p);
 		if(contenidoFrame != NULL){
+			log_trace(log_memoria, "hexdump");
 			hexdump(contenidoFrame, tamanioDeMarcos, archivoDump);
+			hexdump(contenidoFrame, tamanioDeMarcos, stderr);
 		}
 
 		nroPag++;
@@ -1313,6 +1310,11 @@ void dumpProcesoParticular(t_pid pid) {
 		printf(
 				"\n//////////////ESTRUCTURA DE MEMORIA PROCESO %d//////////////\n",
 				proceso->PID);
+
+
+
+
+
 		fprintf(archivoDump, "\nCantidad de frames asignados: %d\n",
 				proceso->cantFramesAsignados);
 		printf("\nCantidad de frames asignados: %d\n",
@@ -1346,7 +1348,10 @@ void dumpTablaPaginas(){
 		frame = malloc(sizeof(t_frame));
 		memcpy(frame, memoria_real + nroFrame*sizeof(t_frame), sizeof(t_frame));
 
-		if(frame->pid == 0){
+		if(frame->pid == cantidadDeMarcos-1){
+			nrof = " TP";
+			nrop = " TP";
+		}else if(frame->pid == 0){
 			nrof = " - ";
 			nrop = " - ";
 		}else{

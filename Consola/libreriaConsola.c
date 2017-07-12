@@ -241,6 +241,7 @@ char* _contarTiempo(char* tiempo1, char* tiempo2){
 void finalizarPrograma(t_programa* prog, bool flag_print){
 
 	if(flag_print){
+		fprintf(stderr, "	● PID %d \n",  prog->pid);
 		fprintf(stderr, "● Fecha y hora de inicio %s \n",  prog->horaInicio);
 		fprintf(stderr, "● Fecha y hora de fin %s \n",  prog->horaFin);
 		fprintf(stderr, "● Impresiones por pantalla %d \n",  prog->cantImpresionesPantalla);

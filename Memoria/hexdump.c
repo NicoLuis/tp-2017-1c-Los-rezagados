@@ -10,8 +10,6 @@ void hexdump(void *mem, unsigned int len, FILE* archi)
 
 	for(i = 0; i < len + ((len % HEXDUMP_COLS) ? (HEXDUMP_COLS - len % HEXDUMP_COLS) : 0); i++){
 
-		log_trace(log_memoria, "hexdump5");
-
 		// print offset
 		if(i % HEXDUMP_COLS == 0)
 			fprintf(archi, "0x%06x: ", i);
@@ -27,8 +25,6 @@ void hexdump(void *mem, unsigned int len, FILE* archi)
 		if(i % HEXDUMP_COLS == (HEXDUMP_COLS - 1)){
 
 			for(j = i - (HEXDUMP_COLS - 1); j <= i; j++){
-
-				log_trace(log_memoria, "hexdump6");
 
 				if(j >= len)
 					// end of block, not really printing

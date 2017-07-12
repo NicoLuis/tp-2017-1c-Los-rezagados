@@ -32,6 +32,7 @@
 #include <herramientas/enum.h>
 #include "hexdump.h"
 
+#define PID_RESERVADO 255 //sizeof(t_pid)-1
 
 //Archivo de Configuracion
 int puertoMemoria;
@@ -52,6 +53,7 @@ typedef struct {
 	t_pid PID;
 	int cantFramesAsignados;
 	int cantFramesUsados;
+	int cantEntradasCache;
 } t_proceso;
 
 //FRAME
@@ -60,16 +62,16 @@ typedef struct {
 	// si usara t_num8 serian 256 (2⁸)
 	// no uso t_num (2³²) xq se quiere achicar espacio
 	t_num16 nroFrame;
-	t_pid pid;
 	t_num16 nroPag;
+	t_pid pid;
 } t_frame;
 
 //ENTRADA Cache
 typedef struct {
 	t_pid pid;
 	t_num16 numPag;
-	t_num16 numFrame;
 	int ultimoAcceso;
+	void* contenido;
 } t_cache;
 
 typedef struct HeapMetadata {
@@ -127,21 +129,20 @@ void terminarMemoria();
 /*			CACHE 			*/
 
 t_list* crearCache();
+void liberarCacheDeProceso(t_pid pid);
 void vaciarCache();
 void eliminarCache(t_list* unaCache);
 
-t_cache* crearRegistroCache(t_pid pid, t_num16 numPag, int numFrame);
 
 int estaEnCache(t_pid pid, t_num16 numero_pagina);
-void agregarEntradaCache(t_pid pid, t_num16 numero_pagina, int nroFrame);
+t_cache* crearRegistroCache(t_pid pid, t_num16 numPag);
+void agregarEntradaCache(t_pid pid, t_num16 numero_pagina);
 t_cache* buscarEntradaCache(t_pid pid, t_num16 numero_pagina);
-void borrarEntradasCacheSegunPID(t_pid pid);
-void borrarEntradaCacheSegunFrame(int nroFrame);
 
 int hayEspacioEnCache();
 int Cache_Activada();
 
-void algoritmoLRU();
+void algoritmoLRU(t_pid pid);
 
 void* obtenerContenidoSegunCache(t_pid pid, t_posicion puntero);
 void escribirContenidoSegunCache(t_pid pid, t_posicion puntero, void* contenido_escribir);
@@ -155,6 +156,7 @@ void dumpTodosLosProcesos();
 void dumpEstructurasMemoriaTodosLosProcesos(FILE* archivoDump);
 void dumpContenidoMemoriaProceso(t_pid pid, FILE* archivoDump);
 void dumpProcesoParticular(t_pid pid);
+void dumpCache();
 void dumpTablaPaginas();
 t_proceso* buscarProcesoEnListaProcesosParaDump(t_pid pid);
 

@@ -592,7 +592,10 @@ void escucharCPU(int socket_cpu) {
 
 			_sumarCantOpPriv(pcb->pid);
 			break;
-//----------------------------------------------------------------------------------------------------
+
+
+
+
 		case MOVER_ANSISOP:
 			log_trace(logKernel, "Recibi MOVER_ANSISOP de CPU");
 			t_valor_variable cursorRecibido;
@@ -603,9 +606,9 @@ void escucharCPU(int socket_cpu) {
 
 			_cargarEntradasxTabla();
 
-			if(entradaProcesoBuscado == NULL){
-				log_trace(logKernel, "no existe la entrada buscada");
-			}else{
+			if(TablaProceso != NULL)
+			if(entradaProcesoBuscado != NULL)
+			if(entradaGlobalBuscada != NULL){
 				entradaProcesoBuscado->cursor = cursorRecibido;
 				log_trace(logKernel, "se seteo el cursor");
 			}
@@ -628,10 +631,9 @@ void escucharCPU(int socket_cpu) {
 
 			_cargarEntradasxTabla();
 
-			if(entradaGlobalBuscada == NULL){
-				log_trace(logKernel, "no existe la entrada buscada");
-			}else{
-
+			if(TablaProceso != NULL)
+			if(entradaProcesoBuscado != NULL)
+			if(entradaGlobalBuscada != NULL){
 				if(entradaProcesoBuscado->bandera.lectura == 1){
 					t_num sizePath = string_length(entradaGlobalBuscada->FilePath);
 					void* buffer = malloc(sizeof(t_num) + sizePath + sizeof(t_valor_variable)*2);
@@ -710,9 +712,9 @@ void escucharCPU(int socket_cpu) {
 
 					_cargarEntradasxTabla();
 
-					if(entradaGlobalBuscada == NULL){
-						log_trace(logKernel, "no existe la entrada buscada");
-					}else{
+					if(TablaProceso != NULL)
+					if(entradaProcesoBuscado != NULL)
+					if(entradaGlobalBuscada != NULL){
 						t_num sizePath = string_length(entradaGlobalBuscada->FilePath);
 						void* buffer = malloc(sizeof(t_num) + sizePath
 									   + sizeof(t_valor_variable) + sizeof(t_valor_variable)) + sizeInformacion;
@@ -752,17 +754,19 @@ void escucharCPU(int socket_cpu) {
 				}
 
 			}
-
 			_sumarCantOpPriv(pcb->pid);
 			free(datos);
 			pthread_mutex_unlock(&cpuUsada->mutex);
 			break;
 
 
-//-----------------------------------------------------------------------------------------
+
 
 		case ABRIR_ANSISOP:
 			// fixme cuando ejecute 2do script q abre archivo exploto -> buscar porque
+
+			// fixme: NO ESTA VALIDANDO QUE EXISTA EL ARCHIVO !!!!!!!! VER EL ENUNCIADO !!!!!!!!!!!
+
 			log_trace(logKernel, "Recibi la siguiente operacion ABRIR_ANSISOP de CPU");
 			t_direccion_archivo pathArchivo;
 			t_num longitudPath;
@@ -780,8 +784,7 @@ void escucharCPU(int socket_cpu) {
 			memcpy(&pid, msgRecibido->data + offset, tmpsize = sizeof(t_pid));
 			offset += tmpsize;
 
-//-------------- busco si ya tengo este path en la tabla global ---------
-
+			// busco si ya tengo este path en la tabla global
 			int _buscarPath(t_entrada_GlobalFile* a){ return string_equals_ignore_case(a->FilePath,pathArchivo); }
 			t_entrada_GlobalFile* entradaGlobalOld = list_find(lista_tabla_global, (void*) _buscarPath);
 
@@ -808,11 +811,12 @@ void escucharCPU(int socket_cpu) {
 				list_add(lista_tabla_global, entradaGlobalOld);
 			}
 
-//-------------- seteo variable necesarias para la tabla de procesos ------------------------------
-
+			// seteo variable necesarias para la tabla de procesos
 			t_entrada_proceso *entradaProcesoNew = malloc(sizeof(t_entrada_proceso));
 
 			entradaProcesoNew->bandera = flags;
+			entradaProcesoNew->referenciaGlobalTable = indiceActualGlobal;
+			entradaProcesoNew->cursor = 0; // seteo del cursor
 
 			if(flags.creacion){
 
@@ -824,12 +828,7 @@ void escucharCPU(int socket_cpu) {
 				// todo: esperar ok de fs
 			}
 
-			entradaProcesoNew->referenciaGlobalTable = indiceActualGlobal;
-
-			entradaProcesoNew->cursor = 0; // seteo del cursor
-
-			//-------------- busco si ya tengo la tabla para este id de proceso -------------------------
-
+			// busco si ya tengo la tabla para este id de proceso
 			int _espid(t_tabla_proceso* a){ return a->pid == pid; }
 			// todo: poner un mutex lock lista_tabla_de_procesos
 			t_tabla_proceso* tablaProceso = list_remove_by_condition(lista_tabla_de_procesos, (void*) _espid);
@@ -869,9 +868,9 @@ void escucharCPU(int socket_cpu) {
 
 			_cargarEntradasxTabla();
 
-			if(entradaGlobalBuscada == NULL){
-				log_trace(logKernel, "no existe la entrada buscada");
-			}else{
+			if(TablaProceso != NULL)
+			if(entradaProcesoBuscado != NULL)
+			if(entradaGlobalBuscada != NULL){
 				if(entradaGlobalBuscada->Open == 1){
 					msg_enviar_separado(BORRAR, string_length(entradaGlobalBuscada->FilePath), entradaGlobalBuscada->FilePath, socket_fs);
 					list_remove_by_condition(lista_tabla_global, (void*) _esIndiceGlobal);
@@ -896,9 +895,9 @@ void escucharCPU(int socket_cpu) {
 
 			_cargarEntradasxTabla();
 
-			if(entradaGlobalBuscada == NULL){
-				log_trace(logKernel, "no existe la entrada buscada");
-			}else{
+			if(TablaProceso != NULL)
+			if(entradaProcesoBuscado != NULL)
+			if(entradaGlobalBuscada != NULL){
 				// todo: poner un mutex lock lista_tabla_global
 				entradaGlobalBuscada = list_remove_by_condition(lista_tabla_global, (void*) _buscarPorIndice);
 				// saco la entrada global buscada

@@ -161,7 +161,7 @@ void leerMetadataArchivo(){
 
 }
 
-void leerBitMap(){		//fixme: con q numero arranc bloques 0 o 1?	considero 1
+void leerBitMap(){
 	int fd;
 	char *data;
 	struct stat sbuf;
@@ -206,7 +206,8 @@ void crearArchivo(void* path){
 		}
 	}
 
-	char* data = string_from_format("TAMANIO=1 BLOQUES=[%d]", nroBloque + 1);
+	char* data = string_from_format("TAMANIO=1 \nBLOQUES=[%d]", nroBloque);
+	// si arrancara en 1 los bloques seria nroBloque+1
 
 	system(string_from_format("touch %s", rutaMetadata));
 
@@ -237,8 +238,9 @@ void borrarArchivo(void* path){
 	char** bloques = config_get_array_value(metadata, "BLOQUES");
 
 	for(i = 0; i*tamanioBloques < tamanio; i++){
-		int nroBloque =  atoi(bloques[i / tamanioBloques]);
-		bitarray_clean_bit(bitMap, nroBloque - 1);
+		int nroBloque =  atoi(bloques[i]);
+		bitarray_clean_bit(bitMap, nroBloque);
+		// si arrancara en 1 los bloques seria nroBloque-1
 	}
 
 	config_destroy(metadata);
@@ -248,7 +250,7 @@ void borrarArchivo(void* path){
 }
 
 char* leerBloquesArchivo(void* path, int offset, int size){
-	char* data = malloc(size), *tmpdata, *pathBloque;
+	char* data = malloc(size+1), *tmpdata, *pathBloque;
 	int i, tmpoffset = 0;
 	char* rutaMetadata = string_new();
 	string_append(&rutaMetadata, puntoMontaje);
@@ -266,24 +268,34 @@ char* leerBloquesArchivo(void* path, int offset, int size){
 	}
 	int tamanio = config_get_int_value(metadata, "TAMANIO");
 	char** bloques = config_get_array_value(metadata, "BLOQUES");
+	log_error(logFS, "OK bloques");
 
-	for(i = offset / tamanioBloques; i < tamanio; i += tamanioBloques, tmpoffset += tamanioBloques){
+	log_info(logFS, "Leo bloque inicial %d", offset / tamanioBloques);
+	for(i = offset / tamanioBloques; i*tamanioBloques < tamanio; i++, tmpoffset += tamanioBloques){
+		log_info(logFS, "Leo bloque %d", i);
 		pathBloque = string_new();
 		string_append(&pathBloque, puntoMontaje);
-		string_append_with_format(&pathBloque, "/Bloques/%s.bin", bloques[i / tamanioBloques]);
+		string_append_with_format(&pathBloque, "/Bloques/%s.bin", bloques[i]);
 		tmpdata = leerArchivo(pathBloque);
 
 		if(size-tmpoffset > tamanioBloques)	//lo q falta
 			memcpy(data + tmpoffset, tmpdata, tamanioBloques);
 		else{
+			log_info(logFS, "memcpy");
 			memcpy(data + tmpoffset, tmpdata, size-tmpoffset);
 			break;
 		}
 	}
+	log_info(logFS, "sali del for");
+	data[size] = '\0';
+	log_info(logFS, "data %s", data);
 
 	free(rutaMetadata);
+	log_error(logFS, "pok");
 	free(pathBloque);
+	log_error(logFS, "pok");
 	free(bloques);
+	log_error(logFS, "pok");
 	return data;
 }
 

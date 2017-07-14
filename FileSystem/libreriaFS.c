@@ -35,7 +35,7 @@ void escucharKERNEL(void* socket_kernel) {
 		tipoError = 0;
 
 		pthread_mutex_lock(&mutex_solicitud);
-		log_info(logFS, "Atiendo solicitud de %d", socketKernel);
+		log_info(logFS, "Atiendo solicitud de Kernel %d", socketKernel);
 
 		switch(msgRecibido->tipoMensaje){
 		case 0:
@@ -51,14 +51,14 @@ void escucharKERNEL(void* socket_kernel) {
 			path[msgRecibido->longitud] = '\0';
 			log_info(logFS, "Path: %s", path);
 
-			bool existe = false;
 			int fd = open(path, O_RDONLY);
 			if (fd > 0){
-				existe = true;
 				log_info(logFS, "El archivo existe");
-			}else
+				msg_enviar_separado(VALIDAR_ARCHIVO, 0, 0, socketKernel);
+			}else{
 				log_info(logFS, "El archivo no existe");
-			msg_enviar_separado(VALIDAR_ARCHIVO, sizeof(bool), &existe, socketKernel);
+				msg_enviar_separado(ARCHIVO_INEXISTENTE, 0, 0, socketKernel);
+			}
 			close(fd);
 			free(path);
 			break;
@@ -70,7 +70,11 @@ void escucharKERNEL(void* socket_kernel) {
 			log_info(logFS, "Path: %s", path);
 
 			crearArchivo(path);
-			msg_enviar_separado(CREAR_ARCHIVO, 0, 0, socketKernel);
+
+			if(tipoError < 0)
+				msg_enviar_separado(tipoError, 0, 0, socketKernel);
+			else
+				msg_enviar_separado(CREAR_ARCHIVO, 0, 0, socketKernel);
 			free(path);
 			log_info(logFS, "Se creo archivo");
 			break;
@@ -82,7 +86,10 @@ void escucharKERNEL(void* socket_kernel) {
 			log_info(logFS, "Path: %s", path);
 
 			borrarArchivo(path);
-			msg_enviar_separado(BORRAR, 0, 0, socketKernel);
+			if(tipoError < 0)
+				msg_enviar_separado(tipoError, 0, 0, socketKernel);
+			else
+				msg_enviar_separado(BORRAR, 0, 0, socketKernel);
 			free(path);
 			break;
 		case OBTENER_DATOS:
@@ -102,7 +109,11 @@ void escucharKERNEL(void* socket_kernel) {
 			log_info(logFS, "Path: %s - offset: %d - size %d", path, offset, size);
 
 			char* data = leerBloquesArchivo(path, offset, size);
-			msg_enviar_separado(OBTENER_DATOS, size, data, socketKernel);
+
+			if(tipoError < 0)
+				msg_enviar_separado(tipoError, 0, 0, socketKernel);
+			else
+				msg_enviar_separado(OBTENER_DATOS, size, data, socketKernel);
 			free(data);
 			free(path);
 
@@ -125,14 +136,17 @@ void escucharKERNEL(void* socket_kernel) {
 			log_info(logFS, "Path: %s - offset: %d - size %d \n buffer %s", path, offset, size, buffer);
 
 			escribirBloquesArchivo(path, offset, size, buffer);
-			msg_enviar_separado(GUARDAR_DATOS, 0, 0, socketKernel);
+			if(tipoError < 0)
+				msg_enviar_separado(tipoError, 0, 0, socketKernel);
+			else
+				msg_enviar_separado(GUARDAR_DATOS, 0, 0, socketKernel);
 			free(data);
 			free(path);
 			break;
 
 		}
 
-		log_info(logFS, "Finalizo solicitud de %d", socketKernel);
+		log_info(logFS, "Finalizo solicitud de Kernel %d", socketKernel);
 		pthread_mutex_unlock(&mutex_solicitud);
 	}
 }
@@ -214,6 +228,10 @@ void crearArchivo(void* path){
 	system(string_from_format("touch %s", rutaMetadata));
 
 	int fd = open(rutaMetadata, O_RDWR);
+	if(fd < 0){
+		log_error(logFS, "No se creo el archivo");
+		tipoError = SIN_DEFINICION;
+	}
 	write(fd, data, string_length(data));
 	close(fd);
 
@@ -234,6 +252,7 @@ void borrarArchivo(void* path){
 		fprintf(stderr, "No se encuentra archivo %s\n", rutaMetadata);
 		free(rutaMetadata);
 		free(metadata);
+		tipoError = ARCHIVO_INEXISTENTE;
 		return;
 	}
 	int tamanio = config_get_int_value(metadata, "TAMANIO");
@@ -266,6 +285,7 @@ char* leerBloquesArchivo(void* path, int offset, int size){
 		fprintf(stderr, "No se encuentra archivo %s\n", rutaMetadata);
 		free(rutaMetadata);
 		free(metadata);
+		tipoError = ARCHIVO_INEXISTENTE;
 		return NULL;
 	}
 	int tamanio = config_get_int_value(metadata, "TAMANIO");
@@ -308,6 +328,7 @@ void escribirBloquesArchivo(void* path, int offset, int size, char* buffer){
 		fprintf(stderr, "No se encuentra archivo %s\n", rutaMetadata);
 		free(rutaMetadata);
 		free(metadata);
+		tipoError = ARCHIVO_INEXISTENTE;
 		return;
 	}
 	int tamanio = config_get_int_value(metadata, "TAMANIO");
@@ -318,6 +339,9 @@ void escribirBloquesArchivo(void* path, int offset, int size, char* buffer){
 		string_append(&pathBloque, puntoMontaje);
 		string_append_with_format(&pathBloque, "/Bloques/%s.bin", bloques[i / tamanioBloques]);
 		tmpdata = leerArchivo(pathBloque);
+
+		if(tmpdata == NULL)
+			return;
 
 		if(size-tmpoffset > tamanioBloques)	//lo q falta
 			memcpy(tmpdata, buffer + tmpoffset, tamanioBloques);
@@ -338,17 +362,20 @@ char* leerArchivo(void* path){
 	struct stat sbuf;
 
 	fd = open(path, O_RDWR);
-	if (fd == -1) {
+	if (fd < 0) {
 		perror("error al abrir el archivo");
+		tipoError = ARCHIVO_INEXISTENTE;
 		return NULL;
 	}
 	if (stat(path, &sbuf) == -1) {
 		perror("stat, chequear si el archivo esta corrupto");
+		tipoError = SIN_DEFINICION;
 		return NULL;
 	}
 	data = mmap((caddr_t)0, sbuf.st_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
 	if (data == MAP_FAILED) {
 		perror("Fallo el mmap");
+		tipoError = SIN_DEFINICION;
 		return NULL;
 	}
 	close(fd);

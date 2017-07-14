@@ -25,7 +25,8 @@
 #include <herramientas/sockets.h>
 #include <herramientas/enum.h>
 
-
+#define ARCHIVO_INEXISTENTE -2
+#define SIN_DEFINICION -20
 
 //Archivo de Configuracion
 int puertoFS;
@@ -38,7 +39,6 @@ t_log* logFS;
 
 pthread_mutex_t mutex_solicitud;
 int tipoError;
-
 
 void mostrarArchivoConfig();
 void leerMetadataArchivo();

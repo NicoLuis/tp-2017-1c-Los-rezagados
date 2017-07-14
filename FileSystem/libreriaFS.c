@@ -23,7 +23,6 @@ void escucharKERNEL(void* socket_kernel) {
 
 	while(1){
 
-		// lo unico q esta haciendo es mostrar lo que se recibio
 		t_msg* msgRecibido = msg_recibir(socketKernel);
 		if(msgRecibido->longitud > 0)
 			msg_recibir_data(socketKernel, msgRecibido);
@@ -38,12 +37,15 @@ void escucharKERNEL(void* socket_kernel) {
 		log_info(logFS, "Atiendo solicitud de Kernel %d", socketKernel);
 
 		switch(msgRecibido->tipoMensaje){
+
 		case 0:
 			fprintf(stderr, "El kernel %d se ha desconectado \n", socketKernel);
 			log_trace(logFS, "Se desconecto el kernel %d", socketKernel);
 			pthread_mutex_unlock(&mutex_solicitud);
 			pthread_exit(NULL);
 			break;
+
+
 		case VALIDAR_ARCHIVO:
 			log_info(logFS, "Validar archivo");
 			path = malloc(msgRecibido->longitud+1);
@@ -52,6 +54,7 @@ void escucharKERNEL(void* socket_kernel) {
 			log_info(logFS, "Path: %s", path);
 
 			int fd = open(path, O_RDONLY);
+
 			if (fd > 0){
 				log_info(logFS, "El archivo existe");
 				msg_enviar_separado(VALIDAR_ARCHIVO, 0, 0, socketKernel);
@@ -62,8 +65,11 @@ void escucharKERNEL(void* socket_kernel) {
 			close(fd);
 			free(path);
 			break;
+
+
 		case CREAR_ARCHIVO:
 			log_info(logFS, "Crear archivo");
+
 			path = malloc(msgRecibido->longitud+1);
 			memcpy(path, msgRecibido->data, msgRecibido->longitud);
 			path[msgRecibido->longitud] = '\0';
@@ -76,22 +82,27 @@ void escucharKERNEL(void* socket_kernel) {
 			else
 				msg_enviar_separado(CREAR_ARCHIVO, 0, 0, socketKernel);
 			free(path);
-			log_info(logFS, "Se creo archivo");
 			break;
+
+
 		case BORRAR:
 			log_info(logFS, "Borrar archivo");
+
 			path = malloc(msgRecibido->longitud+1);
 			memcpy(path, msgRecibido->data, msgRecibido->longitud);
 			path[msgRecibido->longitud] = '\0';
 			log_info(logFS, "Path: %s", path);
 
 			borrarArchivo(path);
+
 			if(tipoError < 0)
 				msg_enviar_separado(tipoError, 0, 0, socketKernel);
 			else
 				msg_enviar_separado(BORRAR, 0, 0, socketKernel);
 			free(path);
 			break;
+
+
 		case OBTENER_DATOS:
 			log_info(logFS, "Obtener datos archivo");
 
@@ -105,7 +116,6 @@ void escucharKERNEL(void* socket_kernel) {
 			tmpoffset += tmpsize;
 			memcpy(&size, msgRecibido->data + tmpoffset, tmpsize = sizeof(t_valor_variable));
 			tmpoffset += tmpsize;
-
 			log_info(logFS, "Path: %s - offset: %d - size %d", path, offset, size);
 
 			char* data = leerBloquesArchivo(path, offset, size);
@@ -116,8 +126,9 @@ void escucharKERNEL(void* socket_kernel) {
 				msg_enviar_separado(OBTENER_DATOS, size, data, socketKernel);
 			free(data);
 			free(path);
-
 			break;
+
+
 		case GUARDAR_DATOS:
 			log_info(logFS, "Guardar datos archivo");
 
@@ -136,6 +147,7 @@ void escucharKERNEL(void* socket_kernel) {
 			log_info(logFS, "Path: %s - offset: %d - size %d \n buffer %s", path, offset, size, buffer);
 
 			escribirBloquesArchivo(path, offset, size, buffer);
+
 			if(tipoError < 0)
 				msg_enviar_separado(tipoError, 0, 0, socketKernel);
 			else
@@ -164,7 +176,7 @@ void leerMetadataArchivo(){
 	if(metadata == NULL){
 		log_error(logFS, "No se encuentra metadata");
 		fprintf(stderr, "No se encuentra metadata\n");
-		exit(1);
+		finalizarFS();
 	}
 	tamanioBloques = config_get_int_value(metadata, "TAMANIO_BLOQUES");
 	cantidadBloques = config_get_int_value(metadata, "CANTIDAD_BLOQUES");
@@ -172,7 +184,7 @@ void leerMetadataArchivo(){
 	if(!string_equals_ignore_case( config_get_string_value(metadata, "MAGIC_NUMBER") , "SADICA")){
 		log_error(logFS, "No es un FS SADICA");
 		fprintf(stderr, "No es un FS SADICA\n");
-		exit(1);
+		finalizarFS();
 	}
 	config_destroy(metadata);
 
@@ -189,17 +201,17 @@ void leerBitMap(){
 	fd = open(rutaBitMap, O_RDWR);
 	if (fd < 0) {
 		perror("error al abrir el archivo bitmap");
-		exit(1);		//fixme: reemplazar exit por funcion finalizar
+		finalizarFS();
 	}
 	if (stat(rutaBitMap, &sbuf) < 0) {
 		perror("stat, chequear si el archivo esta corrupto");
-		exit(1);
+		finalizarFS();
 	}
 
 	data = mmap((caddr_t)0, sbuf.st_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
 	if (data == MAP_FAILED) {
 		perror("Fallo el mmap del bitmap");
-		exit(1);
+		finalizarFS();
 	}
 	bitMap = bitarray_create_with_mode(data, sbuf.st_size, MSB_FIRST);
 
@@ -380,4 +392,15 @@ char* leerArchivo(void* path){
 	}
 	close(fd);
 	return data;
+}
+
+
+
+void finalizarFS(){
+	log_trace(logFS, "Finalizo FileSystem");
+
+	if(bitMap != NULL)
+		bitarray_destroy(bitMap);
+
+	exit(1);
 }

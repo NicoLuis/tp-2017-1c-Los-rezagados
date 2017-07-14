@@ -50,5 +50,6 @@ void escribirBloquesArchivo(void* path, int offset, int size, char* buffer);
 char* leerArchivo(void* path);
 
 void escucharKERNEL(void*);
+void finalizarFS();
 
 #endif

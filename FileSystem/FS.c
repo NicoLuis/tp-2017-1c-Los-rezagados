@@ -19,6 +19,7 @@ int main(int argc, char* argv[]) {
 		return -2;
 	}
 
+	signal(SIGINT, finalizarFS);
 
 	//Cargo archivo de configuracion
 

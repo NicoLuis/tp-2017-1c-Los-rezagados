@@ -857,7 +857,27 @@ void escucharCPU(int socket_cpu) {
 				// todo: chequear si existe primero
 
 				// si no exite crearlo
-				msg_enviar_separado(CREAR_ARCHIVO, longitudPath, pathArchivo, socket_fs);
+				//void _verificarExistenciaArchivo(){
+
+				msg_enviar_separado(VALIDAR_ARCHIVO, longitudPath, pathArchivo, socket_fs);
+
+				t_msg* msgValidacionObtenida = msg_recibir(socket_fs);
+
+				if(msgValidacionObtenida->tipoMensaje == ARCHIVO_INEXISTENTE){
+					log_trace(logKernel, " se creo el arcihvo: %s", pathArchivo, socket_cpu);
+					msg_enviar_separado(CREAR_ARCHIVO, longitudPath, pathArchivo, socket_fs);
+
+				}
+				//else{  ARCHIVO_EXISTE => no hago nada}
+				msg_destruir(msgValidacionObtenida);
+
+
+
+
+
+
+
+
 
 				// todo: esperar ok de fs
 			}
@@ -897,8 +917,15 @@ void escucharCPU(int socket_cpu) {
 
 		case BORRAR_ANSISOP:
 
+
 			_lockFS();
 			log_trace(logKernel, " [CPU %d] Recibi la siguiente operacion BORRAR_ANSISOP de CPU", socket_cpu);
+
+			//---- validacion ----
+
+			// solo deberia dejarlo borrar si tiene flag c??
+
+			//--------------------
 
 			memcpy(&fdRecibido, msgRecibido->data, sizeof(t_descriptor_archivo));
 			memcpy(&pidRecibido, msgRecibido->data + sizeof(t_descriptor_archivo), sizeof(t_pid));

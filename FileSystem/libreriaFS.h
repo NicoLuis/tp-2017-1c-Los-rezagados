@@ -26,6 +26,12 @@
 #include <herramientas/enum.h>
 
 #define ARCHIVO_INEXISTENTE -2
+#define ARCHIVO_LECTURA_DENEGADA -3
+#define ARCHIVO_ESCRIBIR_DENEGADO -4
+#define EXCEPCION_MEMORIA -5
+#define DESCONECCION_CONSOLA -6
+#define FINALIZAR_COMANDO_CONSOLA -7
+
 #define SIN_DEFINICION -20
 
 //Archivo de Configuracion

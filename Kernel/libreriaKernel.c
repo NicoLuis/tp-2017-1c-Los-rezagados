@@ -647,6 +647,7 @@ void escucharCPU(int socket_cpu) {
 
 		case LEER_ANSISOP:
 			_lockFS();
+
 			log_trace(logKernel, " [CPU %d] Recibi LEER_ANSISOP de CPU", socket_cpu);
 			t_valor_variable tamanio;
 
@@ -662,7 +663,7 @@ void escucharCPU(int socket_cpu) {
 			if(TablaProceso != NULL)
 			if(entradaProcesoBuscado != NULL)
 			if(entradaGlobalBuscada != NULL){
-				if(entradaProcesoBuscado->bandera.lectura == 1){
+				if(entradaProcesoBuscado->bandera.lectura == true){
 					t_num sizePath = string_length(entradaGlobalBuscada->FilePath);
 					void* buffer = malloc(sizeof(t_num) + sizePath + sizeof(t_valor_variable)*2);
 
@@ -696,8 +697,23 @@ void escucharCPU(int socket_cpu) {
 					}
 				}else{
 					log_error(logKernel, " [CPU %d] No tiene permisos de escritura"), socket_cpu;
+
 					// todo: hacer algo mas tipo enviar un error
 					// settear exit code correspondiente
+
+
+					/*int _es_PCB(t_PCB* p){
+						return p->pid == pidaux;
+					}
+					//--- saco, modifico y vuelvo a meterlo en la lista
+					// codigo de error de lectura sin permiso = -3 se debe matar proceso y de
+					// ver exitcode es entero no signado??
+					t_PCB* pcbAtcual = list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
+					pcbAtcual->exitCode = -3;
+					list_add(lista_PCBs,pcbAtcual);*/
+
+
+
 				}
 
 			}
@@ -800,6 +816,8 @@ void escucharCPU(int socket_cpu) {
 
 			// fixme: NO ESTA VALIDANDO QUE EXISTA EL ARCHIVO !!!!!!!! VER EL ENUNCIADO !!!!!!!!!!!
 
+
+
 			_lockFS();
 			log_trace(logKernel, " [CPU %d] Recibi la siguiente operacion ABRIR_ANSISOP de CPU", socket_cpu);
 			t_direccion_archivo pathArchivo;
@@ -818,6 +836,41 @@ void escucharCPU(int socket_cpu) {
 			memcpy(&pid, msgRecibido->data + offset, tmpsize = sizeof(t_pid));
 			offset += tmpsize;
 
+//----------------------- validacion existencia archivo --------------------
+
+			msg_enviar_separado(VALIDAR_ARCHIVO, longitudPath, pathArchivo, socket_fs);
+			t_msg* msgValidacionObtenida = msg_recibir(socket_fs);
+
+			bool seguirEjecutando = true;
+			int exitcode;
+
+			if(msgValidacionObtenida->tipoMensaje == ARCHIVO_INEXISTENTE && (flags.creacion == true)){
+
+				msg_enviar_separado(CREAR_ARCHIVO, longitudPath, pathArchivo, socket_fs);
+
+				msg_destruir(msgValidacionObtenida);
+				msgValidacionObtenida = msg_recibir(socket_fs);
+
+				if(msgValidacionObtenida->tipoMensaje < 0 ){
+					log_trace(logKernel, " error al crear el arcihvo: %s", pathArchivo, socket_cpu);
+					seguirEjecutando = false;
+					//error al crear archivo exitcode =-20 matar proceso??
+					exitcode = msgValidacionObtenida->tipoMensaje;
+				}else{
+					log_trace(logKernel, " se creo el arcihvo: %s", pathArchivo, socket_cpu);
+				}
+			}
+
+			if(msgValidacionObtenida->tipoMensaje == ARCHIVO_INEXISTENTE){
+				seguirEjecutando = false;
+				exitcode = msgValidacionObtenida->tipoMensaje;
+			}
+
+
+			msg_destruir(msgValidacionObtenida);
+
+//------------------- valido si se puede seguir ejecutando -----------------------
+		if(seguirEjecutando){
 			// busco si ya tengo este path en la tabla global
 			int _buscarPath(t_entrada_GlobalFile* a){ return string_equals_ignore_case(a->FilePath,pathArchivo); }
 			t_entrada_GlobalFile* entradaGlobalOld = list_find(lista_tabla_global, (void*) _buscarPath);
@@ -852,35 +905,7 @@ void escucharCPU(int socket_cpu) {
 			entradaProcesoNew->referenciaGlobalTable = indiceActualGlobal;
 			entradaProcesoNew->cursor = 0; // seteo del cursor
 
-			if(flags.creacion){
 
-				// todo: chequear si existe primero
-
-				// si no exite crearlo
-				//void _verificarExistenciaArchivo(){
-
-				msg_enviar_separado(VALIDAR_ARCHIVO, longitudPath, pathArchivo, socket_fs);
-
-				t_msg* msgValidacionObtenida = msg_recibir(socket_fs);
-
-				if(msgValidacionObtenida->tipoMensaje == ARCHIVO_INEXISTENTE){
-					log_trace(logKernel, " se creo el arcihvo: %s", pathArchivo, socket_cpu);
-					msg_enviar_separado(CREAR_ARCHIVO, longitudPath, pathArchivo, socket_fs);
-
-				}
-				//else{  ARCHIVO_EXISTE => no hago nada}
-				msg_destruir(msgValidacionObtenida);
-
-
-
-
-
-
-
-
-
-				// todo: esperar ok de fs
-			}
 
 			// busco si ya tengo la tabla para este id de proceso
 			int _espid(t_tabla_proceso* a){ return a->pid == pid; }
@@ -911,6 +936,14 @@ void escucharCPU(int socket_cpu) {
 			_unlockFS();
 			//sem_post(&cpuUsada->semaforo);
 			break;
+		}else{
+			_sumarCantOpPriv(pcb->pid);
+
+			_unlockFS();
+
+			break;
+
+		}
 
 
 
@@ -920,12 +953,6 @@ void escucharCPU(int socket_cpu) {
 
 			_lockFS();
 			log_trace(logKernel, " [CPU %d] Recibi la siguiente operacion BORRAR_ANSISOP de CPU", socket_cpu);
-
-			//---- validacion ----
-
-			// solo deberia dejarlo borrar si tiene flag c??
-
-			//--------------------
 
 			memcpy(&fdRecibido, msgRecibido->data, sizeof(t_descriptor_archivo));
 			memcpy(&pidRecibido, msgRecibido->data + sizeof(t_descriptor_archivo), sizeof(t_pid));

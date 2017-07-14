@@ -368,15 +368,25 @@ void escucharCPU(int socket_cpu) {
 			break;
 
 
-			// todo: considerar errores cpu
-
-
+		case EXCEPCION_MEMORIA:
+		case STACKOVERFLOW:
 		case ERROR:
 			log_trace(logKernel, "Recibi ERROR de CPU");
 			pcb = recibir_pcb(socket_cpu, msgRecibido, 0, 0);
 			finalizarPid(pcb->pid);
-			if((int)pcb->exitCode > 0)
-				pcb->exitCode = ERROR_SCRIPT;
+			if((int)pcb->exitCode > 0){
+				switch(msgRecibido->tipoMensaje){
+				case EXCEPCION_MEMORIA:
+					pcb->exitCode = ERROR_EXCEPCION_MEMORIA;
+					break;
+				case STACKOVERFLOW:
+					pcb->exitCode = ERROR_STACKOVERFLOW;
+					break;
+				case ERROR:
+					pcb->exitCode = ERROR_SCRIPT;
+					break;
+				}
+			}
 			if((int)pcb->exitCode < 0){
 				_ponerEnCola(pcb->pid, cola_Exit, mutex_Exit);
 				liberarPCB(pcb, true);
@@ -410,7 +420,8 @@ void escucharCPU(int socket_cpu) {
 			t_VariableCompartida* varBuscada = list_find(lista_variablesCompartidas, (void*) _buscar_VarComp);
 			if (varBuscada == NULL){
 				log_error(logKernel, "Error no encontre VALOR_VARIABLE_COMPARTIDA");
-				msg_enviar_separado(ERROR, 0, 0, socket_cpu);
+				t_num exitCode = VARIABLE_COMPARTIDA_INEXISTENTE;
+				msg_enviar_separado(ERROR, sizeof(t_num), &exitCode, socket_cpu);
 			}else{
 				varBuscada->valor = varCompartida->valor;
 				msg_enviar_separado(GRABAR_VARIABLE_COMPARTIDA, 0, 0, socket_cpu);
@@ -434,7 +445,8 @@ void escucharCPU(int socket_cpu) {
 			t_VariableCompartida* varBuscad = list_find(lista_variablesCompartidas, (void*) _buscar_VarComp);
 			if (varBuscad == NULL){
 				log_error(logKernel, "Error no encontre VALOR_VARIABLE_COMPARTIDA");
-				msg_enviar_separado(ERROR, 0, 0, socket_cpu);
+				t_num exitCode = VARIABLE_COMPARTIDA_INEXISTENTE;
+				msg_enviar_separado(ERROR, sizeof(t_num), &exitCode, socket_cpu);
 			}else{
 				log_info(logKernel, "Valor %d", varBuscad->valor);
 				msg_enviar_separado(VALOR_VARIABLE_COMPARTIDA, sizeof(t_valor_variable), &varBuscad->valor, socket_cpu);
@@ -458,7 +470,8 @@ void escucharCPU(int socket_cpu) {
 			t_VariableSemaforo* semBuscado = list_remove_by_condition(lista_variablesSemaforo, (void*) _buscar_VarSem);
 			if (semBuscado == NULL){
 				log_error(logKernel, "Error no encontre SEMAFORO");
-				msg_enviar_separado(ERROR, 0, 0, socket_cpu);
+				t_num exitCode = SEMAFORO_INEXISTENTE;
+				msg_enviar_separado(ERROR, sizeof(t_num), &exitCode, socket_cpu);
 			}else{
 				semBuscado->valorSemaforo++;
 				log_trace(logKernel, "Valor %d", semBuscado->valorSemaforo);
@@ -498,7 +511,8 @@ void escucharCPU(int socket_cpu) {
 			t_VariableSemaforo* semBuscad = list_remove_by_condition(lista_variablesSemaforo, (void*) _buscar_VarSem);
 			if (semBuscad == NULL){
 				log_error(logKernel, "Error no encontre SEMAFORO");
-				msg_enviar_separado(ERROR, 0, 0, socket_cpu);
+				t_num exitCode = SEMAFORO_INEXISTENTE;
+				msg_enviar_separado(ERROR, sizeof(t_num), &exitCode, socket_cpu);
 			}else{
 				semBuscad->valorSemaforo--;
 				log_trace(logKernel, "Valor semaforo %s %d", semBuscad->nombre, semBuscad->valorSemaforo);
@@ -559,8 +573,10 @@ void escucharCPU(int socket_cpu) {
 
 			if((int)direccion > 0)
 				msg_enviar_separado(ASIGNACION_MEMORIA, sizeof(t_puntero) + sizeof(bool), tmpb, socket_cpu);
-			else
-				msg_enviar_separado(ERROR, sizeof(t_puntero), &direccion, socket_cpu);
+			else{
+				t_num exitCode = direccion;
+				msg_enviar_separado(ERROR, sizeof(t_num), &exitCode, socket_cpu);
+			}
 			free(tmpb);
 
 
@@ -580,10 +596,12 @@ void escucharCPU(int socket_cpu) {
 			memcpy(&posicion, msgRecibido->data, msgRecibido->longitud);
 			log_trace(logKernel, "LIBERAR posicion %d", posicion);
 
-			if( liberarMemoriaHeap(posicion, pcb) < 0 )
-				msg_enviar_separado(ERROR, 0, 0, socket_cpu);
+			if( liberarMemoriaHeap(posicion, pcb) < 0 ){
+				t_num exitCode = ERROR_EXCEPCION_MEMORIA;
+				msg_enviar_separado(ERROR, sizeof(t_num), &exitCode, socket_cpu);
+			}
 			else
-				msg_enviar_separado(LIBERAR, 1, 0, socket_cpu);
+				msg_enviar_separado(LIBERAR, 0, 0, socket_cpu);
 
 			_lockLista_PCBs();
 			if(list_remove_by_condition(lista_PCBs, (void*) _es_PCB) == NULL) log_warning(logKernel, "No se encuentra pcb en LIBERAR");
@@ -667,7 +685,7 @@ void escucharCPU(int socket_cpu) {
 					}else{
 						msg_destruir(msgDatosObtenidos);
 						log_error(logKernel, "Error al leer");
-						// todo: manejar error NO_EXISTE_ARCHIVO o algo parecido
+						msg_enviar_separado(ERROR, sizeof(t_num), &msgDatosObtenidos->tipoMensaje, socket_cpu);
 					}
 				}else{
 					log_error(logKernel, "No tiene permisos de escritura");
@@ -754,13 +772,12 @@ void escucharCPU(int socket_cpu) {
 						// todo: hacer algo mas tipo enviar un error
 						// settear exit code correspondiente
 					}
-
-
+				}
+				_unlockFS();
 			}
 			_sumarCantOpPriv(pcb->pid);
 			free(datos);
 			pthread_mutex_unlock(&cpuUsada->mutex);
-			_unlockFS();
 			break;
 
 
@@ -1338,6 +1355,25 @@ void consolaKernel(){
 			log_trace(logKernel, "Reanudo planificacion");
 			pthread_mutex_unlock(&mut_detengo_plani);
 
+		}else if(string_equals_ignore_case(comando, "exitcodes")){
+
+			printf("Exit Codes:\n"
+					PRINT_COLOR_BLUE "  ○ " PRINT_COLOR_CYAN "  0 " PRINT_COLOR_RESET "El programa finalizó correctamente\n"
+					PRINT_COLOR_BLUE "  ○ " PRINT_COLOR_CYAN " -1 " PRINT_COLOR_RESET "No se pudieron reservar recursos para ejecutar el programa\n"
+					PRINT_COLOR_BLUE "  ○ " PRINT_COLOR_CYAN " -2 " PRINT_COLOR_RESET "El programa intentó acceder a un archivo que no existe\n"
+					PRINT_COLOR_BLUE "  ○ " PRINT_COLOR_CYAN " -3 " PRINT_COLOR_RESET "El programa intentó leer un archivo sin permisos\n"
+					PRINT_COLOR_BLUE "  ○ " PRINT_COLOR_CYAN " -4 " PRINT_COLOR_RESET "El programa intentó escribir un archivo sin permisos\n"
+					PRINT_COLOR_BLUE "  ○ " PRINT_COLOR_CYAN " -5 " PRINT_COLOR_RESET "Excepción de memoria\n"
+					PRINT_COLOR_BLUE "  ○ " PRINT_COLOR_CYAN " -6 " PRINT_COLOR_RESET "Finalizado a través de desconexión de consola\n"
+					PRINT_COLOR_BLUE "  ○ " PRINT_COLOR_CYAN " -7 " PRINT_COLOR_RESET "Finalizado a través del comando Finalizar Programa de la consola\n"
+					PRINT_COLOR_BLUE "  ○ " PRINT_COLOR_CYAN " -8 " PRINT_COLOR_RESET "Se intentó reservar más memoria que el tamaño de una página\n"
+					PRINT_COLOR_BLUE "  ○ " PRINT_COLOR_CYAN " -9 " PRINT_COLOR_RESET "No se pueden asignar más páginas al proceso\n"
+					PRINT_COLOR_BLUE "  ○ " PRINT_COLOR_CYAN "-11 " PRINT_COLOR_RESET "Error de sintaxis del script\n"
+					PRINT_COLOR_BLUE "  ○ " PRINT_COLOR_CYAN "-12 " PRINT_COLOR_RESET "StackOverflow\n"
+					PRINT_COLOR_BLUE "  ○ " PRINT_COLOR_CYAN "-13 " PRINT_COLOR_RESET "Se intento acceder a un semaforo inexistente\n"
+					PRINT_COLOR_BLUE "  ○ " PRINT_COLOR_CYAN "-14 " PRINT_COLOR_RESET "Se intento acceder a una variable compartida inexistente\n"
+					PRINT_COLOR_BLUE "  ○ " PRINT_COLOR_CYAN "-20 " PRINT_COLOR_RESET "Error sin definición\n");
+
 		}else if(string_equals_ignore_case(comando, "help")){
 			printf("Comandos:\n"
 					PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "list procs: " PRINT_COLOR_RESET "Obtener listado de procesos\n"
@@ -1346,7 +1382,8 @@ void consolaKernel(){
 					PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "grado mp [grado]: " PRINT_COLOR_RESET "Setear grado de multiprogramacion\n"
 					PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "kill [pid]: " PRINT_COLOR_RESET "Finalizar proceso\n"
 					PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "detener: " PRINT_COLOR_RESET "Detener la planificación\n"
-					PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "reanudar: " PRINT_COLOR_RESET "Reanuda la planificación\n");
+					PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "reanudar: " PRINT_COLOR_RESET "Reanuda la planificación\n"
+					PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "exitcodes: " PRINT_COLOR_RESET "Listado de exit codes\n");
 
 		}else if(string_equals_ignore_case(comando, "\0")){
 		}else
@@ -1550,6 +1587,7 @@ void asignarNuevaPag(t_PCB* pcb){
 
 
 
+// si hay error en esta funcion devuelve el exitCode
 t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
 
 	int _esHeap(t_heap* h){
@@ -1586,11 +1624,11 @@ t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
 				if(msgRecibido->tipoMensaje != LECTURA_PAGINA){
 					log_error(logKernel, "No recibi LECTURA_PAGINA sino %d", msgRecibido->tipoMensaje);
 					if(msgRecibido->tipoMensaje == EXCEPCION_MEMORIA)
-						return -4;
+						return ERROR_EXCEPCION_MEMORIA;
 					if(msgRecibido->tipoMensaje == STACKOVERFLOW)
-						return -3;	//todo: solo aca meto el exitcod
+						return ERROR_STACKOVERFLOW;
 					else
-						return -2;
+						return SIN_DEFINICION;
 				}
 				msg_recibir_data(socket_memoria, msgRecibido);
 				t_HeapMetadata heapMetadata;
@@ -1618,11 +1656,11 @@ t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
 					if(msgRecibido3->tipoMensaje != ESCRITURA_PAGINA){
 						log_error(logKernel, "No recibi ESCRITURA_PAGINA sino %d", msgRecibido3->tipoMensaje);
 						if(msgRecibido->tipoMensaje == EXCEPCION_MEMORIA)
-							return -4;
+							return ERROR_EXCEPCION_MEMORIA;
 						if(msgRecibido->tipoMensaje == STACKOVERFLOW)
-							return -3;	//todo: solo aca meto el exitcod
+							return ERROR_STACKOVERFLOW;
 						else
-							return -2;
+							return SIN_DEFINICION;
 					}
 					msg_destruir(msgRecibido3);
 
@@ -1656,11 +1694,11 @@ t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
 					if(msgRecibido2->tipoMensaje != ESCRITURA_PAGINA){
 						log_error(logKernel, "No recibi ESCRITURA_PAGINA sino %d", msgRecibido2->tipoMensaje);
 						if(msgRecibido->tipoMensaje == EXCEPCION_MEMORIA)
-							return -4; 	//todo: solo aca meto el exitcod
+							return ERROR_EXCEPCION_MEMORIA;
 						if(msgRecibido->tipoMensaje == STACKOVERFLOW)
-							return -3;
+							return ERROR_STACKOVERFLOW;
 						else
-							return -2;
+							return SIN_DEFINICION;
 					}
 					msg_destruir(msgRecibido2);
 					_unlockMemoria();
@@ -1679,12 +1717,12 @@ t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
 	}
 	list_destroy(listAux);
 	// no encontre hueco
-	return SIN_DEFINICION;
+	return -1;
 }
 
 
 
-
+// si hay error en esta funcion devuelve el exitCode
 t_puntero reservarMemoriaHeap(t_num cantBytes, t_PCB* pcb){
 	int _esHeap(t_heap* h){
 		return h->pid == pcb->pid;
@@ -1708,8 +1746,11 @@ t_puntero reservarMemoriaHeap(t_num cantBytes, t_PCB* pcb){
 		log_trace(logKernel, "No encontre hueco");
 		asignarNuevaPag(pcb);
 		retorno = encontrarHueco(cantBytes, pcb);
-	}else if( retorno < 0 )
+	}
+	if( retorno < -1 )
 		return retorno;
+	if( retorno == -1 )
+		return SIN_DEFINICION;
 	_sumarCantOpAlocar(pcb->pid, cantBytes);
 
 	return retorno + sizeof(t_HeapMetadata);
@@ -1800,7 +1841,7 @@ int liberarMemoriaHeap(t_puntero posicion, t_PCB* pcb){
 
 	t_msg* msgRecibido = msg_recibir(socket_memoria);
 	if(msgRecibido->tipoMensaje == LIBERAR){
-		log_trace(logKernel, "Se LIBERO piola");
+		log_trace(logKernel, "Se LIBERO");
 		flag_se_libero_pag = 1;
 		_sumarCantPagsHeap(pcb->pid, -1);
 		list_remove_and_destroy_by_condition(tabla_heap, (void*) _esHeap, free);

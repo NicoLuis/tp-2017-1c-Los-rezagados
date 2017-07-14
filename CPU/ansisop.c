@@ -261,6 +261,10 @@ t_valor_variable asignarValorCompartida(t_nombre_compartida variable, t_valor_va
 
 	log_error(logAnsisop, "No se pudo asignar - se recibio %d", msgRecibido->tipoMensaje);
 	flag_error = true;
+	if(msgRecibido->tipoMensaje == ERROR){
+		msg_recibir_data(socket_kernel, msgRecibido);
+		memcpy(&pcb->exitCode, msgRecibido->data, sizeof(t_num));
+	}
 	msg_destruir(msgRecibido);
 
 	return -1;
@@ -285,6 +289,10 @@ t_valor_variable obtenerValorCompartida(t_nombre_compartida variable){
 	}else{
 		log_error(logAnsisop, "Error al obtener variable - se recibio %d", msgRecibido->tipoMensaje);
 		flag_error = true;
+		if(msgRecibido->tipoMensaje == ERROR){
+			msg_recibir_data(socket_kernel, msgRecibido);
+			memcpy(&pcb->exitCode, msgRecibido->data, sizeof(t_num));
+		}
 		msg_destruir(msgRecibido);
 		return -1;
 	}
@@ -325,11 +333,10 @@ t_descriptor_archivo abrir(t_direccion_archivo direccion, t_banderas flags){
 	}else{
 		log_error(logAnsisop, "Error - se recibio %d", msgRecibido->tipoMensaje);
 		flag_error = 1;
-
-		//todo: definir errores posibles
-		// de forma q quede por ej: tipoError = EXCEPCION_MEMORIA;
-
-
+		if(msgRecibido->tipoMensaje == ERROR){
+			msg_recibir_data(socket_kernel, msgRecibido);
+			memcpy(&pcb->exitCode, msgRecibido->data, sizeof(t_num));
+		}
 	}
 
 	msg_destruir(msgRecibido);
@@ -426,8 +433,10 @@ void escribir(t_descriptor_archivo descriptor_archivo, void* informacion, t_valo
 	else{
 		log_error(logAnsisop, "Error al escribir");
 		flag_error = 1;
-		//todo: definir errores posibles
-		// de forma q quede por ej: tipoError = EXCEPCION_MEMORIA;
+		if(msgRecibido->tipoMensaje == ERROR){
+			msg_recibir_data(socket_kernel, msgRecibido);
+			memcpy(&pcb->exitCode, msgRecibido->data, sizeof(t_num));
+		}
 	}
 
 	msg_destruir(msgRecibido);
@@ -481,8 +490,10 @@ void leer(t_descriptor_archivo descriptor_archivo, t_puntero informacion, t_valo
 	}else{
 		log_error(logCPU, "Error al leer");
 		flag_error = 1;
-		//todo: definir errores posibles
-		// de forma q quede por ej: tipoError = EXCEPCION_MEMORIA;
+		if(msgDatosObtenidos->tipoMensaje == ERROR){
+			msg_recibir_data(socket_kernel, msgDatosObtenidos);
+			memcpy(&pcb->exitCode, msgDatosObtenidos->data, sizeof(t_num));
+		}
 	}
 	msg_destruir(msgDatosObtenidos);
 
@@ -553,14 +564,10 @@ t_puntero reservar(t_valor_variable espacio){
 	else{
 		log_error(logAnsisop, "Error al reservar memoria - se recibio %d", msgRecibido->tipoMensaje);
 		flag_error = true;
-
 		if(msgRecibido->tipoMensaje == ERROR){
 			msg_recibir_data(socket_kernel, msgRecibido);
 			memcpy(&pcb->exitCode, msgRecibido->data, sizeof(t_num));
 		}
-
-		//todo: definir errores posibles
-		// de forma q quede por ej: tipoError = EXCEPCION_MEMORIA;
 	}
 	msg_destruir(msgRecibido);
 	return direccion;
@@ -582,9 +589,10 @@ void liberar(t_puntero puntero){
 	else{
 		log_error(logAnsisop, "Error al liberar memoria - se recibio %d", msgRecibido->tipoMensaje);
 		flag_error = true;
-
-		//todo: definir errores posibles
-		// de forma q quede por ej: tipoError = EXCEPCION_MEMORIA;
+		if(msgRecibido->tipoMensaje == ERROR){
+			msg_recibir_data(socket_kernel, msgRecibido);
+			memcpy(&pcb->exitCode, msgRecibido->data, sizeof(t_num));
+		}
 	}
 	msg_destruir(msgRecibido);
 }
@@ -599,6 +607,10 @@ void ansisop_signal(t_nombre_semaforo identificador_semaforo){
 	if(msgRecibido->tipoMensaje != SIGNAL){
 		log_error(logAnsisop, "Error al hacer el signal - se recibio %d", msgRecibido->tipoMensaje);
 		flag_error = true;
+		if(msgRecibido->tipoMensaje == ERROR){
+			msg_recibir_data(socket_kernel, msgRecibido);
+			memcpy(&pcb->exitCode, msgRecibido->data, sizeof(t_num));
+		}
 	}
 	msg_destruir(msgRecibido);
 }
@@ -617,12 +629,15 @@ void ansisop_wait(t_nombre_semaforo identificador_semaforo){
 		log_trace(logAnsisop, "valorSemaforoRecibido %d", valorSemaforoRecibido);
 		if((int)valorSemaforoRecibido < 0)
 			flag_ultimaEjecucion = 1;
-		msg_destruir(msgRecibido);
 	}else{
 		log_error(logAnsisop, "Error al hacer el wait - se recibio %d", msgRecibido->tipoMensaje);
 		flag_error = true;
-		msg_destruir(msgRecibido);
+		if(msgRecibido->tipoMensaje == ERROR){
+			msg_recibir_data(socket_kernel, msgRecibido);
+			memcpy(&pcb->exitCode, msgRecibido->data, sizeof(t_num));
+		}
 	}
+	msg_destruir(msgRecibido);
 }
 
 

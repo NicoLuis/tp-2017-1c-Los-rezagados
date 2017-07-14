@@ -1,0 +1,10 @@
+start /home/utnso/workspace/ansisop-parser/programas-ejemplo/evaluacion-final-esther/Scripts-Prueba/escribirFS.ansisop
+start /home/utnso/workspace/ansisop-parser/programas-ejemplo/evaluacion-final-esther/Scripts-Prueba/heapbasico.ansisop
+start /home/utnso/workspace/ansisop-parser/programas-ejemplo/evaluacion-final-esther/Scripts-Prueba/heapcompactar.ansisop
+start /home/utnso/workspace/ansisop-parser/programas-ejemplo/evaluacion-final-esther/Scripts-Prueba/heappasado.ansisop
+start /home/utnso/workspace/ansisop-parser/programas-ejemplo/evaluacion-final-esther/Scripts-Prueba/leeBorra.ansisop
+start /home/utnso/workspace/ansisop-parser/programas-ejemplo/evaluacion-final-esther/Scripts-Prueba/leerFS.ansisop
+start /home/utnso/workspace/ansisop-parser/programas-ejemplo/evaluacion-final-esther/Scripts-Prueba/llenandomemoria.ansisop
+start /home/utnso/workspace/ansisop-parser/programas-ejemplo/evaluacion-final-esther/Scripts-Prueba/stackoverflow.ansisop
+start /home/utnso/workspace/ansisop-parser/programas-ejemplo/evaluacion-final-esther/Scripts-Prueba/creaAnsisop.ansisop
+start /home/utnso/workspace/ansisop-parser/programas-ejemplo/evaluacion-final-esther/Scripts-Prueba/creaGigante.ansisop

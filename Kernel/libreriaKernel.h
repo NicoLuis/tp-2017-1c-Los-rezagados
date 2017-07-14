@@ -31,8 +31,8 @@
 #include <commons/collections/dictionary.h>
 #include <commons/log.h>
 #include <commons/process.h>
-#include <herramientas/sockets.h>
-#include <herramientas/enum.h>
+#include <sockets.h>
+#include <enum.h>
 #include <parser/metadata_program.h>
 
 #define FINALIZO_CORRECTAMENTE 0

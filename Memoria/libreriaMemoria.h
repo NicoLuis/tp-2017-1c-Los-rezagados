@@ -28,8 +28,8 @@
 #include <commons/collections/queue.h>
 #include <commons/log.h>
 #include <commons/process.h>
-#include <herramientas/sockets.h>
-#include <herramientas/enum.h>
+#include <sockets.h>
+#include <enum.h>
 #include "hexdump.h"
 
 #define PID_RESERVADO 255 //sizeof(t_pid)-1

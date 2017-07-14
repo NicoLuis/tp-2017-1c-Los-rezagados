@@ -1,4 +1,4 @@
-#include <herramientas/sockets.c>
+#include <sockets.c>
 #include "libreriaConsola.h"
 
 

@@ -22,8 +22,8 @@
 #include <commons/bitarray.h>
 #include <commons/log.h>
 #include <commons/process.h>
-#include <herramientas/sockets.h>
-#include <herramientas/enum.h>
+#include <sockets.h>
+#include <enum.h>
 
 #define ARCHIVO_INEXISTENTE -2
 #define ARCHIVO_LECTURA_DENEGADA -3

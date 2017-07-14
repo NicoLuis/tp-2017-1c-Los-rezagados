@@ -29,8 +29,8 @@
 #include <commons/log.h>
 #include <commons/process.h>
 #include <commons/temporal.h>
-#include <herramientas/sockets.h>
-#include <herramientas/enum.h>
+#include <sockets.h>
+#include <enum.h>
 
 typedef struct {
 	t_pid pid;

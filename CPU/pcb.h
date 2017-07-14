@@ -8,7 +8,7 @@
 #ifndef OPERACIONESPCB_H_
 #define OPERACIONESPCB_H_
 
-#include <herramientas/sockets.h>
+#include <sockets.h>
 
 typedef struct {
 	t_num size;

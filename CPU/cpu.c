@@ -1,4 +1,4 @@
-#include <herramientas/sockets.c>
+#include <sockets.c>
 #include "libreriaCPU.h"
 #include "pcb.h"
 

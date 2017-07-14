@@ -6,7 +6,7 @@
  */
 
 
-#include <herramientas/sockets.c>
+#include <sockets.c>
 #include "libreriaKernel.h"
 #include "planificacion.h"
 

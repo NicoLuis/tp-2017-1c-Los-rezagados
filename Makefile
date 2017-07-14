@@ -13,15 +13,18 @@ dependencias: so-commons-library ansisop-parser
 
 so-commons-library:
 	$(call mostrarTitulo,$@)
-	cd ..; git clone https://github.com/sisoputnfrba/so-commons-library
+	#cd ..; git clone https://github.com/sisoputnfrba/so-commons-library
+	cd ../so-commons-library; git pull origin master
+	cd ../so-commons-library; sudo make uninstall
 	cd ../so-commons-library; sudo make install
 	
 ansisop-parser:
 	$(call mostrarTitulo,$@)
-	cd ..; git clone https://github.com/sisoputnfrba/ansisop-parser
+	#cd ..; git clone https://github.com/sisoputnfrba/ansisop-parser
+	cd ../so-commons-library; git pull origin master
 	cd ../ansisop-parser/parser; make all	
 	cd ../ansisop-parser/parser; sudo make install	
-	
+
 build: herramientas filesystem cpu consola kernel memoria
 
 herramientas: 

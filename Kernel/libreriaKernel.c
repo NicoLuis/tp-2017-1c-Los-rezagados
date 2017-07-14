@@ -1424,6 +1424,8 @@ void consolaKernel(){
 				}
 			}
 
+		//todo: mostrar valores semaforos y variables compartidas
+
 		}else if(string_equals_ignore_case(comando, "detener")){
 
 			log_trace(logKernel, "Detengo planificacion");
@@ -1513,6 +1515,8 @@ void finalizarPid(t_pid pid, int abortiva){
 		return i->pidPCB == pid;
 	}
 	bool flag_hagoesto = 1;
+
+	// todo: sacar de tabla archivos
 
 	list_remove_and_destroy_by_condition(lista_PCB_consola, (void*) _buscarPID, free);
 

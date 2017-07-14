@@ -115,17 +115,22 @@ void finalizarPCB(t_pid pidPCB){
 
 
 void setearExitCode(t_pid pidPCB, int exitCode){
-	log_warning(logKernel, "Setteo exit code %d a pid %d", exitCode, pidPCB);
+	log_trace(logKernel, "Setteo exit code %d a pid %d", exitCode, pidPCB);
 	bool _buscarPCB(t_PCB* pcb){
 		return pcb->pid == pidPCB;
 	}
 
 	_lockLista_PCBs();
 	t_PCB* pcb = list_remove_by_condition(lista_PCBs, (void*) _buscarPCB);
-	if((int)pcb->exitCode > 0)
-		pcb->exitCode = exitCode;
-	list_add(lista_PCBs, pcb);
+	if(pcb == NULL)
+		log_warning(logKernel, "No se encuentra pcb %d", pidPCB);
+	else{
+		if((int)pcb->exitCode > 0){
+			pcb->exitCode = exitCode;
+		}
+		list_add(lista_PCBs, pcb);
+		_ponerEnCola(pcb->pid, cola_Exit, mutex_Exit);
+		liberarPCB(pcb, true);
+	}
 	_unlockLista_PCBs();
-	_ponerEnCola(pcb->pid, cola_Exit, mutex_Exit);
-	liberarPCB(pcb, true);
 }

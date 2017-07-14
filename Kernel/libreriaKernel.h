@@ -120,7 +120,7 @@ typedef struct {
 typedef struct {
 	int socket;
 	t_num pidProcesoCPU;
-	pthread_mutex_t mutex;
+	//sem_t semaforo;
 	bool libre;
 }t_cpu;
 
@@ -231,6 +231,6 @@ void atender_consola(int socket_consola);
 void consolaKernel();
 void terminarKernel();
 
-void finalizarPid(t_pid pid);
+void finalizarPid(t_pid pid, int);
 
 #endif /* LIBRERIAKERNEL_H_ */

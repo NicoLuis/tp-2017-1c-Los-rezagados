@@ -1032,7 +1032,9 @@ void agregarEntradaCache(t_pid pid, t_num16 numero_pagina) {
 	p.offset = 0;
 	p.size = tamanioDeMarcos;
 	p.pagina = numero_pagina;
-	memcpy(nuevaEntradaCache->contenido, obtenerContenido(pid, p), tamanioDeMarcos);
+	void* bufaux = obtenerContenido(pid, p);
+	memcpy(nuevaEntradaCache->contenido, bufaux, tamanioDeMarcos);
+	free(bufaux);
 
 	if(proceso->cantEntradasCache == cachePorProceso)
 		algoritmoLRU(pid);

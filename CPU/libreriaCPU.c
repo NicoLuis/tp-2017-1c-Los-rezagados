@@ -65,7 +65,7 @@ void finalizarCPU(){
 
 void ultimaEjecTotal(){
 	log_info(logCPU, "Signal ultimaEjecucionTotal");
-	ultimaEjec();
+	//ultimaEjec();
 	flag_ultimaEjecucionTotal = 1;
 }
 
@@ -81,8 +81,10 @@ void ejecutar(){
 
 	do{
 		quantumRestante--;
-		if(quantumRestante <= 0 && string_equals_ignore_case(algoritmo, "RR"))
+		if(quantumRestante <= 0 && string_equals_ignore_case(algoritmo, "RR")){
 			flag_ultimaEjecucion = 1;
+			log_info(logCPU, "ULTIMO QUANTUM RR");
+		}
 		ejecutarInstruccion();
 		pcb->cantRafagas++;
 	} while(!flag_ultimaEjecucion);

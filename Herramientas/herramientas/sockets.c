@@ -88,12 +88,16 @@ void msg_destruir(t_msg *msg) {
 	free(msg);
 }
 
-void msg_enviar_separado(t_num8 tipoMensaje, t_num longitud, void* data, int socketTo){
+int msg_enviar_separado(t_num8 tipoMensaje, t_num longitud, void* data, int socketTo){
 
-	send(socketTo, &tipoMensaje, sizeof(t_num8), 0);
-	send(socketTo, &longitud, sizeof(t_num), 0);
-	send(socketTo, data, longitud, 0);
+	if(send(socketTo, &tipoMensaje, sizeof(t_num8), MSG_NOSIGNAL) < 0)
+		return -1;
+	if(send(socketTo, &longitud, sizeof(t_num), MSG_NOSIGNAL) < 0)
+		return -1;
+	if(send(socketTo, data, longitud, MSG_NOSIGNAL) < 0)
+		return -1;
 
+	return 0;
 }
 
 void msg_enviar(t_msg* msg, int socketTo){

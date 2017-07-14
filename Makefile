@@ -7,23 +7,7 @@
 ## bajará lo que no esté bajado y compilará lo no compilado.
 ## Si se desea rehacer el proceso, escribir "sudo make clean", lo que reiniciará todo.
 
-deploy: dependencias build
-
-dependencias: so-commons-library ansisop-parser
-
-so-commons-library:
-	$(call mostrarTitulo,$@)
-	#cd ..; git clone https://github.com/sisoputnfrba/so-commons-library
-	cd ../so-commons-library; git pull origin master
-	cd ../so-commons-library; sudo make uninstall
-	cd ../so-commons-library; sudo make install
-	
-ansisop-parser:
-	$(call mostrarTitulo,$@)
-	#cd ..; git clone https://github.com/sisoputnfrba/ansisop-parser
-	cd ../so-commons-library; git pull origin master
-	cd ../ansisop-parser/parser; make all	
-	cd ../ansisop-parser/parser; sudo make install	
+deploy: build
 
 build: herramientas filesystem cpu consola kernel memoria
 

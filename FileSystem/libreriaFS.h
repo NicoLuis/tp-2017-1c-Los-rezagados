@@ -37,6 +37,7 @@ t_bitarray* bitMap;
 t_log* logFS;
 
 pthread_mutex_t mutex_solicitud;
+int tipoError;
 
 
 void mostrarArchivoConfig();

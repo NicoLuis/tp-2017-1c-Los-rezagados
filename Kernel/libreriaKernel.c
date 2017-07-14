@@ -619,6 +619,7 @@ void escucharCPU(int socket_cpu) {
 
 
 		case LEER_ANSISOP:
+			_lockFS();
 			log_trace(logKernel, "Recibi LEER_ANSISOP de CPU");
 			t_valor_variable tamanio;
 
@@ -675,6 +676,7 @@ void escucharCPU(int socket_cpu) {
 				}
 
 			}
+			_unlockFS();
 			break;
 
 
@@ -706,15 +708,16 @@ void escucharCPU(int socket_cpu) {
 				msg_enviar_separado(ESCRIBIR_FD, 0, 0, socket_cpu);
 			}else{
 
-				if (entradaProcesoBuscado->bandera.escritura == 1){
+				_lockFS();
+				log_trace(logKernel, "Escribo en fd %d: %s", fdRecibido, datos);
 
-					log_trace(logKernel, "Escribo en fd %d: %s", fdRecibido, datos);
+				_cargarEntradasxTabla();
 
-					_cargarEntradasxTabla();
+				if(TablaProceso != NULL)
+				if(entradaProcesoBuscado != NULL)
+				if(entradaGlobalBuscada != NULL){
 
-					if(TablaProceso != NULL)
-					if(entradaProcesoBuscado != NULL)
-					if(entradaGlobalBuscada != NULL){
+					if (entradaProcesoBuscado->bandera.escritura == 1){
 						t_num sizePath = string_length(entradaGlobalBuscada->FilePath);
 						void* buffer = malloc(sizeof(t_num) + sizePath
 									   + sizeof(t_valor_variable) + sizeof(t_valor_variable)) + sizeInformacion;
@@ -746,17 +749,18 @@ void escucharCPU(int socket_cpu) {
 							// todo: manejar error NO_EXISTE_ARCHIVO o algo parecido
 						}
 
+					}else{
+						log_error(logKernel, "No tiene permisos de escritura");
+						// todo: hacer algo mas tipo enviar un error
+						// settear exit code correspondiente
 					}
-				}else{
-					log_error(logKernel, "No tiene permisos de lectura");
-					// todo: hacer algo mas tipo enviar un error
-					// settear exit code correspondiente
-				}
+
 
 			}
 			_sumarCantOpPriv(pcb->pid);
 			free(datos);
 			pthread_mutex_unlock(&cpuUsada->mutex);
+			_unlockFS();
 			break;
 
 
@@ -767,6 +771,7 @@ void escucharCPU(int socket_cpu) {
 
 			// fixme: NO ESTA VALIDANDO QUE EXISTA EL ARCHIVO !!!!!!!! VER EL ENUNCIADO !!!!!!!!!!!
 
+			_lockFS();
 			log_trace(logKernel, "Recibi la siguiente operacion ABRIR_ANSISOP de CPU");
 			t_direccion_archivo pathArchivo;
 			t_num longitudPath;
@@ -854,6 +859,7 @@ void escucharCPU(int socket_cpu) {
 			free(pathArchivo);
 
 			_sumarCantOpPriv(pcb->pid);
+			_unlockFS();
 			break;
 
 
@@ -861,6 +867,7 @@ void escucharCPU(int socket_cpu) {
 
 		case BORRAR_ANSISOP:
 
+			_lockFS();
 			log_trace(logKernel, "Recibi la siguiente operacion BORRAR_ANSISOP de CPU");
 
 			memcpy(&fdRecibido, msgRecibido->data, sizeof(t_descriptor_archivo));
@@ -882,6 +889,7 @@ void escucharCPU(int socket_cpu) {
 				}
 			}
 			_sumarCantOpPriv(pcb->pid);
+			_unlockFS();
 			break;
 
 
@@ -1472,6 +1480,12 @@ void _unlockMemoria(){
 	pthread_mutex_unlock(&mutex_Solicitud_Memoria);
 }
 
+void _lockFS(){
+	pthread_mutex_lock(&mutex_Solicitud_FS);
+}
+void _unlockFS(){
+	pthread_mutex_unlock(&mutex_Solicitud_FS);
+}
 
 
 

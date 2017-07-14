@@ -25,11 +25,14 @@ void escucharKERNEL(void* socket_kernel) {
 
 		// lo unico q esta haciendo es mostrar lo que se recibio
 		t_msg* msgRecibido = msg_recibir(socketKernel);
-		msg_recibir_data(socketKernel, msgRecibido);
+		if(msgRecibido->longitud > 0)
+			msg_recibir_data(socketKernel, msgRecibido);
 		char* path;
 		void* buffer;
 		int tmpsize = 0, tmpoffset = 0;
 		t_num offset, size;
+		t_num sizePath = 0;
+		tipoError = 0;
 
 		pthread_mutex_lock(&mutex_solicitud);
 		log_info(logFS, "Atiendo solicitud de %d", socketKernel);
@@ -43,23 +46,25 @@ void escucharKERNEL(void* socket_kernel) {
 			break;
 		case VALIDAR_ARCHIVO:
 			log_info(logFS, "Validar archivo");
-			path = malloc(msgRecibido->longitud);
+			path = malloc(msgRecibido->longitud+1);
 			memcpy(path, msgRecibido->data, msgRecibido->longitud);
 			path[msgRecibido->longitud] = '\0';
 			log_info(logFS, "Path: %s", path);
 
 			bool existe = false;
 			int fd = open(path, O_RDONLY);
-			if (fd > 0)
+			if (fd > 0){
 				existe = true;
-			fd > 0? log_info(logFS, "El archivo existe"): log_info(logFS, "El archivo no existe");
-			msg_enviar_separado(VALIDAR_ARCHIVO, 1, &existe, socketKernel);
+				log_info(logFS, "El archivo existe");
+			}else
+				log_info(logFS, "El archivo no existe");
+			msg_enviar_separado(VALIDAR_ARCHIVO, sizeof(bool), &existe, socketKernel);
 			close(fd);
 			free(path);
 			break;
 		case CREAR_ARCHIVO:
 			log_info(logFS, "Crear archivo");
-			path = malloc(msgRecibido->longitud);
+			path = malloc(msgRecibido->longitud+1);
 			memcpy(path, msgRecibido->data, msgRecibido->longitud);
 			path[msgRecibido->longitud] = '\0';
 			log_info(logFS, "Path: %s", path);
@@ -71,7 +76,7 @@ void escucharKERNEL(void* socket_kernel) {
 			break;
 		case BORRAR:
 			log_info(logFS, "Borrar archivo");
-			path = malloc(msgRecibido->longitud);
+			path = malloc(msgRecibido->longitud+1);
 			memcpy(path, msgRecibido->data, msgRecibido->longitud);
 			path[msgRecibido->longitud] = '\0';
 			log_info(logFS, "Path: %s", path);
@@ -82,8 +87,6 @@ void escucharKERNEL(void* socket_kernel) {
 			break;
 		case OBTENER_DATOS:
 			log_info(logFS, "Obtener datos archivo");
-
-			t_num sizePath;
 
 			memcpy(&sizePath, msgRecibido->data + tmpoffset, tmpsize = sizeof(t_num));
 			tmpoffset += tmpsize;
@@ -107,11 +110,11 @@ void escucharKERNEL(void* socket_kernel) {
 		case GUARDAR_DATOS:
 			log_info(logFS, "Guardar datos archivo");
 
-			memcpy(&tmpsize, msgRecibido->data, sizeof(int));
-			tmpoffset = sizeof(int);       //tmpoffset += sizeof(int);
-			path = malloc(tmpsize);
-			memcpy(path, msgRecibido->data + tmpoffset, tmpsize);
-			path[tmpsize] = '\0';
+			memcpy(&sizePath, msgRecibido->data + tmpoffset, tmpsize = sizeof(t_num));
+			tmpoffset += tmpsize;
+			path = malloc(sizePath+1);
+			memcpy(path, msgRecibido->data + tmpoffset, sizePath);
+			path[sizePath] = '\0';
 			tmpoffset += tmpsize;
 			memcpy(&offset, msgRecibido->data + tmpoffset, sizeof(t_valor_variable));
 			tmpoffset += sizeof(t_valor_variable);
@@ -180,7 +183,6 @@ void leerBitMap(){
 	}
 
 	data = mmap((caddr_t)0, sbuf.st_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-	//fixme no actualiza archivo bitmap.bin como deberia
 	if (data == MAP_FAILED) {
 		perror("Fallo el mmap del bitmap");
 		exit(1);
@@ -268,11 +270,8 @@ char* leerBloquesArchivo(void* path, int offset, int size){
 	}
 	int tamanio = config_get_int_value(metadata, "TAMANIO");
 	char** bloques = config_get_array_value(metadata, "BLOQUES");
-	log_error(logFS, "OK bloques");
 
-	log_info(logFS, "Leo bloque inicial %d", offset / tamanioBloques);
 	for(i = offset / tamanioBloques; i*tamanioBloques < tamanio; i++, tmpoffset += tamanioBloques){
-		log_info(logFS, "Leo bloque %d", i);
 		pathBloque = string_new();
 		string_append(&pathBloque, puntoMontaje);
 		string_append_with_format(&pathBloque, "/Bloques/%s.bin", bloques[i]);
@@ -281,21 +280,16 @@ char* leerBloquesArchivo(void* path, int offset, int size){
 		if(size-tmpoffset > tamanioBloques)	//lo q falta
 			memcpy(data + tmpoffset, tmpdata, tamanioBloques);
 		else{
-			log_info(logFS, "memcpy");
 			memcpy(data + tmpoffset, tmpdata, size-tmpoffset);
 			break;
 		}
 	}
-	log_info(logFS, "sali del for");
 	data[size] = '\0';
-	log_info(logFS, "data %s", data);
+	log_info(logFS, "Contenido leido %s", data);
 
 	free(rutaMetadata);
-	log_error(logFS, "pok");
 	free(pathBloque);
-	log_error(logFS, "pok");
 	free(bloques);
-	log_error(logFS, "pok");
 	return data;
 }
 

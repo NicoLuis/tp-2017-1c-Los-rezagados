@@ -282,6 +282,7 @@ void escucharCPU(int socket_cpu) {
 				// terminar??
 			} else {
 				entradaProcesoBuscado = list_find(TablaProceso->lista_entradas_de_proceso, (void*) _buscarFD); //tabla proceso es una lista
+
 				if(entradaProcesoBuscado == NULL){
 					log_trace(logKernel, " [CPU %d] no existe entrada de la tabla proceso que tenga a FD", socket_cpu);
 					// hacer algo??
@@ -763,10 +764,10 @@ void escucharCPU(int socket_cpu) {
 					if (entradaProcesoBuscado->bandera.escritura == 1){
 						t_num sizePath = string_length(entradaGlobalBuscada->FilePath);
 						void* buffer = malloc(sizeof(t_num) + sizePath
-									   + sizeof(t_valor_variable) + sizeof(t_valor_variable)) + sizeInformacion;
+									   + sizeof(t_valor_variable) + sizeof(t_valor_variable) + sizeInformacion);
 						offset = 0;
 						tmpsize = 0;
-						memcpy(buffer, &sizePath, tmpsize = sizeof(t_num));
+						memcpy(buffer + offset, &sizePath, tmpsize = sizeof(t_num));
 						offset += tmpsize;
 						memcpy(buffer + offset, entradaGlobalBuscada->FilePath, tmpsize = sizePath);
 						offset += tmpsize;
@@ -778,20 +779,22 @@ void escucharCPU(int socket_cpu) {
 						offset += tmpsize;
 
 						msg_enviar_separado(GUARDAR_DATOS, offset, buffer, socket_fs);
-						free(buffer);
 
-						msg_destruir(msgRecibido);
-						msgRecibido = msg_recibir(socket_fs);
+						t_msg* msgRecibido2 = msg_recibir(socket_fs);
 
-						if(msgRecibido->tipoMensaje == GUARDAR_DATOS){
+						if(msgRecibido2->tipoMensaje == GUARDAR_DATOS){
 							log_trace(logKernel, " [CPU %d] Escribio bien", socket_cpu);
-							msg_recibir_data(socket_fs, msgRecibido);
 							msg_enviar_separado(ESCRIBIR_FD, 0, 0, socket_cpu);
 						}else{
 							log_error(logKernel, " [CPU %d] Error al escribir", socket_cpu);
 							t_num exitCode = ARCHIVO_INEXISTENTE;
 							msg_enviar_separado(ERROR, sizeof(t_num), &exitCode, socket_cpu);
 						}
+						log_trace(logKernel, " buffer");
+						free(buffer);
+						log_trace(logKernel, " msg_destruir");
+						msg_destruir(msgRecibido2);
+						log_trace(logKernel, " msg_destruir");
 
 					}else{
 						log_error(logKernel, " [CPU %d] No tiene permisos de escritura", socket_cpu);
@@ -802,7 +805,9 @@ void escucharCPU(int socket_cpu) {
 				_unlockFS();
 			}
 			_sumarCantOpPriv(pcb->pid);
+			log_trace(logKernel, " datos");
 			free(datos);
+			log_trace(logKernel, " datos");
 			//sem_post(&cpuUsada->semaforo);
 			break;
 
@@ -819,9 +824,9 @@ void escucharCPU(int socket_cpu) {
 			offset = 0;
 			memcpy(&longitudPath, msgRecibido->data + offset, tmpsize = sizeof(t_num));
 			offset += tmpsize;
-			pathArchivo = malloc(longitudPath);
+			pathArchivo = malloc(longitudPath+1);
 			memcpy(pathArchivo, msgRecibido->data + offset, tmpsize = longitudPath);
-			//pathArchivo[longitudPath] = '\0';
+			pathArchivo[longitudPath] = '\0';
 			offset += tmpsize;
 			memcpy(&flags, msgRecibido->data + offset, tmpsize = sizeof(t_banderas));
 			offset += tmpsize;

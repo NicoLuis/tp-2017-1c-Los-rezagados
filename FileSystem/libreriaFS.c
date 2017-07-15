@@ -134,16 +134,17 @@ void escucharKERNEL(void* socket_kernel) {
 		case GUARDAR_DATOS:
 			log_info(logFS, "Guardar datos archivo");
 
+			tmpoffset = 0;
 			memcpy(&sizePath, msgRecibido->data + tmpoffset, tmpsize = sizeof(t_num));
 			tmpoffset += tmpsize;
 			path = malloc(sizePath+1);
-			memcpy(path, msgRecibido->data + tmpoffset, sizePath);
+			memcpy(path, msgRecibido->data + tmpoffset, tmpsize = sizePath);
 			path[sizePath] = '\0';
 			tmpoffset += tmpsize;
-			memcpy(&offset, msgRecibido->data + tmpoffset, sizeof(t_valor_variable));
-			tmpoffset += sizeof(t_valor_variable);
-			memcpy(&size, msgRecibido->data + tmpoffset, sizeof(t_valor_variable));
-			tmpoffset += sizeof(t_valor_variable);
+			memcpy(&offset, msgRecibido->data + tmpoffset, tmpsize = sizeof(t_valor_variable));
+			tmpoffset += tmpsize;
+			memcpy(&size, msgRecibido->data + tmpoffset, tmpsize = sizeof(t_valor_variable));
+			tmpoffset += tmpsize;
 			buffer = malloc(size);
 			memcpy(buffer, msgRecibido->data + tmpoffset, size);
 			log_info(logFS, "Path: %s - offset: %d - size %d \n buffer %s", path, offset, size, buffer);

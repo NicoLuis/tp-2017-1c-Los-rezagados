@@ -53,6 +53,12 @@ void escucharKERNEL(void* socket_kernel) {
 			path[msgRecibido->longitud] = '\0';
 			log_info(logFS, "Path: %s", path);
 
+			char* rutaMetadata = string_new();
+			string_append(&rutaMetadata, puntoMontaje);
+			string_append(&rutaMetadata, "/Archivos");
+			string_append(&rutaMetadata, path);
+			log_info(logFS, "rutaMetadata %s", rutaMetadata);
+
 			int fd = open(path, O_RDONLY);
 
 			if (fd > 0){
@@ -60,7 +66,8 @@ void escucharKERNEL(void* socket_kernel) {
 				msg_enviar_separado(VALIDAR_ARCHIVO, 0, 0, socketKernel);
 			}else{
 				log_info(logFS, "El archivo no existe");
-				msg_enviar_separado(ARCHIVO_INEXISTENTE, 0, 0, socketKernel);
+				t_num exitcode = ARCHIVO_INEXISTENTE;
+				msg_enviar_separado(ERROR, sizeof(t_num), &exitcode, socketKernel);
 			}
 			close(fd);
 			free(path);

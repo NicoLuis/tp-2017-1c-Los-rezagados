@@ -847,30 +847,33 @@ void escucharCPU(int socket_cpu) {
 			t_msg* msgValidacionObtenida = msg_recibir(socket_fs);
 
 			bool seguirEjecutando = true;
-			int exitcode;
 
-			if(msgValidacionObtenida->tipoMensaje == ARCHIVO_INEXISTENTE && (flags.creacion == true)){
+			t_num exitcode;
+			if(msgValidacionObtenida->tipoMensaje == VALIDAR_ARCHIVO){
+				log_trace(logKernel, "El archivo existe %s", pathArchivo);
+			}else{
+				msg_recibir_data(socket_fs, msgValidacionObtenida);
+				memcpy(&exitcode, msgValidacionObtenida->data, sizeof(t_num));
+				if(exitcode == ARCHIVO_INEXISTENTE && flags.creacion == true){
 
-				msg_enviar_separado(CREAR_ARCHIVO, longitudPath, pathArchivo, socket_fs);
+					log_trace(logKernel, "Se crea el archivo %s", pathArchivo);
+					msg_enviar_separado(CREAR_ARCHIVO, longitudPath, pathArchivo, socket_fs);
 
-				msg_destruir(msgValidacionObtenida);
-				msgValidacionObtenida = msg_recibir(socket_fs);
+					msg_destruir(msgValidacionObtenida);
+					msgValidacionObtenida = msg_recibir(socket_fs);
 
-				if(msgValidacionObtenida->tipoMensaje < 0 ){
-					log_trace(logKernel, " error al crear el arcihvo: %s", pathArchivo, socket_cpu);
-					seguirEjecutando = false;
-					//error al crear archivo exitcode =-20 matar proceso??
-					exitcode = msgValidacionObtenida->tipoMensaje;
+					if(msgValidacionObtenida->tipoMensaje != CREAR_ARCHIVO ){
+						log_trace(logKernel, " error al crear el arcihvo: %s", pathArchivo, socket_cpu);
+						seguirEjecutando = false;
+						//error al crear archivo exitcode =-20 matar proceso??
+					}else{
+						log_trace(logKernel, " se creo el archivo: %s", pathArchivo, socket_cpu);
+					}
 				}else{
-					log_trace(logKernel, " se creo el arcihvo: %s", pathArchivo, socket_cpu);
+					seguirEjecutando = false;
+					msg_enviar_separado(ERROR, sizeof(t_num), &exitcode, socket_cpu);
 				}
 			}
-
-			if(msgValidacionObtenida->tipoMensaje == ARCHIVO_INEXISTENTE){
-				seguirEjecutando = false;
-				exitcode = msgValidacionObtenida->tipoMensaje;
-			}
-
 
 			msg_destruir(msgValidacionObtenida);
 
@@ -937,18 +940,11 @@ void escucharCPU(int socket_cpu) {
 
 			free(pathArchivo);
 
-			_sumarCantOpPriv(pcb->pid);
-			_unlockFS();
-			//sem_post(&cpuUsada->semaforo);
-			break;
-		}else{
-			_sumarCantOpPriv(pcb->pid);
-
-			_unlockFS();
-
-			break;
-
 		}
+		_sumarCantOpPriv(pcb->pid);
+		_unlockFS();
+		//sem_post(&cpuUsada->semaforo);
+		break;
 
 
 

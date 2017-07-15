@@ -371,9 +371,7 @@ void borrar(t_descriptor_archivo direccion){
 		log_trace(logAnsisop, "Borro correctamente");
 	else{
 		log_error(logAnsisop, "Error al borrar");
-
-		//todo: definir errores posibles
-		// de forma q quede por ej: tipoError = EXCEPCION_MEMORIA;
+		flag_error = 1;
 	}
 
 	msg_destruir(msgRecibido);
@@ -384,21 +382,14 @@ void cerrar(t_descriptor_archivo descriptor_archivo){
 
 	mandarMsgaKernel(CERRAR_ANSISOP, descriptor_archivo);
 
-	//todo: recibir confirmacion
-
-	/*
 	t_msg* msgRecibido = msg_recibir(socket_kernel);
 
 	if(msgRecibido->tipoMensaje == CERRAR_ANSISOP)
 		log_trace(logAnsisop, "Cerre correctamente");
 	else{
 		log_error(logAnsisop, "Error al cerrar");
-
-		//todo: definir errores posibles
-		// de forma q quede por ej: tipoError = EXCEPCION_MEMORIA;
+		flag_error = 1;
 	}
-
-	 */
 }
 
 void mandarMSGaKernel_LE(t_descriptor_archivo descriptor_archivo, void* informacion, t_valor_variable tamanio, int tipoMsj){
@@ -513,23 +504,15 @@ void moverCursor(t_descriptor_archivo descriptor_archivo, t_valor_variable posic
 	msg_enviar_separado(MOVER_ANSISOP, sizeof(t_descriptor_archivo) + sizeof(t_descriptor_archivo), buffer, socket_kernel);
 	free(buffer);
 
-
-
-	//todo: recibir confirmacion
-
-	/*
 	t_msg* msgRecibido = msg_recibir(socket_kernel);
 
 	if(msgRecibido->tipoMensaje == MOVER_ANSISOP)
-		log_trace(logAnsisop, "... correctamente");
+		log_trace(logAnsisop, "Cursor movido correctamente");
 	else{
-		log_error(logAnsisop, "Error al ...");
-
-		//todo: definir errores posibles
-		// de forma q quede por ej: tipoError = EXCEPCION_MEMORIA;
+		log_error(logAnsisop, "Error al mover cursor");
+		flag_error = 1;
 	}
 
-	 */
 
 }
 

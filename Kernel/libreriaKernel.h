@@ -68,6 +68,7 @@ typedef struct{
 } t_tabla_proceso;
 
 t_list* lista_tabla_de_procesos;
+pthread_mutex_t mutex_tablaProcesos;
 
 typedef struct{
 	t_descriptor_archivo indiceGlobalTable;
@@ -76,6 +77,7 @@ typedef struct{
 }t_entrada_GlobalFile;
 
 t_list* lista_tabla_global;
+pthread_mutex_t mutex_tablaGlobal;
 
 
 ////////////////////////////////////////////////////////

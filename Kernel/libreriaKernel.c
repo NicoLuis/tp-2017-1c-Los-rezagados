@@ -635,13 +635,18 @@ void escucharCPU(int socket_cpu) {
 			memcpy(&pidRecibido, msgRecibido->data + sizeof(t_descriptor_archivo) + sizeof(t_valor_variable), sizeof(t_pid));
 
 			_cargarEntradasxTabla();
+			bool error = 1;
 
 			if(TablaProceso != NULL)
 			if(entradaProcesoBuscado != NULL)
 			if(entradaGlobalBuscada != NULL){
 				entradaProcesoBuscado->cursor = cursorRecibido;
 				log_trace(logKernel, " [CPU %d] se seteo el cursor", socket_cpu);
+				msg_enviar_separado(MOVER_ANSISOP,0,0,socket_cpu);
+				error = 0;
 			}
+			if(error)
+				msg_enviar_separado(ERROR,0,0,socket_cpu);
 
 			//sem_post(&cpuUsada->semaforo);
 			break;
@@ -702,21 +707,8 @@ void escucharCPU(int socket_cpu) {
 				}else{
 					log_error(logKernel, " [CPU %d] No tiene permisos de escritura"), socket_cpu;
 
-					// todo: hacer algo mas tipo enviar un error
-					// settear exit code correspondiente
-
-
-					/*int _es_PCB(t_PCB* p){
-						return p->pid == pidaux;
-					}
-					//--- saco, modifico y vuelvo a meterlo en la lista
-					// codigo de error de lectura sin permiso = -3 se debe matar proceso y de
-					// ver exitcode es entero no signado??
-					t_PCB* pcbAtcual = list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
-					pcbAtcual->exitCode = -3;
-					list_add(lista_PCBs,pcbAtcual);*/
-
-
+					t_num exitCode = LECTURA_SIN_PERMISOS;
+					msg_enviar_separado(ERROR, sizeof(t_num), &exitCode, socket_cpu);
 
 				}
 
@@ -794,16 +786,17 @@ void escucharCPU(int socket_cpu) {
 						if(msgRecibido->tipoMensaje == GUARDAR_DATOS){
 							log_trace(logKernel, " [CPU %d] Escribio bien", socket_cpu);
 							msg_recibir_data(socket_fs, msgRecibido);
-							msg_enviar_separado(GUARDAR_DATOS, 0, 0, socket_cpu);
+							msg_enviar_separado(ESCRIBIR_FD, 0, 0, socket_cpu);
 						}else{
 							log_error(logKernel, " [CPU %d] Error al escribir", socket_cpu);
-							// todo: manejar error NO_EXISTE_ARCHIVO o algo parecido
+							t_num exitCode = ARCHIVO_INEXISTENTE;
+							msg_enviar_separado(ERROR, sizeof(t_num), &exitCode, socket_cpu);
 						}
 
 					}else{
 						log_error(logKernel, " [CPU %d] No tiene permisos de escritura", socket_cpu);
-						// todo: hacer algo mas tipo enviar un error
-						// settear exit code correspondiente
+						t_num exitCode = ESCRITURA_SIN_PERMISOS;
+						msg_enviar_separado(ERROR, sizeof(t_num), &exitCode, socket_cpu);
 					}
 				}
 				_unlockFS();
@@ -817,12 +810,6 @@ void escucharCPU(int socket_cpu) {
 
 
 		case ABRIR_ANSISOP:
-			// fixme cuando ejecute 2do script q abre archivo exploto -> buscar porque
-
-			// fixme: NO ESTA VALIDANDO QUE EXISTA EL ARCHIVO !!!!!!!! VER EL ENUNCIADO !!!!!!!!!!!
-
-
-
 			_lockFS();
 			log_trace(logKernel, " [CPU %d] Recibi la siguiente operacion ABRIR_ANSISOP de CPU", socket_cpu);
 			t_direccion_archivo pathArchivo;
@@ -832,9 +819,9 @@ void escucharCPU(int socket_cpu) {
 			offset = 0;
 			memcpy(&longitudPath, msgRecibido->data + offset, tmpsize = sizeof(t_num));
 			offset += tmpsize;
-			pathArchivo = malloc(longitudPath + 1);
+			pathArchivo = malloc(longitudPath);
 			memcpy(pathArchivo, msgRecibido->data + offset, tmpsize = longitudPath);
-			pathArchivo[longitudPath] = '\0';
+			//pathArchivo[longitudPath] = '\0';
 			offset += tmpsize;
 			memcpy(&flags, msgRecibido->data + offset, tmpsize = sizeof(t_banderas));
 			offset += tmpsize;
@@ -917,7 +904,7 @@ void escucharCPU(int socket_cpu) {
 
 			// busco si ya tengo la tabla para este id de proceso
 			int _espid(t_tabla_proceso* a){ return a->pid == pid; }
-			// todo: poner un mutex lock lista_tabla_de_procesos
+			pthread_mutex_lock(&mutex_tablaProcesos);
 			t_tabla_proceso* tablaProceso = list_remove_by_condition(lista_tabla_de_procesos, (void*) _espid);
 
 			if(tablaProceso == NULL){
@@ -933,7 +920,7 @@ void escucharCPU(int socket_cpu) {
 			// en este momento ya estan cargados los flags, el indice y la referencia a tabla global
 			list_add(tablaProceso->lista_entradas_de_proceso, entradaProcesoNew);
 			list_add(lista_tabla_de_procesos, tablaProceso);
-			// todo: poner un mutex UNLOCK lista_tabla_de_procesos
+			pthread_mutex_unlock(&mutex_tablaProcesos);
 
 			// le mando a cpu el fd asignado
 			msg_enviar_separado(ABRIR_ANSISOP, sizeof(t_descriptor_archivo), &entradaProcesoNew->fd, socket_cpu);
@@ -992,21 +979,27 @@ void escucharCPU(int socket_cpu) {
 			if(TablaProceso != NULL)
 			if(entradaProcesoBuscado != NULL)
 			if(entradaGlobalBuscada != NULL){
-				// todo: poner un mutex lock lista_tabla_global
+				pthread_mutex_lock(&mutex_tablaGlobal);
 				entradaGlobalBuscada = list_remove_by_condition(lista_tabla_global, (void*) _buscarPorIndice);
-				// saco la entrada global buscada
-				entradaGlobalBuscada->Open --;
+				if(entradaGlobalBuscada == NULL){
+					log_trace(logKernel, "No encontre entrada");
+					msg_enviar_separado(ERROR,0,0,socket_cpu);
+				}else{
+					// saco la entrada global buscada
+					entradaGlobalBuscada->Open --;
 
-				//int _esFD(t_entrada_proceso *entradaP){return entradaP->indice == entradaProcesoBuscado->indice;}
-				list_remove_by_condition(TablaProceso->lista_entradas_de_proceso, (void*) _esFD);
-				if(entradaGlobalBuscada->Open == 0){
-					// no hago nada ya que la saque antes
-					free(entradaGlobalBuscada);
-				} else {
-					// vuelvo a meter la entrada que modifique en la tabla global
-					list_add(lista_tabla_global, entradaGlobalBuscada);
+					//int _esFD(t_entrada_proceso *entradaP){return entradaP->indice == entradaProcesoBuscado->indice;}
+					list_remove_by_condition(TablaProceso->lista_entradas_de_proceso, (void*) _esFD);
+					if(entradaGlobalBuscada->Open == 0){
+						// no hago nada ya que la saque antes
+						free(entradaGlobalBuscada);
+					} else {
+						// vuelvo a meter la entrada que modifique en la tabla global
+						list_add(lista_tabla_global, entradaGlobalBuscada);
+					}
+					msg_enviar_separado(CERRAR_ANSISOP,0,0,socket_cpu);
 				}
-				// todo: poner un mutex unlock lista_tabla_global
+				pthread_mutex_unlock(&mutex_tablaGlobal);
 			}
 
 			_sumarCantOpPriv(pcb->pid);
@@ -1099,11 +1092,9 @@ void atender_consola(int socket_consola){
 
 	void* script;	//si lo declaro adentro del switch se queja
 	void _finalizarPIDs(t_infosocket* i){
-		log_trace(logKernel, "fin");
 		if(i->socket == socket_consola){
-			log_trace(logKernel, "alizo");
 			int pidAux = i->pidPCB;
-			log_trace(logKernel, "pio");
+			log_trace(logKernel, "alizo");
 			finalizarPid(pidAux, 1);
 			log_trace(logKernel, "la");
 			setearExitCode(pidAux, DESCONEXION_CONSOLA);
@@ -1425,7 +1416,21 @@ void consolaKernel(){
 				}
 			}
 
-		//todo: mostrar valores semaforos y variables compartidas
+		}else if(string_equals_ignore_case(comando, "estado variables")){
+
+			printf(PRINT_COLOR_CYAN "   ····  VariableCompartida  ····   Valor   ···· " PRINT_COLOR_RESET "\n");
+			int i, sizelista = list_size(lista_variablesCompartidas);
+			for(i=0;i < sizelista; i++){
+				t_VariableCompartida* v = list_get(lista_variablesCompartidas, i);
+				printf( "   ····  %18s  ····    %3d    ···· \n", v->nombre, v->valor);
+			}
+
+			printf(PRINT_COLOR_CYAN "   ····       Semaforo       ····   Valor   ···· " PRINT_COLOR_RESET "\n");
+			sizelista = list_size(lista_variablesSemaforo);
+			for(i=0;i < sizelista; i++){
+				t_VariableSemaforo* s = list_get(lista_variablesSemaforo, i);
+				printf( "   ····  %18s  ····    %3d    ···· \n", s->nombre, s->valorSemaforo);
+			}
 
 		}else if(string_equals_ignore_case(comando, "detener")){
 
@@ -1465,6 +1470,7 @@ void consolaKernel(){
 					PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "kill [pid]: " PRINT_COLOR_RESET "Finalizar proceso\n"
 					PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "detener: " PRINT_COLOR_RESET "Detener la planificación\n"
 					PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "reanudar: " PRINT_COLOR_RESET "Reanuda la planificación\n"
+					PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "estado variables: " PRINT_COLOR_RESET "Muestra los valores actuales de las variables\n"
 					PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "exitcodes: " PRINT_COLOR_RESET "Listado de exit codes\n");
 
 		}else if(string_equals_ignore_case(comando, "\0")){
@@ -1517,7 +1523,31 @@ void finalizarPid(t_pid pid, int abortiva){
 	}
 	bool flag_hagoesto = 1;
 
-	// todo: sacar de tabla archivos
+	int i=0, sizeLista = list_size(lista_tabla_de_procesos);
+	for(;i < sizeLista;i++){
+		t_tabla_proceso* tablaProceso = list_get(lista_tabla_de_procesos, i);
+		if(tablaProceso->pid == pid){
+			list_remove(lista_tabla_de_procesos, i);
+			int j=0, sizeLista2 = list_size(tablaProceso->lista_entradas_de_proceso);
+			for(; j<sizeLista2 ;j++){
+				t_entrada_proceso* entradaProcesoBuscado = list_remove(tablaProceso->lista_entradas_de_proceso, j);
+				int _buscarPorIndice(t_entrada_GlobalFile* entradaGlobal){return entradaGlobal->indiceGlobalTable == entradaProcesoBuscado->referenciaGlobalTable;}
+
+				pthread_mutex_lock(&mutex_tablaGlobal);
+				t_entrada_GlobalFile* entradaGlobalBuscada = list_remove_by_condition(lista_tabla_global, (void*) _buscarPorIndice);
+				entradaGlobalBuscada->Open --;
+				if(entradaGlobalBuscada->Open == 0){
+					free(entradaGlobalBuscada);
+				} else {
+					list_add(lista_tabla_global, entradaGlobalBuscada);
+				}
+				pthread_mutex_unlock(&mutex_tablaGlobal);
+				free(entradaProcesoBuscado);
+			}
+			list_destroy(tablaProceso->lista_entradas_de_proceso);
+			free(tablaProceso);
+		}
+	}
 
 	list_remove_and_destroy_by_condition(lista_PCB_consola, (void*) _buscarPID, free);
 
@@ -1632,7 +1662,7 @@ void _unlockFS(){
 
 
 
-void asignarNuevaPag(t_PCB* pcb){
+int asignarNuevaPag(t_PCB* pcb){
 	int _esHeap(t_heap* h){
 		return h->pid == pcb->pid;
 	}
@@ -1649,7 +1679,9 @@ void asignarNuevaPag(t_PCB* pcb){
 	t_msg* msgRecibido = msg_recibir(socket_memoria);
 	if(msgRecibido->tipoMensaje != ASIGNACION_MEMORIA){
 		log_error(logKernel, "No recibi ASIGNACION_MEMORIA sino %d", msgRecibido->tipoMensaje);
-		// todo: manejar error
+		msg_destruir(msgRecibido);
+		_unlockMemoria();
+		return ERROR_EXCEPCION_MEMORIA;
 	}
 	msg_destruir(msgRecibido);
 	_unlockMemoria();
@@ -1676,18 +1708,21 @@ void asignarNuevaPag(t_PCB* pcb){
 	_lockMemoria();
 	send(socket_memoria, &pcb->pid, sizeof(t_pid), 0);
 	msg_enviar_separado(ESCRITURA_PAGINA, sizeof(t_posicion) + sizeof(t_HeapMetadata), buffer, socket_memoria);
+	free(buffer);
 	msgRecibido = msg_recibir(socket_memoria);
 	if(msgRecibido->tipoMensaje != ESCRITURA_PAGINA){
 		log_error(logKernel, "No recibi ESCRITURA_PAGINA sino %d", msgRecibido->tipoMensaje);
-		// todo: manejar error
+		msg_destruir(msgRecibido);
+		_unlockMemoria();
+		return ERROR_EXCEPCION_MEMORIA;
 	}
 	msg_destruir(msgRecibido);
 	_unlockMemoria();
 
 	_sumarCantPagsHeap(pcb->pid, 1);
 
-	free(buffer);
 	list_add(tabla_heap, nuevaHeap);
+	return 0;
 }
 
 
@@ -1844,13 +1879,15 @@ t_puntero reservarMemoriaHeap(t_num cantBytes, t_PCB* pcb){
 
 	if( list_count_satisfying(tabla_heap, (void*)_esHeap) == 0 ){
 		log_trace(logKernel, "Se reserva primer pagina heap pid %d", pcb->pid);
-		asignarNuevaPag(pcb);
+		if(asignarNuevaPag(pcb) < 0)
+			return ERROR_EXCEPCION_MEMORIA;
 	}
 
 	int retorno = encontrarHueco(cantBytes, pcb);
 	if( retorno == -1 ){
 		log_trace(logKernel, "No encontre hueco");
-		asignarNuevaPag(pcb);
+		if(asignarNuevaPag(pcb) < 0)
+			return ERROR_EXCEPCION_MEMORIA;
 		retorno = encontrarHueco(cantBytes, pcb);
 	}
 	if( retorno < -1 )

@@ -53,23 +53,18 @@ void escucharKERNEL(void* socket_kernel) {
 			path[msgRecibido->longitud] = '\0';
 			log_info(logFS, "Path: %s", path);
 
-			char* rutaMetadata = string_new();
-			string_append(&rutaMetadata, puntoMontaje);
-			string_append(&rutaMetadata, "/Archivos");
-			string_append(&rutaMetadata, path);
-			log_info(logFS, "rutaMetadata %s", rutaMetadata);
+			//int fd = open("/home/utnso/workspace/tp-2017-1c-Los-rezagados/FS_SADICA/Archivos/archivo.bin", O_RDWR);
+			//close(fd);
 
-			int fd = open(path, O_RDONLY);
-
-			if (fd < 0){
+			if(verificarArchivo(path)){
+				log_info(logFS, "El archivo existe");
+				msg_enviar_separado(VALIDAR_ARCHIVO, 0, 0, socketKernel);
+			}else{
 				log_info(logFS, "El archivo no existe");
 				t_num exitcode = ARCHIVO_INEXISTENTE;
 				msg_enviar_separado(ERROR, sizeof(t_num), &exitcode, socketKernel);
-			}else{
-				log_info(logFS, "El archivo existe");
-				msg_enviar_separado(VALIDAR_ARCHIVO, 0, 0, socketKernel);
 			}
-			close(fd);
+
 			free(path);
 			break;
 
@@ -85,7 +80,7 @@ void escucharKERNEL(void* socket_kernel) {
 			crearArchivo(path);
 
 			if(tipoError < 0)
-				msg_enviar_separado(tipoError, 0, 0, socketKernel);
+				msg_enviar_separado(ERROR, 0, 0, socketKernel);
 			else
 				msg_enviar_separado(CREAR_ARCHIVO, 0, 0, socketKernel);
 			free(path);
@@ -103,7 +98,7 @@ void escucharKERNEL(void* socket_kernel) {
 			borrarArchivo(path);
 
 			if(tipoError < 0)
-				msg_enviar_separado(tipoError, 0, 0, socketKernel);
+				msg_enviar_separado(ERROR, 0, 0, socketKernel);
 			else
 				msg_enviar_separado(BORRAR, 0, 0, socketKernel);
 			free(path);
@@ -128,7 +123,7 @@ void escucharKERNEL(void* socket_kernel) {
 			char* data = leerBloquesArchivo(path, offset, size);
 
 			if(tipoError < 0)
-				msg_enviar_separado(tipoError, 0, 0, socketKernel);
+				msg_enviar_separado(ERROR, 0, 0, socketKernel);
 			else
 				msg_enviar_separado(OBTENER_DATOS, size, data, socketKernel);
 			free(data);
@@ -156,7 +151,7 @@ void escucharKERNEL(void* socket_kernel) {
 			escribirBloquesArchivo(path, offset, size, buffer);
 
 			if(tipoError < 0)
-				msg_enviar_separado(tipoError, 0, 0, socketKernel);
+				msg_enviar_separado(ERROR, 0, 0, socketKernel);
 			else
 				msg_enviar_separado(GUARDAR_DATOS, 0, 0, socketKernel);
 			free(data);
@@ -170,6 +165,24 @@ void escucharKERNEL(void* socket_kernel) {
 	}
 }
 
+
+int verificarArchivo(char* path){
+
+	char* rutaMetadata = string_new();
+	string_append(&rutaMetadata, puntoMontaje);
+	string_append(&rutaMetadata, "/Archivos");
+	string_append(&rutaMetadata, path);
+	log_info(logFS, "rutaMetadata %s", rutaMetadata);
+
+	int fd = open(rutaMetadata, O_RDWR);
+	if(fd > 0){
+		close(fd);
+		return 1;
+	}else{
+		close(fd);
+		return 0;
+	}
+}
 
 
 
@@ -239,6 +252,10 @@ void crearArchivo(void* path){
 			bitarray_set_bit(bitMap, i);
 			nroBloque = i;
 		}
+	}
+	if(nroBloque == -1){
+		log_warning(logFS, "No hay bloques libres");
+		tipoError = -1;
 	}
 
 	char* data = string_from_format("TAMANIO=1 \nBLOQUES=[%d]", nroBloque);

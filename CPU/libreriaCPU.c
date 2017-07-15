@@ -112,6 +112,20 @@ void ejecutarInstruccion(){
 
 	if(flag_error){
 		log_trace(logCPU, "Devuelvo ERROR");
+
+		switch(tipoError){
+		case ERROR:
+			fprintf(stderr, PRINT_COLOR_YELLOW "Error en PID %d" PRINT_COLOR_RESET "\n", pcb->pid);
+			break;
+		case STACKOVERFLOW:
+			fprintf(stderr, PRINT_COLOR_YELLOW "STACKOVERFLOW PID %d" PRINT_COLOR_RESET "\n", pcb->pid);
+			break;
+		case EXCEPCION_MEMORIA:
+			fprintf(stderr, PRINT_COLOR_YELLOW "Excepcion de memoria PID %d" PRINT_COLOR_RESET "\n", pcb->pid);
+			break;
+		}
+
+
 		uint32_t size = tamanioTotalPCB(pcb);
 		void* pcbSerializado = serializarPCB(pcb);
 		msg_enviar_separado(tipoError, size, pcbSerializado, socket_kernel);
@@ -126,9 +140,10 @@ void ejecutarInstruccion(){
 		log_trace(logCPU, "Ultima Instruccion");
 		uint32_t size = tamanioTotalPCB(pcb);
 		void* pcbSerializado = serializarPCB(pcb);
-		if(flag_finalizado)
+		if(flag_finalizado){
+			fprintf(stderr, PRINT_COLOR_CYAN "PID %d finaliza correctamente" PRINT_COLOR_RESET "\n", pcb->pid);
 			msg_enviar_separado(FINALIZAR_PROGRAMA, size, pcbSerializado, socket_kernel);
-		else
+		}else
 			msg_enviar_separado(ENVIO_PCB, size, pcbSerializado, socket_kernel);
 		free(pcbSerializado);
 	}

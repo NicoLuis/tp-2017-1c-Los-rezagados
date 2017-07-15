@@ -49,6 +49,7 @@ int tipoError;
 void mostrarArchivoConfig();
 void leerMetadataArchivo();
 void leerBitMap();
+int verificarArchivo(char* path);
 void crearArchivo(void* path);
 void borrarArchivo(void* path);
 char* leerBloquesArchivo(void* path, int offset, int size);

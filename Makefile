@@ -7,8 +7,23 @@
 ## bajará lo que no esté bajado y compilará lo no compilado.
 ## Si se desea rehacer el proceso, escribir "sudo make clean", lo que reiniciará todo.
 
-deploy: build
+deploy: dependencias build
 
+dependencias: so-commons-library ansisop-parser b
+
+so-commons-library:
+	$(call mostrarTitulo,$@)
+	cd ..; git clone https://github.com/sisoputnfrba/so-commons-library
+	cd ../so-commons-library; sudo make install
+	
+ansisop-parser:
+	$(call mostrarTitulo,$@)
+	cd ..; git clone https://github.com/sisoputnfrba/ansisop-parser
+	cd ../ansisop-parser/parser; make all	
+	cd ../ansisop-parser/parser; sudo make install	
+	tar -xzvf ansisop-parser/programas-ejemplo/evaluacion-final-esther/FS-ejemplo/FS.tgz
+	tar -xvzf ansisop-parser/programas-ejemplo/evaluacion-final-esther/FS-ejemplo/SADICA_FS_V2.tar.gz
+	
 build: herramientas filesystem cpu consola kernel memoria
 
 herramientas: 

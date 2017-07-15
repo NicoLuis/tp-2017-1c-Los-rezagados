@@ -167,7 +167,8 @@ void escucharKernel(){
 				memcpy(texto, msgRecibido->data, msgRecibido->longitud);
 				fprintf(stderr, "%s\n", texto);
 				programa = list_find(lista_programas, (void*) _esPrograma);
-				programa->cantImpresionesPantalla++;
+				if(programa != NULL)
+					programa->cantImpresionesPantalla++;
 			}else
 				log_warning(logConsola, "No recibi nada");
 			break;

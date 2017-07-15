@@ -476,10 +476,9 @@ void escucharCPU(int socket_cpu) {
 			pthread_mutex_lock(&mutex_listaSemaforos);
 			t_VariableSemaforo* semBuscado = list_remove_by_condition(lista_variablesSemaforo, (void*) _buscar_VarSem);
 			if (semBuscado == NULL){
-				log_error(logKernel, " [CPU %d] Error no encontre SEMAFORO", socket_cpu);
+				log_error(logKernel, " [CPU %d] Error no encontre SEMAFORO %s", socket_cpu, varSemaforo->nombre);
 				t_num exitCode = SEMAFORO_INEXISTENTE;
 				msg_enviar_separado(ERROR, sizeof(t_num), &exitCode, socket_cpu);
-				pthread_mutex_unlock(&mutex_listaSemaforos);
 			}else{
 				semBuscado->valorSemaforo++;
 				log_trace(logKernel, " [CPU %d] Valor %d", socket_cpu, semBuscado->valorSemaforo);
@@ -500,8 +499,8 @@ void escucharCPU(int socket_cpu) {
 				list_add(lista_variablesSemaforo, semBuscado);
 				msg_enviar_separado(SIGNAL, 0, 0, socket_cpu);
 				_sumarCantOpPriv(pcb->pid);
-				pthread_mutex_unlock(&mutex_listaSemaforos);
 			}
+			pthread_mutex_unlock(&mutex_listaSemaforos);
 			free(varSemaforo->nombre);
 			//sem_post(&cpuUsada->semaforo);
 			break;
@@ -517,9 +516,10 @@ void escucharCPU(int socket_cpu) {
 			varSemaforo->nombre[tamanioNombre] = '\0';
 			log_info(logKernel, " [CPU %d] Semaforo %s", socket_cpu, varSemaforo->nombre);
 
+			pthread_mutex_lock(&mutex_listaSemaforos);
 			t_VariableSemaforo* semBuscad = list_remove_by_condition(lista_variablesSemaforo, (void*) _buscar_VarSem);
 			if (semBuscad == NULL){
-				log_error(logKernel, " [CPU %d] Error no encontre SEMAFORO", socket_cpu);
+				log_error(logKernel, " [CPU %d] Error no encontre SEMAFORO %s", socket_cpu, varSemaforo->nombre);
 				t_num exitCode = SEMAFORO_INEXISTENTE;
 				msg_enviar_separado(ERROR, sizeof(t_num), &exitCode, socket_cpu);
 			}else{
@@ -551,6 +551,7 @@ void escucharCPU(int socket_cpu) {
 				list_add(lista_variablesSemaforo, semBuscad);
 				_sumarCantOpPriv(pcb->pid);
 			}
+			pthread_mutex_unlock(&mutex_listaSemaforos);
 			free(varSemaforo->nombre);
 			//sem_post(&cpuUsada->semaforo);
 			break;

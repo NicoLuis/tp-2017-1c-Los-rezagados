@@ -61,13 +61,13 @@ void escucharKERNEL(void* socket_kernel) {
 
 			int fd = open(path, O_RDONLY);
 
-			if (fd > 0){
-				log_info(logFS, "El archivo existe");
-				msg_enviar_separado(VALIDAR_ARCHIVO, 0, 0, socketKernel);
-			}else{
+			if (fd < 0){
 				log_info(logFS, "El archivo no existe");
 				t_num exitcode = ARCHIVO_INEXISTENTE;
 				msg_enviar_separado(ERROR, sizeof(t_num), &exitcode, socketKernel);
+			}else{
+				log_info(logFS, "El archivo existe");
+				msg_enviar_separado(VALIDAR_ARCHIVO, 0, 0, socketKernel);
 			}
 			close(fd);
 			free(path);

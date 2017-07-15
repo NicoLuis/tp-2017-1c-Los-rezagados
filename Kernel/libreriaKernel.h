@@ -92,6 +92,7 @@ typedef struct {
 	t_valor_variable valor;
 }t_VariableCompartida;
 t_list* lista_variablesCompartidas;
+pthread_mutex_t mutex_listaVariables;
 
 typedef struct {
 	char* nombre;

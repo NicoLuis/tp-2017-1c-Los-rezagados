@@ -750,7 +750,8 @@ void escucharCPU(int socket_cpu) {
 				_unlockLista_PCB_consola();
 				if(info == NULL){
 					log_trace(logKernel, " [CPU %d] No se encuentra consola asociada a pid %d", socket_cpu, pcb->pid);
-					msg_enviar_separado(ERROR, 0, 0, socket_cpu);
+					t_num exitCode = DESCONEXION_CONSOLA;
+					msg_enviar_separado(ERROR, sizeof(t_num), &exitCode, socket_cpu);
 				}else{
 					msg_enviar_separado(IMPRIMIR_TEXTO, sizeInformacion, datos, info->socket);
 					msg_enviar_separado(ESCRIBIR_FD, 0, 0, socket_cpu);

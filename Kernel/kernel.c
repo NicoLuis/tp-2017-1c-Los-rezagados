@@ -197,6 +197,7 @@ int conectar_select(char* puerto_escucha) {
 							case 2:
 // Aca entro cuando entro una nueva cpu			-----------------------------------------------------------------
 
+								// todo: imprimir nueva CPU / consola
 								cpuNueva = malloc(sizeof(t_cpu));
 								cpuNueva->socket = socket_cliente_aceptado;
 								recv(socket_cliente_aceptado, &cpuNueva->pidProcesoCPU, sizeof(t_num), 0);

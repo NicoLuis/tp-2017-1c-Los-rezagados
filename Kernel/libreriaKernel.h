@@ -100,6 +100,7 @@ typedef struct {
 	pthread_mutex_t mutex_colaBloqueados;
 }t_VariableSemaforo;
 t_list* lista_variablesSemaforo;
+pthread_mutex_t mutex_listaSemaforos;
 
 typedef struct {
 	int nroPag;

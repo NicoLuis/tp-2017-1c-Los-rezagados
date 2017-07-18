@@ -24,7 +24,7 @@ int main(int argc, char* argv[]) {
 
 	signal (SIGINT, finalizarCPU);
 	signal (SIGUSR1, ultimaEjecTotal);
-	signal (SIGUSR2, ultimaEjec);
+	//signal (SIGUSR2, ultimaEjec);
 	flag_ultimaEjecucionTotal = 0;
 	flag_ultimaEjecucion = 0;
 	flag_finalizado = 0;

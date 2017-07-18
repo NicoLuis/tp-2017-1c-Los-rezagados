@@ -11,7 +11,7 @@ t_pid crearPCB(int socketConsola, char* script){
 
 	t_PCB* pcb = malloc(sizeof(t_PCB));
 	pcb->pid = pid;
-	pcb->exitCode = 1;
+	pcb->exitCode = SIN_ASIGNAR;
 	pcb->cantRafagas = 0;
 	pcb->cantPagsCodigo = 0;
 	pcb->cantPagsStack = stackSize;
@@ -56,20 +56,22 @@ t_pid _sacarDeCola(t_pid pid, t_queue* cola, pthread_mutex_t mutex){
 	t_pid tmppid, retorno = -1;
 	void* aux;
 	pthread_mutex_lock(&mutex);
-	if(pid == 0){		//si pid == 0 saco el ultimo
-		aux = queue_pop(cola);
-		memcpy(&retorno, aux, sizeof(t_pid));
-		free(aux);
-	}
-	else
-	for(; i < queue_size(cola) ; i++){
-		aux = queue_pop(cola);
-		memcpy(&tmppid, aux, sizeof(t_pid));
-		if( tmppid != pid )
-			queue_push(cola, aux);
-		else{
+	if(queue_size(cola) > 0){
+		if(pid == 0){		//si pid == 0 saco el ultimo
+			aux = queue_pop(cola);
 			memcpy(&retorno, aux, sizeof(t_pid));
 			free(aux);
+		}
+		else
+		for(; i < queue_size(cola) ; i++){
+			aux = queue_pop(cola);
+			memcpy(&tmppid, aux, sizeof(t_pid));
+			if( tmppid != pid )
+				queue_push(cola, aux);
+			else{
+				memcpy(&retorno, aux, sizeof(t_pid));
+				free(aux);
+			}
 		}
 	}
 	pthread_mutex_unlock(&mutex);
@@ -115,7 +117,7 @@ void finalizarPCB(t_pid pidPCB){
 
 
 void setearExitCode(t_pid pidPCB, int exitCode){
-	log_trace(logKernel, "Setteo exit code %d a pid %d", exitCode, pidPCB);
+	//log_trace(logKernel, "Setteo exit code %d a pid %d", exitCode, pidPCB);
 	bool _buscarPCB(t_PCB* pcb){
 		return pcb->pid == pidPCB;
 	}
@@ -125,12 +127,10 @@ void setearExitCode(t_pid pidPCB, int exitCode){
 	if(pcb == NULL)
 		log_warning(logKernel, "No se encuentra pcb %d", pidPCB);
 	else{
-		if((int)pcb->exitCode > 0){
+		if(pcb->exitCode == SIN_ASIGNAR){
 			pcb->exitCode = exitCode;
 		}
 		list_add(lista_PCBs, pcb);
-		_ponerEnCola(pcb->pid, cola_Exit, mutex_Exit);
-		liberarPCB(pcb, true);
 	}
 	_unlockLista_PCBs();
 }

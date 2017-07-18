@@ -68,12 +68,15 @@ void ultimaEjecTotal(){
 	//ultimaEjec();
 	flag_ultimaEjecucionTotal = 1;
 }
-
+/*
 void ultimaEjec(){
 	log_info(logCPU, "Signal ultimaEjecucion");
 	flag_finalizado = 1;
 	flag_ultimaEjecucion = 1;
-}
+	flag_error = 1;
+	tipoError = DESCONECTAR;
+	log_info(logCPU, "Signal ultimaEjecucion --");
+}*/
 
 
 void ejecutar(){
@@ -114,6 +117,9 @@ void ejecutarInstruccion(){
 		log_trace(logCPU, "Devuelvo ERROR");
 
 		switch(tipoError){
+		case DESCONECTAR:
+			fprintf(stderr, PRINT_COLOR_YELLOW "Se desconecto el PID %d" PRINT_COLOR_RESET "\n", pcb->pid);
+			break;
 		case ERROR:
 			fprintf(stderr, PRINT_COLOR_YELLOW "Error en PID %d" PRINT_COLOR_RESET "\n", pcb->pid);
 			break;
@@ -141,6 +147,7 @@ void ejecutarInstruccion(){
 		uint32_t size = tamanioTotalPCB(pcb);
 		void* pcbSerializado = serializarPCB(pcb);
 		if(flag_finalizado){
+			log_trace(logCPU, "flag_finalizado");
 			fprintf(stderr, PRINT_COLOR_CYAN "PID %d finaliza correctamente" PRINT_COLOR_RESET "\n", pcb->pid);
 			msg_enviar_separado(FINALIZAR_PROGRAMA, size, pcbSerializado, socket_kernel);
 		}else

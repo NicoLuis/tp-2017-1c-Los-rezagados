@@ -72,6 +72,7 @@ void leerComando(char* comando){
 
 	}else if(string_equals_ignore_case(comando, "disconnect")){
 
+		flag_desconexion = 1;
 		msg_enviar_separado(DESCONECTAR, 0, 0, socket_kernel);
 
 	}else if(string_equals_ignore_case(comando, "clear")){
@@ -83,6 +84,7 @@ void leerComando(char* comando){
 				PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "kill [pid]: " PRINT_COLOR_RESET "Finalizar Programa\n"
 				PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "disconnect: " PRINT_COLOR_RESET "Desconectar Consola\n"
 				PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "clear: " PRINT_COLOR_RESET "Limpiar Mensajes\n");
+	}else if(string_equals_ignore_case(comando, "\0")){
 	}else
 		fprintf(stderr, PRINT_COLOR_YELLOW "El comando '%s' no es valido" PRINT_COLOR_RESET "\n", comando);
 
@@ -140,7 +142,10 @@ void escucharKernel(){
 				log_warning(logConsola, "No recibi nada");
 			break;
 		case 0:
-			fprintf(stderr, PRINT_COLOR_RED "El kernel se ha desconectado" PRINT_COLOR_RESET "\n");
+			if(flag_desconexion)
+				fprintf(stderr, PRINT_COLOR_BLUE "El kernel se ha desconectado" PRINT_COLOR_RESET "\n");
+			else
+				fprintf(stderr, PRINT_COLOR_RED "El kernel se ha desconectado" PRINT_COLOR_RESET "\n");
 			log_trace(logConsola, "La desconecto el kernel");
 			close(socket_kernel);
 			socket_kernel = 0;

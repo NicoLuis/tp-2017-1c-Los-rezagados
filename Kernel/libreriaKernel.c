@@ -50,7 +50,7 @@ void inicializarSemaforosYVariables(char** ids, char** valores, char** shared_va
 		t_VariableCompartida* variable = malloc(sizeof(t_VariableCompartida));
 		variable->nombre = string_substring(shared_vars[i], 1, string_length(shared_vars[i])-1);
 		variable->valor = 0;
-		log_info(logKernel, "shared_vars[CPU %d] %s", i, variable->nombre);
+		log_info(logKernel, "shared_vars[%d] %s", i, variable->nombre);
 		list_add(lista_variablesCompartidas, variable);
 	}
 	sem_init(&sem_gradoMp, 0, gradoMultiprogramacion);
@@ -170,8 +170,8 @@ t_PCB* recibir_pcb(int socket_cpu, t_msg* msgRecibido, bool flag_bloqueo){
 	bool _esCPU2(t_infosocket* aux){
 		return aux->socket == socket_cpu;
 	}
-	log_trace(logKernel, " [CPU %d] Recibi PCB", socket_cpu);
 	t_PCB* pcb = desserealizarPCB(msgRecibido->data);
+	log_trace(logKernel, " [CPU %d | PID %d] Recibi PCB", socket_cpu, pcb->pid);
 	_lockLista_PCB_cpu();
 	list_remove_and_destroy_by_condition(lista_PCB_cpu, (void*) _esCPU2, free);
 	_unlockLista_PCB_cpu();
@@ -194,6 +194,7 @@ t_PCB* recibir_pcb(int socket_cpu, t_msg* msgRecibido, bool flag_bloqueo){
 void liberarCPU(t_cpu* cpu){
 	cpu->libre = true;
 	//pthread_mutex_unlock(&cpu->mutex);
+	log_trace(logKernel, " [CPU %d] Libero CPU", cpu->socket);
 	sem_post(&sem_cantCPUs);
 }
 
@@ -272,19 +273,19 @@ void escucharCPU(int socket_cpu) {
 
 		void _cargarEntradasxTabla(){
 
-			log_trace(logKernel, " [CPU %d] fdRecibido %d pidRecibido %d", socket_cpu, fdRecibido, pidRecibido);
+			log_trace(logKernel, " [CPU %d | PID %d] fdRecibido %d pidRecibido %d", socket_cpu, pcb->pid, fdRecibido, pidRecibido);
 
 			TablaProceso = list_find(lista_tabla_de_procesos, (void*) _buscarPid); //tabla proceso es una lista
 
 			if(TablaProceso == NULL){
-				log_trace(logKernel, " [CPU %d] no existe la tabla de este proceso", socket_cpu);
+				log_trace(logKernel, " [CPU %d | PID %d] no existe la tabla de este proceso", socket_cpu, pcb->pid);
 
 				// terminar??
 			} else {
 				entradaProcesoBuscado = list_find(TablaProceso->lista_entradas_de_proceso, (void*) _buscarFD); //tabla proceso es una lista
 
 				if(entradaProcesoBuscado == NULL){
-					log_trace(logKernel, " [CPU %d] no existe entrada de la tabla proceso que tenga a FD", socket_cpu);
+					log_trace(logKernel, " [CPU %d | PID %d] no existe entrada de la tabla proceso que tenga a FD", socket_cpu, pcb->pid);
 					// hacer algo??
 				} else {
 
@@ -295,17 +296,18 @@ void escucharCPU(int socket_cpu) {
 		}
 
 //-------------------------------------------------------------------------------
-
+		t_num exitcode;
 		switch(msgRecibido->tipoMensaje){
 
 
 
 		case FINALIZAR_PROGRAMA:
-			log_trace(logKernel, " [CPU %d] Recibi FINALIZAR_PROGRAMA de CPU", socket_cpu);
+			log_trace(logKernel, " [CPU %d | PID %d] Recibi FINALIZAR_PROGRAMA de CPU", socket_cpu, pcb->pid);
 			flag_finalizado = true;
 			//no break
 		case ENVIO_PCB:		// si me devuelve el PCB es porque fue la ultima instruccion
-			pcb = recibir_pcb(socket_cpu, msgRecibido, 0);
+			exitcode = 0;
+			t_PCB* pcbRecibido = recibir_pcb(socket_cpu, msgRecibido, 0);
 			if(flag_finalizado){
 				_lockLista_PCB_consola();
 				t_infosocket* info = list_remove_by_condition(lista_PCB_consola, (void*) _esPid);
@@ -314,24 +316,29 @@ void escucharCPU(int socket_cpu) {
 				list_remove_and_destroy_by_condition(lista_PCB_cpu, (void*) _esPid, free);
 				_unlockLista_PCB_cpu();
 				if(info == NULL)
-					log_trace(logKernel, " [CPU %d] No se encuentra consola asociada a pid %d", socket_cpu, pcb->pid);
+					log_trace(logKernel, " [CPU %d | PID %d] No se encuentra consola asociada", socket_cpu, pcb->pid);
 				else
 					msg_enviar_separado(FINALIZAR_PROGRAMA, sizeof(t_pid), &info->pidPCB, info->socket);
 				sem_post(&sem_gradoMp);
 				free(info);
-				finalizarPid(pcb->pid, 0);
-				if((int)pcb->exitCode > 0){
-					pcb->exitCode = 0;
-					_ponerEnCola(pcb->pid, cola_Exit, mutex_Exit);
-					liberarPCB(pcb, true);
-				}
+				finalizarPid(pcb->pid);
 			}
+
 			_lockLista_PCBs();
-			if(list_remove_by_condition(lista_PCBs, (void*) _es_PCB) == NULL) log_warning(logKernel, " [CPU %d] No se encuentra pcb en ENVIO_PCB", socket_cpu);
-			list_add(lista_PCBs, pcb);
+			pcb = list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
+			if(pcb == NULL) log_warning(logKernel, " [CPU %d | PID %d] No se encuentra pcb en ENVIO_PCB", socket_cpu, pcb->pid);
+			else if(pcb->exitCode != SIN_ASIGNAR){
+				exitcode = pcb->exitCode;
+				pcbRecibido->exitCode = exitcode;
+			}
+			liberarPCB(pcb, 0);
+			list_add(lista_PCBs, pcbRecibido);
 			_unlockLista_PCBs();
-			if(!flag_finalizado){
-				_ponerEnCola(pcb->pid, cola_Ready, mutex_Ready);
+
+			if(flag_finalizado)
+				setearExitCode(pcbRecibido->pid, exitcode);
+			else{
+				_ponerEnCola(pcbRecibido->pid, cola_Ready, mutex_Ready);
 				sem_post(&sem_cantColaReady);
 			}
 			liberarCPU(cpuUsada);
@@ -342,7 +349,7 @@ void escucharCPU(int socket_cpu) {
 
 		case 0: case FIN_CPU:
 			fprintf(stderr, PRINT_COLOR_YELLOW "La cpu %d se ha desconectado" PRINT_COLOR_RESET "\n", socket_cpu);
-			log_trace(logKernel, " [CPU %d] Se desconecto la cpu", socket_cpu);
+			log_trace(logKernel, " [CPU %d | PID %d] Se desconecto la CPU", socket_cpu, pcb->pid);
 			//pthread_mutex_unlock(&cpuUsada->mutex);
 			//si la cpu se desconecto la saco de la lista
 			_lockLista_cpus();
@@ -366,7 +373,7 @@ void escucharCPU(int socket_cpu) {
 				}
 				list_iterate(lista_variablesSemaforo, (void*) _sacarDeSemaforos);
 				_lockLista_PCBs();
-				if(list_remove_by_condition(lista_PCBs, (void*) _es_PCB) == NULL) log_warning(logKernel, " [CPU %d] No se encuentra pcb en FIN_CPU", socket_cpu);
+				if(list_remove_by_condition(lista_PCBs, (void*) _es_PCB) == NULL) log_warning(logKernel, " [CPU %d | PID %d] No se encuentra pcb en FIN_CPU", socket_cpu, pcb->pid);
 				list_add(lista_PCBs, pcb);
 				_unlockLista_PCBs();
 			}
@@ -375,37 +382,42 @@ void escucharCPU(int socket_cpu) {
 			break;
 
 
+
+
+		case DESCONECTAR:
 		case EXCEPCION_MEMORIA:
 		case STACKOVERFLOW:
 		case ERROR:
-			log_trace(logKernel, " [CPU %d] Recibi ERROR de CPU", socket_cpu);
-			pcb = recibir_pcb(socket_cpu, msgRecibido, 0);
+			log_trace(logKernel, " [CPU %d | PID %d] Recibi ERROR de CPU", socket_cpu, pcb->pid);
+			t_PCB* pcbRecibido2 = recibir_pcb(socket_cpu, msgRecibido, 0);
 			_lockLista_PCB_consola();
 			t_infosocket* info = list_remove_by_condition(lista_PCB_consola, (void*) _esPid);
 			_unlockLista_PCB_consola();
-			finalizarPid(pcb->pid, 0);
-			if((int)pcb->exitCode > 0){
+			finalizarPid(pcb->pid);
+			if(pcb->exitCode == SIN_ASIGNAR){
 				switch(msgRecibido->tipoMensaje){
 				case EXCEPCION_MEMORIA:
-					pcb->exitCode = ERROR_EXCEPCION_MEMORIA;
+					pcbRecibido2->exitCode = ERROR_EXCEPCION_MEMORIA;
 					break;
 				case STACKOVERFLOW:
-					pcb->exitCode = ERROR_STACKOVERFLOW;
+					pcbRecibido2->exitCode = ERROR_STACKOVERFLOW;
 					break;
 				case ERROR:
-					pcb->exitCode = ERROR_SCRIPT;
+					pcbRecibido2->exitCode = ERROR_SCRIPT;
 					break;
 				}
 			}
-			if((int)pcb->exitCode < 0){
-				_ponerEnCola(pcb->pid, cola_Exit, mutex_Exit);
-				liberarPCB(pcb, true);
-			}
 			_lockLista_PCBs();
-			if(list_remove_by_condition(lista_PCBs, (void*) _es_PCB) == NULL) log_warning(logKernel, " [CPU %d] No se encuentra pcb en ERROR", socket_cpu);
-			list_add(lista_PCBs, pcb);
+			pcb = list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
+			if(pcb == NULL) log_warning(logKernel, " [CPU %d | PID %d] No se encuentra pcb en ERROR", socket_cpu, pcb->pid);
+			else if(pcb->exitCode != SIN_ASIGNAR){
+				exitcode = pcb->exitCode;
+				pcbRecibido2->exitCode = exitcode;
+			}
+			liberarPCB(pcb, true);
+			list_add(lista_PCBs, pcbRecibido2);
 			_unlockLista_PCBs();
-			msg_enviar_separado(ERROR, sizeof(t_pid), &pcb->pid, info->socket);
+			msg_enviar_separado(ERROR, sizeof(t_pid), &pcbRecibido2->pid, info->socket);
 			sem_post(&sem_gradoMp);
 			liberarCPU(cpuUsada);
 			break;
@@ -414,7 +426,7 @@ void escucharCPU(int socket_cpu) {
 
 
 		case GRABAR_VARIABLE_COMPARTIDA:
-			log_trace(logKernel, " [CPU %d] Recibi GRABAR_VARIABLE_COMPARTIDA de CPU", socket_cpu);
+			log_trace(logKernel, " [CPU %d | PID %d] Recibi GRABAR_VARIABLE_COMPARTIDA de CPU", socket_cpu, pcb->pid);
 			memcpy(&tamanioNombre, msgRecibido->data, sizeof(t_num));
 			offset += sizeof(t_num);
 			varCompartida->nombre = malloc(tamanioNombre+1);
@@ -422,11 +434,11 @@ void escucharCPU(int socket_cpu) {
 			varCompartida->nombre[tamanioNombre] = '\0';
 			offset += tamanioNombre;
 			memcpy(&varCompartida->valor, msgRecibido->data + offset, sizeof(t_valor_variable));
-			log_info(logKernel, " [CPU %d] Variable %s, valor %d", socket_cpu, varCompartida->nombre, varCompartida->valor);
+			log_info(logKernel, " [CPU %d | PID %d] Variable %s, valor %d", socket_cpu, pcb->pid, varCompartida->nombre, varCompartida->valor);
 
 			t_VariableCompartida* varBuscada = list_find(lista_variablesCompartidas, (void*) _buscar_VarComp);
 			if (varBuscada == NULL){
-				log_error(logKernel, " [CPU %d] Error no encontre VALOR_VARIABLE_COMPARTIDA", socket_cpu);
+				log_error(logKernel, " [CPU %d | PID %d] Error no encontre VALOR_VARIABLE_COMPARTIDA", socket_cpu, pcb->pid);
 				t_num exitCode = VARIABLE_COMPARTIDA_INEXISTENTE;
 				msg_enviar_separado(ERROR, sizeof(t_num), &exitCode, socket_cpu);
 			}else{
@@ -442,20 +454,20 @@ void escucharCPU(int socket_cpu) {
 
 
 		case VALOR_VARIABLE_COMPARTIDA:
-			log_trace(logKernel, " [CPU %d] Recibi VALOR_VARIABLE_COMPARTIDA de CPU", socket_cpu);
+			log_trace(logKernel, " [CPU %d | PID %d] Recibi VALOR_VARIABLE_COMPARTIDA de CPU", socket_cpu, pcb->pid);
 			memcpy(&tamanioNombre, &msgRecibido->longitud, sizeof(t_num));
 			varCompartida->nombre = malloc(tamanioNombre+1);
 			memcpy(varCompartida->nombre, msgRecibido->data, tamanioNombre);
 			varCompartida->nombre[tamanioNombre] = '\0';
-			log_info(logKernel, " [CPU %d] Variable %s", socket_cpu, varCompartida->nombre);
+			log_info(logKernel, " [CPU %d | PID %d] Variable %s", socket_cpu, pcb->pid, varCompartida->nombre);
 
 			t_VariableCompartida* varBuscad = list_find(lista_variablesCompartidas, (void*) _buscar_VarComp);
 			if (varBuscad == NULL){
-				log_error(logKernel, " [CPU %d] Error no encontre VALOR_VARIABLE_COMPARTIDA", socket_cpu);
+				log_error(logKernel, " [CPU %d | PID %d] Error no encontre VALOR_VARIABLE_COMPARTIDA", socket_cpu, pcb->pid);
 				t_num exitCode = VARIABLE_COMPARTIDA_INEXISTENTE;
 				msg_enviar_separado(ERROR, sizeof(t_num), &exitCode, socket_cpu);
 			}else{
-				log_info(logKernel, " [CPU %d] Valor %d", socket_cpu, varBuscad->valor);
+				log_info(logKernel, " [CPU %d | PID %d] Valor %d", socket_cpu, pcb->pid, varBuscad->valor);
 				msg_enviar_separado(VALOR_VARIABLE_COMPARTIDA, sizeof(t_valor_variable), &varBuscad->valor, socket_cpu);
 				_sumarCantOpPriv(pcb->pid);
 			}
@@ -467,22 +479,22 @@ void escucharCPU(int socket_cpu) {
 
 
 		case SIGNAL:
-			log_trace(logKernel, " [CPU %d] Recibi SIGNAL de CPU", socket_cpu);
+			log_trace(logKernel, " [CPU %d | PID %d] Recibi SIGNAL de CPU", socket_cpu, pcb->pid);
 			memcpy(&tamanioNombre, &msgRecibido->longitud, sizeof(t_num));
 			varSemaforo->nombre = malloc(tamanioNombre+1);
 			memcpy(varSemaforo->nombre, msgRecibido->data, tamanioNombre);
 			varSemaforo->nombre[tamanioNombre] = '\0';
-			log_info(logKernel, " [CPU %d] Semaforo %s", socket_cpu, varSemaforo->nombre);
+			log_info(logKernel, " [CPU %d | PID %d] Semaforo %s", socket_cpu, pcb->pid, varSemaforo->nombre);
 
 			pthread_mutex_lock(&mutex_listaSemaforos);
 			t_VariableSemaforo* semBuscado = list_remove_by_condition(lista_variablesSemaforo, (void*) _buscar_VarSem);
 			if (semBuscado == NULL){
-				log_error(logKernel, " [CPU %d] Error no encontre SEMAFORO %s", socket_cpu, varSemaforo->nombre);
+				log_error(logKernel, " [CPU %d | PID %d] Error no encontre SEMAFORO %s", socket_cpu, pcb->pid, varSemaforo->nombre);
 				t_num exitCode = SEMAFORO_INEXISTENTE;
 				msg_enviar_separado(ERROR, sizeof(t_num), &exitCode, socket_cpu);
 			}else{
 				semBuscado->valorSemaforo++;
-				log_trace(logKernel, " [CPU %d] Valor %d", socket_cpu, semBuscado->valorSemaforo);
+				log_trace(logKernel, " [CPU %d | PID %d] Valor %d", socket_cpu, pcb->pid, semBuscado->valorSemaforo);
 				if(semBuscado->valorSemaforo <= 0){
 					t_pid pidADesbloquear;
 					void* tmp = malloc(sizeof(t_pid));
@@ -491,11 +503,12 @@ void escucharCPU(int socket_cpu) {
 					pthread_mutex_unlock(&semBuscado->mutex_colaBloqueados);
 					memcpy(&pidADesbloquear, tmp, sizeof(t_pid));
 					free(tmp);
-					log_trace(logKernel, " [CPU %d] Desbloqueo pid %d", socket_cpu, pidADesbloquear);
+					log_trace(logKernel, " [CPU %d | PID %d] Desbloqueo proceso %d", socket_cpu, pcb->pid, pidADesbloquear);
 
-					_sacarDeCola(pidADesbloquear, cola_Block, mutex_Block);
-					_ponerEnCola(pidADesbloquear, cola_Ready, mutex_Ready);
-					sem_post(&sem_cantColaReady);
+					if(_sacarDeCola(pidADesbloquear, cola_Block, mutex_Block) == pidADesbloquear){
+						_ponerEnCola(pidADesbloquear, cola_Ready, mutex_Ready);
+						sem_post(&sem_cantColaReady);
+					}
 				}
 				list_add(lista_variablesSemaforo, semBuscado);
 				msg_enviar_separado(SIGNAL, 0, 0, socket_cpu);
@@ -510,22 +523,26 @@ void escucharCPU(int socket_cpu) {
 
 
 		case WAIT:
-			log_trace(logKernel, " [CPU %d] Recibi WAIT de CPU", socket_cpu);
+			log_trace(logKernel, " [CPU %d | PID %d] Recibi WAIT de CPU", socket_cpu, pcb->pid);
 			memcpy(&tamanioNombre, &msgRecibido->longitud, sizeof(t_num));
 			varSemaforo->nombre = malloc(tamanioNombre+1);
 			memcpy(varSemaforo->nombre, msgRecibido->data, tamanioNombre);
 			varSemaforo->nombre[tamanioNombre] = '\0';
-			log_info(logKernel, " [CPU %d] Semaforo %s", socket_cpu, varSemaforo->nombre);
+			log_info(logKernel, " [CPU %d | PID %d] Semaforo %s", socket_cpu, pcb->pid, varSemaforo->nombre);
 
 			pthread_mutex_lock(&mutex_listaSemaforos);
 			t_VariableSemaforo* semBuscad = list_remove_by_condition(lista_variablesSemaforo, (void*) _buscar_VarSem);
 			if (semBuscad == NULL){
-				log_error(logKernel, " [CPU %d] Error no encontre SEMAFORO %s", socket_cpu, varSemaforo->nombre);
+				log_error(logKernel, " [CPU %d | PID %d] Error no encontre SEMAFORO %s", socket_cpu, pcb->pid, varSemaforo->nombre);
 				t_num exitCode = SEMAFORO_INEXISTENTE;
 				msg_enviar_separado(ERROR, sizeof(t_num), &exitCode, socket_cpu);
-			}else{
+			}else if(pcb->exitCode != SIN_ASIGNAR){
+				msg_enviar_separado(WAIT, sizeof(t_num), &semBuscad->valorSemaforo, socket_cpu);
+				list_add(lista_variablesSemaforo, semBuscad);
+			}
+			else{
 				semBuscad->valorSemaforo--;
-				log_trace(logKernel, " [CPU %d] Valor semaforo %s %d", socket_cpu, semBuscad->nombre, semBuscad->valorSemaforo);
+				log_trace(logKernel, " [CPU %d | PID %d] Valor semaforo %s %d", socket_cpu, pcb->pid, semBuscad->nombre, semBuscad->valorSemaforo);
 				msg_enviar_separado(WAIT, sizeof(t_num), &semBuscad->valorSemaforo, socket_cpu);
 
 				if(semBuscad->valorSemaforo < 0){
@@ -534,23 +551,30 @@ void escucharCPU(int socket_cpu) {
 					pthread_mutex_lock(&semBuscad->mutex_colaBloqueados);
 					queue_push(semBuscad->colaBloqueados, tmp);
 					pthread_mutex_unlock(&semBuscad->mutex_colaBloqueados);
-					log_trace(logKernel, " [CPU %d] Bloqueo pid %d", socket_cpu, pcb->pid);
+					log_trace(logKernel, " [CPU %d | PID %d] Bloqueo proceso", socket_cpu, pcb->pid);
 					//recibo pcb
 					msg_destruir(msgRecibido);
 					msgRecibido = msg_recibir(socket_cpu);
 					if(msg_recibir_data(socket_cpu, msgRecibido) > 0){
-						pcb = recibir_pcb(socket_cpu, msgRecibido, 1);
+						t_PCB* pcbRecibido = recibir_pcb(socket_cpu, msgRecibido, 1);
 						_lockLista_PCBs();
-						if(list_remove_by_condition(lista_PCBs, (void*) _es_PCB) == NULL) log_warning(logKernel, " [CPU %d] No se encuentra pcb en WAIT", socket_cpu);
-						list_add(lista_PCBs, pcb);
+						pcb = list_remove_by_condition(lista_PCBs, (void*) _es_PCB);
+						if(pcb == NULL) log_warning(logKernel, " [CPU %d | PID %d] No se encuentra pcb en WAIT", socket_cpu, pcb->pid);
+						else if(pcb->exitCode != SIN_ASIGNAR){
+							exitcode = pcb->exitCode;
+							pcbRecibido2->exitCode = exitcode;
+						}
+						liberarPCB(pcb, true);
+						list_add(lista_PCBs, pcbRecibido);
 						_unlockLista_PCBs();
 						liberarCPU(cpuUsada);
+						_sumarCantOpPriv(pcbRecibido->pid);
 					}else
 						log_warning(logKernel, "No recibi nada", socket_cpu);
-				}
+				}else
+					_sumarCantOpPriv(pcb->pid);
 
 				list_add(lista_variablesSemaforo, semBuscad);
-				_sumarCantOpPriv(pcb->pid);
 			}
 			pthread_mutex_unlock(&mutex_listaSemaforos);
 			free(varSemaforo->nombre);
@@ -561,10 +585,10 @@ void escucharCPU(int socket_cpu) {
 
 
 		case ASIGNACION_MEMORIA:
-			log_trace(logKernel, " [CPU %d] Recibi ASIGNACION_MEMORIA de CPU", socket_cpu);
+			log_trace(logKernel, " [CPU %d | PID %d] Recibi ASIGNACION_MEMORIA de CPU", socket_cpu, pcb->pid);
 			t_num cantBytes;
 			memcpy(&cantBytes, msgRecibido->data, sizeof(t_valor_variable));
-			log_trace(logKernel, " [CPU %d] ASIGNACION_MEMORIA %d bytes", socket_cpu, cantBytes);
+			log_trace(logKernel, " [CPU %d | PID %d] ASIGNACION_MEMORIA %d bytes", socket_cpu, pcb->pid, cantBytes);
 
 			/*//recibo pcb
 			tmpsize = msgRecibido->longitud - sizeof(t_valor_variable);
@@ -592,7 +616,7 @@ void escucharCPU(int socket_cpu) {
 
 
 			_lockLista_PCBs();
-			if(list_remove_by_condition(lista_PCBs, (void*) _es_PCB) == NULL) log_warning(logKernel, " [CPU %d] No se encuentra pcb en ASIGNACION_MEMORIA", socket_cpu);
+			if(list_remove_by_condition(lista_PCBs, (void*) _es_PCB) == NULL) log_warning(logKernel, " [CPU %d | PID %d] No se encuentra pcb en ASIGNACION_MEMORIA", socket_cpu, pcb->pid);
 			list_add(lista_PCBs, pcb);
 			_unlockLista_PCBs();
 
@@ -603,10 +627,10 @@ void escucharCPU(int socket_cpu) {
 
 
 		case LIBERAR:
-			log_trace(logKernel, " [CPU %d] Recibi LIBERAR de CPU", socket_cpu);
+			log_trace(logKernel, " [CPU %d | PID %d] Recibi LIBERAR de CPU", socket_cpu, pcb->pid);
 			t_puntero posicion;
 			memcpy(&posicion, msgRecibido->data, msgRecibido->longitud);
-			log_trace(logKernel, " [CPU %d] LIBERAR posicion %d", socket_cpu, posicion);
+			log_trace(logKernel, " [CPU %d | PID %d] LIBERAR posicion %d", socket_cpu, pcb->pid, posicion);
 
 			if( liberarMemoriaHeap(posicion, pcb) < 0 ){
 				t_num exitCode = ERROR_EXCEPCION_MEMORIA;
@@ -616,7 +640,7 @@ void escucharCPU(int socket_cpu) {
 				msg_enviar_separado(LIBERAR, 0, 0, socket_cpu);
 
 			_lockLista_PCBs();
-			if(list_remove_by_condition(lista_PCBs, (void*) _es_PCB) == NULL) log_warning(logKernel, " [CPU %d] No se encuentra pcb en LIBERAR", socket_cpu);
+			if(list_remove_by_condition(lista_PCBs, (void*) _es_PCB) == NULL) log_warning(logKernel, " [CPU %d | PID %d] No se encuentra pcb en LIBERAR", socket_cpu, pcb->pid);
 			list_add(lista_PCBs, pcb);
 			_unlockLista_PCBs();
 
@@ -628,7 +652,7 @@ void escucharCPU(int socket_cpu) {
 
 
 		case MOVER_ANSISOP:
-			log_trace(logKernel, " [CPU %d] Recibi MOVER_ANSISOP de CPU", socket_cpu);
+			log_trace(logKernel, " [CPU %d | PID %d] Recibi MOVER_ANSISOP de CPU", socket_cpu, pcb->pid);
 			t_valor_variable cursorRecibido;
 
 			memcpy(&fdRecibido, msgRecibido->data, sizeof(t_descriptor_archivo));
@@ -642,7 +666,7 @@ void escucharCPU(int socket_cpu) {
 			if(entradaProcesoBuscado != NULL)
 			if(entradaGlobalBuscada != NULL){
 				entradaProcesoBuscado->cursor = cursorRecibido;
-				log_trace(logKernel, " [CPU %d] se seteo el cursor", socket_cpu);
+				log_trace(logKernel, " [CPU %d | PID %d] se seteo el cursor", socket_cpu, pcb->pid);
 				msg_enviar_separado(MOVER_ANSISOP,0,0,socket_cpu);
 				error = 0;
 			}
@@ -658,7 +682,7 @@ void escucharCPU(int socket_cpu) {
 		case LEER_ANSISOP:
 			_lockFS();
 
-			log_trace(logKernel, " [CPU %d] Recibi LEER_ANSISOP de CPU", socket_cpu);
+			log_trace(logKernel, " [CPU %d | PID %d] Recibi LEER_ANSISOP de CPU", socket_cpu, pcb->pid);
 			t_valor_variable tamanio;
 
 			memcpy(&fdRecibido, msgRecibido->data + offset, tmpsize = sizeof(t_descriptor_archivo));
@@ -702,11 +726,11 @@ void escucharCPU(int socket_cpu) {
 
 					}else{
 						msg_destruir(msgDatosObtenidos);
-						log_error(logKernel, " [CPU %d] Error al leer", socket_cpu);
+						log_error(logKernel, " [CPU %d | PID %d] Error al leer", socket_cpu, pcb->pid);
 						msg_enviar_separado(ERROR, sizeof(t_num), &msgDatosObtenidos->tipoMensaje, socket_cpu);
 					}
 				}else{
-					log_error(logKernel, " [CPU %d] No tiene permisos de escritura"), socket_cpu;
+					log_error(logKernel, " [CPU %d | PID %d] No tiene permisos de escritura"), socket_cpu, pcb->pid;
 
 					t_num exitCode = LECTURA_SIN_PERMISOS;
 					msg_enviar_separado(ERROR, sizeof(t_num), &exitCode, socket_cpu);
@@ -723,7 +747,7 @@ void escucharCPU(int socket_cpu) {
 
 		case ESCRIBIR_FD:
 
-			log_trace(logKernel, " [CPU %d] Recibi ESCRIBIR_FD de CPU", socket_cpu);
+			log_trace(logKernel, " [CPU %d | PID %d] Recibi ESCRIBIR_FD de CPU", socket_cpu, pcb->pid);
 			t_valor_variable sizeInformacion;
 
 			memcpy(&fdRecibido, msgRecibido->data + offset, tmpsize = sizeof(t_descriptor_archivo));
@@ -737,12 +761,12 @@ void escucharCPU(int socket_cpu) {
 			offset += tmpsize;
 
 			if(fdRecibido == 1){
-				log_trace(logKernel, " [CPU %d] Imprimo por consola: %s", socket_cpu, datos);
+				log_trace(logKernel, " [CPU %d | PID %d] Imprimo por consola: %s", socket_cpu, pcb->pid, datos);
 				_lockLista_PCB_consola();
 				t_infosocket* info = list_find(lista_PCB_consola, (void*) _esPid);
 				_unlockLista_PCB_consola();
 				if(info == NULL){
-					log_trace(logKernel, " [CPU %d] No se encuentra consola asociada a pid %d", socket_cpu, pcb->pid);
+					log_trace(logKernel, " [CPU %d | PID %d] No se encuentra consola asociada", socket_cpu, pcb->pid);
 					t_num exitCode = DESCONEXION_CONSOLA;
 					msg_enviar_separado(ERROR, sizeof(t_num), &exitCode, socket_cpu);
 				}else{
@@ -753,7 +777,7 @@ void escucharCPU(int socket_cpu) {
 			}else{
 
 				_lockFS();
-				log_trace(logKernel, " [CPU %d] Escribo en fd %d: %s", socket_cpu, fdRecibido, datos);
+				log_trace(logKernel, " [CPU %d | PID %d] Escribo en fd %d: %s", socket_cpu, pcb->pid, fdRecibido, datos);
 
 				_cargarEntradasxTabla();
 
@@ -783,21 +807,18 @@ void escucharCPU(int socket_cpu) {
 						t_msg* msgRecibido2 = msg_recibir(socket_fs);
 
 						if(msgRecibido2->tipoMensaje == GUARDAR_DATOS){
-							log_trace(logKernel, " [CPU %d] Escribio bien", socket_cpu);
+							log_trace(logKernel, " [CPU %d | PID %d] Escribio bien", socket_cpu, pcb->pid);
 							msg_enviar_separado(ESCRIBIR_FD, 0, 0, socket_cpu);
 						}else{
-							log_error(logKernel, " [CPU %d] Error al escribir", socket_cpu);
+							log_error(logKernel, " [CPU %d | PID %d] Error al escribir", socket_cpu, pcb->pid);
 							t_num exitCode = ARCHIVO_INEXISTENTE;
 							msg_enviar_separado(ERROR, sizeof(t_num), &exitCode, socket_cpu);
 						}
-						log_trace(logKernel, " buffer");
 						free(buffer);
-						log_trace(logKernel, " msg_destruir");
 						msg_destruir(msgRecibido2);
-						log_trace(logKernel, " msg_destruir");
 
 					}else{
-						log_error(logKernel, " [CPU %d] No tiene permisos de escritura", socket_cpu);
+						log_error(logKernel, " [CPU %d | PID %d] No tiene permisos de escritura", socket_cpu, pcb->pid);
 						t_num exitCode = ESCRITURA_SIN_PERMISOS;
 						msg_enviar_separado(ERROR, sizeof(t_num), &exitCode, socket_cpu);
 					}
@@ -805,9 +826,7 @@ void escucharCPU(int socket_cpu) {
 				_unlockFS();
 			}
 			_sumarCantOpPriv(pcb->pid);
-			log_trace(logKernel, " datos");
 			free(datos);
-			log_trace(logKernel, " datos");
 			//sem_post(&cpuUsada->semaforo);
 			break;
 
@@ -816,7 +835,7 @@ void escucharCPU(int socket_cpu) {
 
 		case ABRIR_ANSISOP:
 			_lockFS();
-			log_trace(logKernel, " [CPU %d] Recibi la siguiente operacion ABRIR_ANSISOP de CPU", socket_cpu);
+			log_trace(logKernel, " [CPU %d | PID %d] Recibi la siguiente operacion ABRIR_ANSISOP de CPU", socket_cpu, pcb->pid);
 			t_direccion_archivo pathArchivo;
 			t_num longitudPath;
 			t_banderas flags;
@@ -878,7 +897,7 @@ void escucharCPU(int socket_cpu) {
 			t_descriptor_archivo indiceActualGlobal;
 
 			if(entradaGlobalOld == NULL){
-				log_trace(logKernel, " [CPU %d] Se abre el archivo por primera vez", socket_cpu);
+				log_trace(logKernel, " [CPU %d | PID %d] Se abre el archivo por primera vez", socket_cpu, pcb->pid);
 				// si es nulo significa qe se abre el archivo por primera vez
 				t_entrada_GlobalFile * entradaGlobalNew = malloc(sizeof(t_entrada_GlobalFile));
 				entradaGlobalNew->FilePath = malloc(longitudPath + 1);
@@ -945,7 +964,7 @@ void escucharCPU(int socket_cpu) {
 
 
 			_lockFS();
-			log_trace(logKernel, " [CPU %d] Recibi la siguiente operacion BORRAR_ANSISOP de CPU", socket_cpu);
+			log_trace(logKernel, " [CPU %d | PID %d] Recibi la siguiente operacion BORRAR_ANSISOP de CPU", socket_cpu, pcb->pid);
 
 			memcpy(&fdRecibido, msgRecibido->data, sizeof(t_descriptor_archivo));
 			memcpy(&pidRecibido, msgRecibido->data + sizeof(t_descriptor_archivo), sizeof(t_pid));
@@ -961,7 +980,7 @@ void escucharCPU(int socket_cpu) {
 					list_remove_by_condition(TablaProceso->lista_entradas_de_proceso, (void*) _esFD);
 					msg_enviar_separado(BORRAR,0,0,socket_cpu);
 				}else{
-					log_trace(logKernel, " [CPU %d] el archivo esta siendo usado por %d procesos, no se puede borrar", socket_cpu, entradaGlobalBuscada->Open);
+					log_trace(logKernel, " [CPU %d | PID %d] el archivo esta siendo usado por %d procesos, no se puede borrar", socket_cpu, entradaGlobalBuscada->Open);
 					msg_enviar_separado(ERROR,0,0,socket_cpu);
 				}
 			}
@@ -974,7 +993,7 @@ void escucharCPU(int socket_cpu) {
 
 		case CERRAR_ANSISOP:
 
-			log_trace(logKernel, "[CPU %d] Recibi la siguiente operacion CERRAR_ANSISOP de CPU", socket_cpu);
+			log_trace(logKernel, "[CPU %d | PID %d] Recibi la siguiente operacion CERRAR_ANSISOP de CPU", socket_cpu, pcb->pid);
 
 			memcpy(&fdRecibido, msgRecibido->data, sizeof(t_descriptor_archivo));
 			memcpy(&pidRecibido, msgRecibido->data + sizeof(t_descriptor_archivo), sizeof(t_pid));
@@ -1099,11 +1118,8 @@ void atender_consola(int socket_consola){
 	void _finalizarPIDs(t_infosocket* i){
 		if(i->socket == socket_consola){
 			int pidAux = i->pidPCB;
-			log_trace(logKernel, "alizo");
-			finalizarPid(pidAux, 1);
-			log_trace(logKernel, "la");
+			finalizarPid(pidAux);
 			setearExitCode(pidAux, DESCONEXION_CONSOLA);
-			log_trace(logKernel, "gua");
 		}
 	}
 
@@ -1143,13 +1159,14 @@ void atender_consola(int socket_consola){
 
 		free(script);
 		break;
+
 	case FINALIZAR_PROGRAMA:
 		//msg_recibir_data(socket_consola, msgRecibido);
 		log_trace(logKernel, "Recibi FINALIZAR_PROGRAMA de consola %d", socket_consola);
 		t_pid pidAFinalizar;
 		memcpy(&pidAFinalizar, msgRecibido->data, sizeof(t_pid));
 		log_trace(logKernel, "FINALIZAR_PROGRAMA pid %d", pidAFinalizar);
-		finalizarPid(pidAFinalizar, 0);
+		finalizarPid(pidAFinalizar);
 		setearExitCode(pidAFinalizar, COMANDO_FINALIZAR);
 		break;
 
@@ -1159,18 +1176,14 @@ void atender_consola(int socket_consola){
 		_lockLista_PCB_consola();
 		list_iterate(lista_PCB_consola, (void*) _finalizarPIDs);
 		_unlockLista_PCB_consola();
-		log_trace(logKernel, "itere");
 
 		//si la consola se desconecto la saco de la lista
 		bool _esConsola(int socketC){ return socketC == socket_consola; }
 		_lockLista_Consolas();
 		list_remove_and_destroy_by_condition(lista_consolas, (void*) _esConsola, free);
 		_unlockLista_Consolas();
-		log_trace(logKernel, "close");
 		close(socket_consola);
-		log_trace(logKernel, "close2");
 		FD_CLR(socket_consola, &fdsMaestro);
-		log_trace(logKernel, "close3");
 		break;
 
 	}
@@ -1217,10 +1230,12 @@ void consolaKernel(){
 					if(cantPags == stackSize)
 						cantPags = 0;
 
-					if((int)pcbA->exitCode > 0)
+					if(pcbA->exitCode == SIN_ASIGNAR)
 						exitCode = " - ";
+					else if(pcbA->exitCode == FINALIZO_CORRECTAMENTE)
+						exitCode = "0";
 					else
-						exitCode = string_from_format("%d", (int)pcbA->exitCode);
+						exitCode = string_from_format("-%d", pcbA->exitCode);
 					if(_estaEnCola(pcbA->pid, cola_New, mutex_New))
 						cola = "NEW";
 					else if(_estaEnCola(pcbA->pid, cola_Ready, mutex_Ready))
@@ -1411,11 +1426,11 @@ void consolaKernel(){
 			if(pcbKill == NULL)
 				fprintf(stderr, PRINT_COLOR_YELLOW "No existe el PID %d" PRINT_COLOR_RESET "\n", pidKill);
 			else{
-				if((int)pcbKill->exitCode <= 0){
+				if(pcbKill->exitCode != SIN_ASIGNAR){
 					log_trace(logKernel,  "El PID %d ya finalizo", pidKill);
 					fprintf(stderr, PRINT_COLOR_YELLOW "El PID %d ya finalizo" PRINT_COLOR_RESET "\n", pidKill);
 				}else{
-					finalizarPid(pidKill, 0);
+					finalizarPid(pidKill);
 					setearExitCode(pidKill, COMANDO_FINALIZAR);
 					fprintf(stderr, PRINT_COLOR_BLUE "Finalizo PID %d" PRINT_COLOR_RESET "\n", pidKill);
 				}
@@ -1521,40 +1536,11 @@ void terminarKernel(){			//aca libero todos
 
 
 
-void finalizarPid(t_pid pid, int abortiva){
-	log_trace(logKernel, "Finalizo pid %d", pid);
+void finalizarPid(t_pid pid){
+	log_trace(logKernel, "Finalizando pid %d", pid);
 	int _buscarPID(t_infosocket* i){
 		return i->pidPCB == pid;
 	}
-	bool flag_hagoesto = 1;
-
-	int i=0, sizeLista = list_size(lista_tabla_de_procesos);
-	for(;i < sizeLista;i++){
-		t_tabla_proceso* tablaProceso = list_get(lista_tabla_de_procesos, i);
-		if(tablaProceso->pid == pid){
-			list_remove(lista_tabla_de_procesos, i);
-			int j=0, sizeLista2 = list_size(tablaProceso->lista_entradas_de_proceso);
-			for(; j<sizeLista2 ;j++){
-				t_entrada_proceso* entradaProcesoBuscado = list_remove(tablaProceso->lista_entradas_de_proceso, j);
-				int _buscarPorIndice(t_entrada_GlobalFile* entradaGlobal){return entradaGlobal->indiceGlobalTable == entradaProcesoBuscado->referenciaGlobalTable;}
-
-				pthread_mutex_lock(&mutex_tablaGlobal);
-				t_entrada_GlobalFile* entradaGlobalBuscada = list_remove_by_condition(lista_tabla_global, (void*) _buscarPorIndice);
-				entradaGlobalBuscada->Open --;
-				if(entradaGlobalBuscada->Open == 0){
-					free(entradaGlobalBuscada);
-				} else {
-					list_add(lista_tabla_global, entradaGlobalBuscada);
-				}
-				pthread_mutex_unlock(&mutex_tablaGlobal);
-				free(entradaProcesoBuscado);
-			}
-			list_destroy(tablaProceso->lista_entradas_de_proceso);
-			free(tablaProceso);
-		}
-	}
-
-	list_remove_and_destroy_by_condition(lista_PCB_consola, (void*) _buscarPID, free);
 
 	t_infosocket* info;
 	_lockLista_PCB_cpu();
@@ -1562,51 +1548,26 @@ void finalizarPid(t_pid pid, int abortiva){
 	_unlockLista_PCB_cpu();
 	if(info == NULL){
 		log_info(logKernel, "No hay cpu ejecutando pid %d", pid);
-		_sacarDeCola(pid, cola_Block, mutex_Block);
-		if(_sacarDeCola(pid, cola_Ready, mutex_Ready) == pid){
-			sem_wait(&sem_cantColaReady);
+		if(_sacarDeCola(pid, cola_Block, mutex_Block) == pid){
+			_ponerEnCola(pid, cola_Ready, mutex_Ready);
+			sem_post(&sem_cantColaReady);
+		}else
+		if(_sacarDeCola(pid, cola_New, mutex_New) == pid){
+			_ponerEnCola(pid, cola_Ready, mutex_Ready);
+			sem_post(&sem_cantColaReady);
 		}
-	}else{
-		_sacarDeCola(pid, cola_Exec, mutex_Exec);
-		int _buscarCPU(t_cpu* c){
-			return c->socket == info->socket;
-		}
-		_lockLista_cpus();
-		t_cpu* cpu = list_find(lista_cpus, (void*) _buscarCPU);
-		_unlockLista_cpus();
-		if(cpu == NULL)
-			log_info(logKernel, "No se encuentra la cpu ejecutando pid %d", pid);
-		else{
-			flag_hagoesto = 0;
-			kill(cpu->pidProcesoCPU, SIGUSR2);
-			if(abortiva){
-				t_msg* msgR = msg_recibir(cpu->socket);
-				if(msgR->longitud > 0)
-					msg_recibir_data(cpu->socket, msgR);
-				_lockLista_PCB_cpu();
-				bool _esPid(t_infosocket* a){ return a->pidPCB == pid; }
-				list_remove_and_destroy_by_condition(lista_PCB_cpu, (void*) _esPid, free);
-				_unlockLista_PCB_cpu();
-				free(info);
-				liberarCPU(cpu);
-				flag_hagoesto = 1;
-			}
-		}
-	}
+		_ponerEnCola(pid, cola_Exit, mutex_Exit);
 
-
-	if(flag_hagoesto){
+		pthread_mutex_lock(&mutex_listaSemaforos);
 		void _sacarDeSemaforos(t_VariableSemaforo* sem){
 			t_pid encontrado = _sacarDeCola(pid, sem->colaBloqueados, sem->mutex_colaBloqueados);
 			if(encontrado == pid)
 				sem->valorSemaforo++;
 		}
 		list_iterate(lista_variablesSemaforo, (void*) _sacarDeSemaforos);
-
-		send(socket_memoria, &pid, sizeof(t_pid), 0);
-		msg_enviar_separado(FINALIZAR_PROGRAMA, 0, 0, socket_memoria);
-		sem_post(&sem_gradoMp);
+		pthread_mutex_unlock(&mutex_listaSemaforos);
 	}
+
 }
 
 void _lockLista_cpus(){

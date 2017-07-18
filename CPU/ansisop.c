@@ -8,7 +8,6 @@
 #include "ansisop.h"
 #include "pcb.h"
 
-
 t_puntero definirVariable(t_nombre_variable identificador_variable){
 	if(flag_error) return -1;
 
@@ -45,7 +44,7 @@ t_puntero definirVariable(t_nombre_variable identificador_variable){
 }
 
 t_valor_variable dereferenciar(t_puntero direccion_variable){
-	if(flag_error) return -1;
+	if(flag_error) return 0;
 
 	if(direccion_variable >= 0){
 		log_trace(logAnsisop, "Dereferenciar direccion variable %d", direccion_variable);
@@ -61,8 +60,9 @@ t_valor_variable dereferenciar(t_puntero direccion_variable){
 	}
 	log_error(logAnsisop, "No se puede obtener valor de %d", direccion_variable);
 	flag_error = true;
-	tipoError = EXCEPCION_MEMORIA;
-	return -1;
+	if(tipoError == ERROR)
+		tipoError = EXCEPCION_MEMORIA;
+	return 0;
 }
 
 
@@ -622,12 +622,6 @@ void ansisop_wait(t_nombre_semaforo identificador_semaforo){
 	}
 	msg_destruir(msgRecibido);
 }
-
-
-
-
-
-
 
 
 

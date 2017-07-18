@@ -19,6 +19,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	signal (SIGINT, finalizarConsola);
+	flag_desconexion = 0;
 
 	//Creo archivo log
 	logConsola = log_create(string_from_format("consola_%d.log", process_getpid()), "CONSOLA", false, LOG_LEVEL_TRACE);

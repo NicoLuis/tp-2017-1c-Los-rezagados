@@ -50,6 +50,8 @@ int socket_kernel;
 
 t_log* logConsola;
 
+bool flag_desconexion;
+
 void leerComando(char* comando);
 void escucharKernel();
 char* cargarScript(void* pathScript);

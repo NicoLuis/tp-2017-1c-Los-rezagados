@@ -1240,7 +1240,7 @@ void ejecutarComandos() {
 						PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "size pid [pid]: " PRINT_COLOR_RESET "Tamaño total de un proceso\n");
 		}else if(string_equals_ignore_case(comando, "\0")){
 		}else
-			printf("Comando Incorrecto\n");
+			fprintf(stderr, PRINT_COLOR_YELLOW "Comando incorrecto" PRINT_COLOR_RESET "\n");
 	}
 }
 
@@ -1447,15 +1447,16 @@ void dumpTablaPaginas(){
 		free(frame);
 	}
 
-
+	string_append(&procActivos, "[ ");
 	void _listarProcs(t_proceso* p){
 		string_append_with_format(&procActivos, " %d,", p->PID);
 	}
 	list_iterate(listaProcesos, (void*) _listarProcs);
 
 	if(procActivos[string_length(procActivos)-1] == ',')
-		procActivos[string_length(procActivos)-1] = '\0';
-	if(string_length(procActivos) == 0)
+		procActivos[string_length(procActivos)-1] = ' ';
+	string_append(&procActivos, " ]");
+	if(string_length(procActivos) == 4)
 		procActivos = "No hay procesos activos";
 	fprintf(stderr, PRINT_COLOR_CYAN "\nProcesos activos: " PRINT_COLOR_RESET "%s\n", procActivos);
 	fprintf(archivoDump, "\nProcesos activos: %s\n", procActivos);

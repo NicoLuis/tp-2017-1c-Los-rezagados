@@ -35,21 +35,22 @@
 #include <enum.h>
 #include <parser/metadata_program.h>
 
+#define SIN_ASIGNAR 50
 #define FINALIZO_CORRECTAMENTE 0
-#define RECURSOS_INSUFICIENTES -1
-#define ARCHIVO_INEXISTENTE -2
-#define LECTURA_SIN_PERMISOS -3
-#define ESCRITURA_SIN_PERMISOS -4
-#define ERROR_EXCEPCION_MEMORIA -5
-#define DESCONEXION_CONSOLA -6
-#define COMANDO_FINALIZAR -7
-#define MAS_MEMORIA_TAMANIO_PAG -8
-#define CANT_PAGS_INSUFICIENTES -9
-#define ERROR_SCRIPT -11
-#define ERROR_STACKOVERFLOW -12
-#define SEMAFORO_INEXISTENTE -13
-#define VARIABLE_COMPARTIDA_INEXISTENTE -14
-#define SIN_DEFINICION -20
+#define RECURSOS_INSUFICIENTES 1
+#define ARCHIVO_INEXISTENTE 2
+#define LECTURA_SIN_PERMISOS 3
+#define ESCRITURA_SIN_PERMISOS 4
+#define ERROR_EXCEPCION_MEMORIA 5
+#define DESCONEXION_CONSOLA 6
+#define COMANDO_FINALIZAR 7
+#define MAS_MEMORIA_TAMANIO_PAG 8
+#define CANT_PAGS_INSUFICIENTES 9
+#define ERROR_SCRIPT 11
+#define ERROR_STACKOVERFLOW 12
+#define SEMAFORO_INEXISTENTE 13
+#define VARIABLE_COMPARTIDA_INEXISTENTE 14
+#define SIN_DEFINICION 20
 
 //////////////////////// CAPA FS ////////////////////////////
 
@@ -235,6 +236,6 @@ void atender_consola(int socket_consola);
 void consolaKernel();
 void terminarKernel();
 
-void finalizarPid(t_pid pid, int);
+void finalizarPid(t_pid pid);
 
 #endif /* LIBRERIAKERNEL_H_ */

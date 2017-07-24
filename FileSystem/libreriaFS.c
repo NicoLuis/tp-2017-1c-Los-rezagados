@@ -327,7 +327,7 @@ char* leerBloquesArchivo(void* path, int offset, int size){
 	int tamanio = config_get_int_value(metadata, "TAMANIO");
 	char** bloques = config_get_array_value(metadata, "BLOQUES");
 
-	for(i = offset / tamanioBloques; i*tamanioBloques < tamanio; i++, tmpoffset += tamanioBloques){
+	for(i = offset; i*tamanioBloques < tamanio; i++, tmpoffset += tamanioBloques){
 		pathBloque = string_new();
 		string_append(&pathBloque, puntoMontaje);
 		string_append_with_format(&pathBloque, "/Bloques/%s.bin", bloques[i]);
@@ -335,11 +335,12 @@ char* leerBloquesArchivo(void* path, int offset, int size){
 		tmpdata = leerArchivo(pathBloque);
 
 		if(size-tmpoffset > tamanioBloques)	//lo q falta
-			memcpy(data + tmpoffset, tmpdata, tamanioBloques);
+			memcpy(data + tmpoffset, tmpdata + offset, tamanioBloques);
 		else{
-			memcpy(data + tmpoffset, tmpdata, size-tmpoffset);
+			memcpy(data + tmpoffset, tmpdata + offset, size-tmpoffset);
 			break;
 		}
+		offset += tamanioBloques;
 	}
 	data[size] = '\0';
 	log_info(logFS, "Contenido leido %s", data);
@@ -371,22 +372,25 @@ void escribirBloquesArchivo(void* path, int offset, int size, char* buffer){
 	int tamanio = config_get_int_value(metadata, "TAMANIO");
 	char** bloques = config_get_array_value(metadata, "BLOQUES");
 
-	for(i = offset / tamanioBloques; i < tamanio; i += tamanioBloques, tmpoffset += tamanioBloques){
+	for(i = offset; i < tamanio; i += tamanioBloques, tmpoffset += tamanioBloques){
 		pathBloque = string_new();
 		string_append(&pathBloque, puntoMontaje);
 		string_append_with_format(&pathBloque, "/Bloques/%s.bin", bloques[i / tamanioBloques]);
 		log_info(logFS, "Leo bloque %s", bloques[i / tamanioBloques]);
 		tmpdata = leerArchivo(pathBloque);
+		log_info(logFS, "Lei bloque %s", bloques[i / tamanioBloques]);
+		log_info(logFS, "contenido bloque \n %s", tmpdata);
 
 		if(tmpdata == NULL)
 			return;
 
 		if(size-tmpoffset > tamanioBloques)	//lo q falta
-			memcpy(tmpdata, buffer + tmpoffset, tamanioBloques);
+			memcpy(tmpdata + offset, buffer + tmpoffset, tamanioBloques);
 		else{
-			memcpy(tmpdata, buffer + tmpoffset, size-tmpoffset);
+			memcpy(tmpdata + offset, buffer + tmpoffset, size-tmpoffset);
 			break;
 		}
+		offset += tamanioBloques;
 	}
 
 	free(rutaMetadata);
@@ -410,6 +414,11 @@ char* leerArchivo(void* path){
 		tipoError = SIN_DEFINICION;
 		return NULL;
 	}
+	if(sbuf.st_size < tamanioBloques)
+		truncate(path, tamanioBloques);
+	
+		log_info(logFS, "size bloque %d", sbuf.st_size);
+	
 	data = mmap((caddr_t)0, tamanioBloques, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
 	if (data == MAP_FAILED) {
 		perror("Fallo el mmap");

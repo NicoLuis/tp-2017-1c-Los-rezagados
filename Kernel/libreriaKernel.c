@@ -978,8 +978,8 @@ void escucharCPU(int socket_cpu) {
 			if(entradaGlobalBuscada != NULL){
 				if(entradaGlobalBuscada->Open == 1){
 					msg_enviar_separado(BORRAR, string_length(entradaGlobalBuscada->FilePath), entradaGlobalBuscada->FilePath, socket_fs);
-					list_remove_by_condition(lista_tabla_global, (void*) _esIndiceGlobal);
-					list_remove_by_condition(TablaProceso->lista_entradas_de_proceso, (void*) _esFD);
+					//list_remove_by_condition(lista_tabla_global, (void*) _esIndiceGlobal);
+					//list_remove_by_condition(TablaProceso->lista_entradas_de_proceso, (void*) _esFD);
 					
 					t_msg* msgRecibidoBorrar = msg_recibir(socket_fs);
 					if(msgRecibidoBorrar->tipoMensaje == BORRAR)

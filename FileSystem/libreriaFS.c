@@ -414,10 +414,27 @@ char* leerArchivo(void* path){
 		tipoError = SIN_DEFINICION;
 		return NULL;
 	}
-	if(sbuf.st_size < tamanioBloques)
-		truncate(path, tamanioBloques);
-	
 		log_info(logFS, "size bloque %d", sbuf.st_size);
+	
+	if(sbuf.st_size < tamanioBloques){
+		close(fd);
+		truncate(path, tamanioBloques);
+		fd = open(path, O_RDWR);
+		
+		if (fd < 0) {
+			perror("error al abrir el archivo");
+			tipoError = ARCHIVO_INEXISTENTE;
+			return NULL;
+		}
+		if (stat(path, &sbuf) == -1) {
+			perror("stat, chequear si el archivo esta corrupto");
+			tipoError = SIN_DEFINICION;
+			return NULL;
+		}
+		
+		log_info(logFS, "size bloque truncado %d", sbuf.st_size);
+	}
+	
 	
 	data = mmap((caddr_t)0, tamanioBloques, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
 	if (data == MAP_FAILED) {

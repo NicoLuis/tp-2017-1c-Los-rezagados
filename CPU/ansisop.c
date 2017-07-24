@@ -501,7 +501,7 @@ void moverCursor(t_descriptor_archivo descriptor_archivo, t_valor_variable posic
 	memcpy(buffer + sizeof(t_descriptor_archivo), &posicion, sizeof(t_valor_variable));
 	memcpy(buffer + sizeof(t_descriptor_archivo) + sizeof(t_valor_variable), &pcb->pid, sizeof(t_pid));
 
-	msg_enviar_separado(MOVER_ANSISOP, sizeof(t_descriptor_archivo) + sizeof(t_descriptor_archivo), buffer, socket_kernel);
+	msg_enviar_separado(MOVER_ANSISOP, sizeof(t_descriptor_archivo) + sizeof(t_valor_variable) + sizeof(t_pid), buffer, socket_kernel);
 	free(buffer);
 
 	t_msg* msgRecibido = msg_recibir(socket_kernel);

@@ -32,7 +32,7 @@ filesystem:
 	$(call mostrarTitulo,$@)
 	cd FileSystem/Debug; make all
 
-consola:
+cpu:
 	$(call mostrarTitulo,$@)
 	cd CPU/Debug; make all
 	

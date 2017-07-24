@@ -9,7 +9,7 @@
 
 deploy: dependencias build
 
-dependencias: so-commons-library ansisop-parser build
+dependencias: so-commons-library ansisop-parser tgz
 
 so-commons-library:
 	$(call mostrarTitulo,$@)
@@ -21,6 +21,10 @@ ansisop-parser:
 	cd ..; git clone https://github.com/sisoputnfrba/ansisop-parser
 	cd ../ansisop-parser/parser; make all	
 	cd ../ansisop-parser/parser; sudo make install	
+	
+tgz:
+	$(call mostrarTitulo,$@)
+	cd ../ansisop-parser/programas-ejemplo/evaluacion-final-esther/FS-ejemplo; tar -xvzf SADICA_FS_V2.tar.gz
 	
 build: herramientas filesystem cpu consola kernel memoria
 

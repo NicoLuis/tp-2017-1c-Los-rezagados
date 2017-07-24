@@ -982,10 +982,10 @@ void escucharCPU(int socket_cpu) {
 					//list_remove_by_condition(TablaProceso->lista_entradas_de_proceso, (void*) _esFD);
 					
 					t_msg* msgRecibidoBorrar = msg_recibir(socket_fs);
-					if(msgRecibidoBorrar->tipoMensaje == BORRAR)
+					if(msgRecibidoBorrar->tipoMensaje == BORRAR){
 						log_trace(logAnsisop, "Borro correctamente");
 						msg_enviar_separado(BORRAR,0,0,socket_cpu);
-					else{
+					}else{
 						log_error(logAnsisop, "Error al borrar");
 						msg_enviar_separado(ERROR,0,0,socket_cpu);
 					}

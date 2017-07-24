@@ -173,7 +173,7 @@ int verificarArchivo(char* path){
 	string_append(&rutaMetadata, puntoMontaje);
 	string_append(&rutaMetadata, "/Archivos");
 	string_append(&rutaMetadata, path);
-	log_info(logFS, "rutaMetadata %s", rutaMetadata);
+	log_info(logFS, "Verificar %s", rutaMetadata);
 
 	int fd = open(rutaMetadata, O_RDWR);
 	if(fd > 0){
@@ -245,8 +245,7 @@ void crearArchivo(void* path){
 	string_append(&rutaMetadata, puntoMontaje);
 	string_append(&rutaMetadata, "/Archivos");
 	string_append(&rutaMetadata, path);
-	log_info(logFS, "rutaMetadata %s", rutaMetadata);
-	log_info(logFS, "bitMap->size %d", bitMap->size);
+	log_info(logFS, "Crear %s", rutaMetadata);
 
 	for(i = 0; i < bitMap->size && nroBloque == -1; i++){
 		if(!bitarray_test_bit(bitMap, i)){
@@ -281,7 +280,7 @@ void borrarArchivo(void* path){
 	string_append(&rutaMetadata, puntoMontaje);
 	string_append(&rutaMetadata, "/Archivos");
 	string_append(&rutaMetadata, path);
-	log_info(logFS, "rutaMetadata %s", rutaMetadata);
+	log_info(logFS, "Borrar %s", rutaMetadata);
 
 	t_config* metadata = config_create(rutaMetadata);
 	if(metadata == NULL){
@@ -314,7 +313,7 @@ char* leerBloquesArchivo(void* path, int offset, int size){
 	string_append(&rutaMetadata, puntoMontaje);
 	string_append(&rutaMetadata, "/Archivos");
 	string_append(&rutaMetadata, path);
-	log_info(logFS, "rutaMetadata %s", rutaMetadata);
+	log_info(logFS, "Leer bloques %s", rutaMetadata);
 
 	t_config* metadata = config_create(rutaMetadata);
 	if(metadata == NULL){
@@ -332,6 +331,7 @@ char* leerBloquesArchivo(void* path, int offset, int size){
 		pathBloque = string_new();
 		string_append(&pathBloque, puntoMontaje);
 		string_append_with_format(&pathBloque, "/Bloques/%s.bin", bloques[i]);
+		log_info(logFS, "Leo bloque %s", bloques[i / tamanioBloques]);
 		tmpdata = leerArchivo(pathBloque);
 
 		if(size-tmpoffset > tamanioBloques)	//lo q falta
@@ -357,7 +357,7 @@ void escribirBloquesArchivo(void* path, int offset, int size, char* buffer){
 	string_append(&rutaMetadata, puntoMontaje);
 	string_append(&rutaMetadata, "/Archivos");
 	string_append(&rutaMetadata, path);
-	log_info(logFS, "rutaMetadata %s", rutaMetadata);
+	log_info(logFS, "Escribir bloques %s", rutaMetadata);
 
 	t_config* metadata = config_create(rutaMetadata);
 	if(metadata == NULL){
@@ -375,6 +375,7 @@ void escribirBloquesArchivo(void* path, int offset, int size, char* buffer){
 		pathBloque = string_new();
 		string_append(&pathBloque, puntoMontaje);
 		string_append_with_format(&pathBloque, "/Bloques/%s.bin", bloques[i / tamanioBloques]);
+		log_info(logFS, "Leo bloque %s", bloques[i / tamanioBloques]);
 		tmpdata = leerArchivo(pathBloque);
 
 		if(tmpdata == NULL)

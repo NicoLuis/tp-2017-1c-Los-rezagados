@@ -980,7 +980,18 @@ void escucharCPU(int socket_cpu) {
 					msg_enviar_separado(BORRAR, string_length(entradaGlobalBuscada->FilePath), entradaGlobalBuscada->FilePath, socket_fs);
 					list_remove_by_condition(lista_tabla_global, (void*) _esIndiceGlobal);
 					list_remove_by_condition(TablaProceso->lista_entradas_de_proceso, (void*) _esFD);
-					msg_enviar_separado(BORRAR,0,0,socket_cpu);
+					
+					t_msg* msgRecibidoBorrar = msg_recibir(socket_fs);
+					if(msgRecibidoBorrar->tipoMensaje == BORRAR)
+						log_trace(logAnsisop, "Borro correctamente");
+						msg_enviar_separado(BORRAR,0,0,socket_cpu);
+					else{
+						log_error(logAnsisop, "Error al borrar");
+						msg_enviar_separado(ERROR,0,0,socket_cpu);
+					}
+					msg_destruir(msgRecibidoBorrar);
+					
+					
 				}else{
 					log_trace(logKernel, " [CPU %d | PID %d] el archivo esta siendo usado por %d procesos, no se puede borrar", socket_cpu, entradaGlobalBuscada->Open);
 					msg_enviar_separado(ERROR,0,0,socket_cpu);

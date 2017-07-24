@@ -30,7 +30,7 @@ herramientas:
 
 filesystem:
 	$(call mostrarTitulo,$@)
-	cd Filesystem/Debug; make all
+	cd FileSystem/Debug; make all
 
 consola:
 	$(call mostrarTitulo,$@)

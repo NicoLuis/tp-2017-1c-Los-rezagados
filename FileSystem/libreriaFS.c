@@ -258,7 +258,7 @@ void crearArchivo(void* path){
 		tipoError = -1;
 	}
 
-	char* data = string_from_format("TAMANIO=1 \nBLOQUES=[%d]", nroBloque);
+	char* data = string_from_format("TAMANIO=0 \nBLOQUES=[%d]", nroBloque);
 	// si arrancara en 1 los bloques seria nroBloque+1
 
 	system(string_from_format("touch %s", rutaMetadata));

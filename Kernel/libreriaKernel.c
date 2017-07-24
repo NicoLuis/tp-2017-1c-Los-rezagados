@@ -537,7 +537,9 @@ void escucharCPU(int socket_cpu) {
 				t_num exitCode = SEMAFORO_INEXISTENTE;
 				msg_enviar_separado(ERROR, sizeof(t_num), &exitCode, socket_cpu);
 			}else if(pcb->exitCode != SIN_ASIGNAR){
+				semBuscad->valorSemaforo--;
 				msg_enviar_separado(WAIT, sizeof(t_num), &semBuscad->valorSemaforo, socket_cpu);
+				semBuscad->valorSemaforo++;
 				list_add(lista_variablesSemaforo, semBuscad);
 			}
 			else{

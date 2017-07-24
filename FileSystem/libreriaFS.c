@@ -409,7 +409,7 @@ char* leerArchivo(void* path){
 		tipoError = SIN_DEFINICION;
 		return NULL;
 	}
-	data = mmap((caddr_t)0, sbuf.st_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+	data = mmap((caddr_t)0, tamanioBloques, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
 	if (data == MAP_FAILED) {
 		perror("Fallo el mmap");
 		tipoError = SIN_DEFINICION;

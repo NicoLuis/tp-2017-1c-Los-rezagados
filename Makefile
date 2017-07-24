@@ -9,7 +9,7 @@
 
 deploy: dependencias build
 
-dependencias: so-commons-library ansisop-parser b
+dependencias: so-commons-library ansisop-parser build
 
 so-commons-library:
 	$(call mostrarTitulo,$@)

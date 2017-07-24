@@ -21,16 +21,12 @@ ansisop-parser:
 	cd ..; git clone https://github.com/sisoputnfrba/ansisop-parser
 	cd ../ansisop-parser/parser; make all	
 	cd ../ansisop-parser/parser; sudo make install	
-	tar -xzvf ansisop-parser/programas-ejemplo/evaluacion-final-esther/FS-ejemplo/FS.tgz
-	tar -xvzf ansisop-parser/programas-ejemplo/evaluacion-final-esther/FS-ejemplo/SADICA_FS_V2.tar.gz
 	
 build: herramientas filesystem cpu consola kernel memoria
 
 herramientas: 
 	$(call mostrarTitulo,$@)
 	cd Herramientas/Debug/; make all
-	sudo cp -u ./Herramientas/Debug/libHerramientas.so /usr/lib/libHerramientas.so
-	sudo cp -u ./Herramientas/* /usr/include
 
 filesystem:
 	$(call mostrarTitulo,$@)

@@ -34,7 +34,7 @@ void escucharKERNEL(void* socket_kernel) {
 		tipoError = 0;
 
 		pthread_mutex_lock(&mutex_solicitud);
-		log_info(logFS, "Atiendo solicitud de Kernel %d", socketKernel);
+		//log_info(logFS, "Atiendo solicitud de Kernel %d", socketKernel);
 
 		switch(msgRecibido->tipoMensaje){
 
@@ -161,7 +161,7 @@ void escucharKERNEL(void* socket_kernel) {
 
 		}
 
-		log_info(logFS, "Finalizo solicitud de Kernel %d", socketKernel);
+		//log_info(logFS, "Finalizo solicitud de Kernel %d", socketKernel);
 		pthread_mutex_unlock(&mutex_solicitud);
 	}
 }

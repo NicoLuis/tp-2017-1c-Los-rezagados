@@ -741,11 +741,9 @@ int buscarFrameLibre(t_pid pid) {
 /*			FRAMES POR PAGINA DE PROCESO			*/
 
 int funcionHashing(t_pid pid, t_num16 nroPagina){
-	int indice = ((pid * cantidadDeMarcos) + (nroPagina * tamanioDeMarcos)) / cantidadDeMarcos;
-	// fixme: no considera indice >= cantidadDeMarcos
-	// ej: pid=8 nroPagina=5 cantMarcos=30 tamanioMarocs=256  =>  (8*30 + 5*256)/30 = 50
-	//			=> voy al marco 50 pero en total son 30 => explota
-	return indice;
+
+	return (pid*pid + nroPagina*nroPagina) % cantidadDeMarcos;
+
 }
 
 int paginaInvalida(t_pid pid, t_num16 nroPagina) {
@@ -955,8 +953,29 @@ void liberarCacheDeProceso(t_pid pid){
 
 void vaciarCache() {
 
+	void _liberarCache(t_cache* entradaCache) {
+		t_posicion p;
+		p.offset = 0;
+		p.pagina = entradaCache->numPag;
+		p.size = tamanioDeMarcos;
+
+		escribirContenido(entradaCache->pid, p, entradaCache->contenido);
+		free(entradaCache->contenido);
+		free(entradaCache);
+
+		int _soy_el_pid_buscado(t_proceso* proceso) { return proceso->PID == entradaCache->pid; }
+		t_proceso* proceso = list_remove_by_condition(listaProcesos, (void*) _soy_el_pid_buscado);
+		if(proceso == NULL)
+			log_warning(log_memoria, "No encontre proceso %d", entradaCache->pid);
+		else{
+			proceso->cantEntradasCache--;
+			list_add(listaProcesos, proceso);
+		}
+	}
+
 	if (Cache_Activada()) {
 		pthread_mutex_lock(&mutexCache);
+		list_iterate(Cache, (void*) _liberarCache);
 		eliminarCache(Cache);
 		Cache = crearCache();
 		pthread_mutex_unlock(&mutexCache);
@@ -1058,7 +1077,6 @@ void* obtenerContenidoSegunCache(t_pid pid, t_posicion puntero){
 	pthread_mutex_lock(&mutexCantAccesosMemoria);
 	entradaCache->ultimoAcceso = cantAccesosMemoria;
 	pthread_mutex_unlock(&mutexCantAccesosMemoria);
-	// todo: ver si se necesita remover de lista para modificar
 
 	log_info(log_memoria, "		CACHE READ %d bytes offset %d", puntero.size, puntero.offset);
 
@@ -1077,7 +1095,6 @@ void escribirContenidoSegunCache(t_pid pid, t_posicion puntero, void* contenido_
 	pthread_mutex_lock(&mutexCantAccesosMemoria);
 	entradaCache->ultimoAcceso = cantAccesosMemoria;
 	pthread_mutex_unlock(&mutexCantAccesosMemoria);
-	// todo: ver si se necesita remover de lista para modificar
 
 	log_info(log_memoria, "		CACHE WRITE %d bytes offset %d", puntero.size, puntero.offset);
 

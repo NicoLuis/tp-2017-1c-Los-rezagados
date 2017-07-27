@@ -12,8 +12,8 @@
 #include "planificacion.h"
 
 
-t_puntero reservarMemoriaHeap(t_num cantBytes, t_PCB* pcb);	//si, pinto ponerlo aca
-int liberarMemoriaHeap(t_puntero posicion, t_PCB* pcb);
+t_puntero reservarMemoriaHeap(t_num cantBytes, t_PCB* pcb, int socket_cpu);	//si, pinto ponerlo aca
+int liberarMemoriaHeap(t_puntero posicion, t_PCB* pcb, int socket_cpu);
 
 void mostrarArchivoConfig() {
 
@@ -602,7 +602,7 @@ void escucharCPU(int socket_cpu) {
 			if(pcb->cantPagsHeap < _cantPagsHeap(pcb->pid))
 				flag_se_agrego_pag = 1;
 
-			t_puntero direccion = reservarMemoriaHeap(cantBytes, pcb);
+			t_puntero direccion = reservarMemoriaHeap(cantBytes, pcb, socket_cpu);
 
 			void* tmpb = malloc(sizeof(t_puntero) + sizeof(bool));
 			memcpy(tmpb, &direccion, sizeof(t_puntero));
@@ -634,7 +634,7 @@ void escucharCPU(int socket_cpu) {
 			memcpy(&posicion, msgRecibido->data, msgRecibido->longitud);
 			log_trace(logKernel, " [CPU %d | PID %d] LIBERAR posicion %d", socket_cpu, pcb->pid, posicion);
 
-			if( liberarMemoriaHeap(posicion, pcb) < 0 ){
+			if( liberarMemoriaHeap(posicion, pcb, socket_cpu) < 0 ){
 				t_num exitCode = ERROR_EXCEPCION_MEMORIA;
 				msg_enviar_separado(ERROR, sizeof(t_num), &exitCode, socket_cpu);
 			}
@@ -732,7 +732,7 @@ void escucharCPU(int socket_cpu) {
 						msg_enviar_separado(ERROR, sizeof(t_num), &msgDatosObtenidos->tipoMensaje, socket_cpu);
 					}
 				}else{
-					log_error(logKernel, " [CPU %d | PID %d] No tiene permisos de escritura"), socket_cpu, pcb->pid;
+					log_error(logKernel, " [CPU %d | PID %d] No tiene permisos de escritura", socket_cpu, pcb->pid);
 
 					t_num exitCode = LECTURA_SIN_PERMISOS;
 					msg_enviar_separado(ERROR, sizeof(t_num), &exitCode, socket_cpu);
@@ -1449,7 +1449,7 @@ void consolaKernel(){
 				}
 			}
 
-		}else if(string_equals_ignore_case(comando, "estado variables")){
+		}else if(string_equals_ignore_case(comando, "variables")){
 
 			printf(PRINT_COLOR_CYAN "   ····  VariableCompartida  ····   Valor   ···· " PRINT_COLOR_RESET "\n");
 			int i, sizelista = list_size(lista_variablesCompartidas);
@@ -1503,7 +1503,7 @@ void consolaKernel(){
 					PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "kill [pid]: " PRINT_COLOR_RESET "Finalizar proceso\n"
 					PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "detener: " PRINT_COLOR_RESET "Detener la planificación\n"
 					PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "reanudar: " PRINT_COLOR_RESET "Reanuda la planificación\n"
-					PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "estado variables: " PRINT_COLOR_RESET "Muestra los valores actuales de las variables\n"
+					PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "variables: " PRINT_COLOR_RESET "Muestra los valores actuales de las variables\n"
 					PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "exitcodes: " PRINT_COLOR_RESET "Listado de exit codes\n");
 
 		}else if(string_equals_ignore_case(comando, "\0")){
@@ -1708,7 +1708,7 @@ int asignarNuevaPag(t_PCB* pcb){
 
 
 // si hay error en esta funcion devuelve el exitCode
-t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
+t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb, int socket_cpu){
 
 	int _esHeap(t_heap* h){
 		return h->pid == pcb->pid;
@@ -1742,7 +1742,7 @@ t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
 				//recibo
 				t_msg* msgRecibido = msg_recibir(socket_memoria);
 				if(msgRecibido->tipoMensaje != LECTURA_PAGINA){
-					log_error(logKernel, "No recibi LECTURA_PAGINA sino %d", msgRecibido->tipoMensaje);
+					log_error(logKernel, " [CPU %d | PID %d] No recibi LECTURA_PAGINA sino %d", socket_cpu, pcb->pid, msgRecibido->tipoMensaje);
 					if(msgRecibido->tipoMensaje == EXCEPCION_MEMORIA)
 						return ERROR_EXCEPCION_MEMORIA;
 					if(msgRecibido->tipoMensaje == STACKOVERFLOW)
@@ -1753,7 +1753,7 @@ t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
 				msg_recibir_data(socket_memoria, msgRecibido);
 				t_HeapMetadata heapMetadata;
 				memcpy(&heapMetadata, msgRecibido->data, sizeof(t_HeapMetadata));
-				log_trace(logKernel, "	busco hueco heapMetadata -> size %d free %d", heapMetadata.size, heapMetadata.isFree);
+				log_trace(logKernel, " [CPU %d | PID %d] 	busco hueco heapMetadata -> size %d free %d", socket_cpu, pcb->pid, heapMetadata.size, heapMetadata.isFree);
 				msg_destruir(msgRecibido);
 				_unlockMemoria();
 
@@ -1774,7 +1774,7 @@ t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
 
 					t_msg* msgRecibido3 = msg_recibir(socket_memoria);
 					if(msgRecibido3->tipoMensaje != ESCRITURA_PAGINA){
-						log_error(logKernel, "No recibi ESCRITURA_PAGINA sino %d", msgRecibido3->tipoMensaje);
+						log_error(logKernel, " [CPU %d | PID %d] No recibi ESCRITURA_PAGINA sino %d", socket_cpu, pcb->pid, msgRecibido3->tipoMensaje);
 						if(msgRecibido->tipoMensaje == EXCEPCION_MEMORIA)
 							return ERROR_EXCEPCION_MEMORIA;
 						if(msgRecibido->tipoMensaje == STACKOVERFLOW)
@@ -1790,7 +1790,7 @@ t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
 
 
 				if(heapMetadata.isFree && cantBytes <= heapMetadata.size ){
-					log_error(logKernel, "Encontre hueco");
+					log_error(logKernel, " [CPU %d | PID %d] Encontre hueco", socket_cpu, pcb->pid);
 					t_HeapMetadata heapMetadataProx;
 					heapMetadataProx.isFree = true;
 					heapMetadataProx.size = heapMetadata.size - cantBytes - sizeof(t_HeapMetadata);
@@ -1812,7 +1812,7 @@ t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
 
 					t_msg* msgRecibido2 = msg_recibir(socket_memoria);
 					if(msgRecibido2->tipoMensaje != ESCRITURA_PAGINA){
-						log_error(logKernel, "No recibi ESCRITURA_PAGINA sino %d", msgRecibido2->tipoMensaje);
+						log_error(logKernel, " [CPU %d | PID %d] No recibi ESCRITURA_PAGINA sino %d", socket_cpu, pcb->pid, msgRecibido2->tipoMensaje);
 						if(msgRecibido->tipoMensaje == EXCEPCION_MEMORIA)
 							return ERROR_EXCEPCION_MEMORIA;
 						if(msgRecibido->tipoMensaje == STACKOVERFLOW)
@@ -1843,7 +1843,7 @@ t_puntero encontrarHueco(t_num cantBytes, t_PCB* pcb){
 
 
 // si hay error en esta funcion devuelve el exitCode
-t_puntero reservarMemoriaHeap(t_num cantBytes, t_PCB* pcb){
+t_puntero reservarMemoriaHeap(t_num cantBytes, t_PCB* pcb, int socket_cpu){
 	int _esHeap(t_heap* h){
 		return h->pid == pcb->pid;
 	}
@@ -1852,22 +1852,22 @@ t_puntero reservarMemoriaHeap(t_num cantBytes, t_PCB* pcb){
 	}
 
 	if(cantBytes > tamanioPag - sizeof(t_HeapMetadata)*2){
-		log_warning(logKernel, "Se quiere asignar mas que tamanio de pagina");
+		log_warning(logKernel, " [CPU %d | PID %d] Se quiere asignar mas que tamanio de pagina", socket_cpu, pcb->pid);
 		return MAS_MEMORIA_TAMANIO_PAG;
 	}
 
 	if( list_count_satisfying(tabla_heap, (void*)_esHeap) == 0 ){
-		log_trace(logKernel, "Se reserva primer pagina heap pid %d", pcb->pid);
+		log_trace(logKernel, " [CPU %d | PID %d] Se reserva primer pagina heap pid %d", socket_cpu, pcb->pid);
 		if(asignarNuevaPag(pcb) < 0)
 			return ERROR_EXCEPCION_MEMORIA;
 	}
 
-	int retorno = encontrarHueco(cantBytes, pcb);
+	int retorno = encontrarHueco(cantBytes, pcb, socket_cpu);
 	if( retorno == -1 ){
-		log_trace(logKernel, "No encontre hueco");
+		log_warning(logKernel, " [CPU %d | PID %d] No encontre hueco", socket_cpu, pcb->pid);
 		if(asignarNuevaPag(pcb) < 0)
 			return ERROR_EXCEPCION_MEMORIA;
-		retorno = encontrarHueco(cantBytes, pcb);
+		retorno = encontrarHueco(cantBytes, pcb, socket_cpu);
 	}
 	if( retorno < -1 )
 		return retorno;
@@ -1879,11 +1879,11 @@ t_puntero reservarMemoriaHeap(t_num cantBytes, t_PCB* pcb){
 }
 
 
-t_HeapMetadata _recibirHeapMetadata(t_pid pid, t_posicion puntero){
+t_HeapMetadata _recibirHeapMetadata(t_pid pid, t_posicion puntero, int socket_cpu){
 	t_HeapMetadata heapMetadata;
 	heapMetadata.isFree = false;
 
-	log_error(logKernel, "LECTURA_PAGINA HEAP %d %d %d", puntero.pagina, puntero.offset, puntero.size);
+	log_trace(logKernel, " [CPU %d | PID %d] LECTURA_PAGINA HEAP %d %d %d", socket_cpu, pid, puntero.pagina, puntero.offset, puntero.size);
 
 	if(puntero.offset + sizeof(t_HeapMetadata) >= tamanioPag)
 		return heapMetadata;
@@ -1895,7 +1895,7 @@ t_HeapMetadata _recibirHeapMetadata(t_pid pid, t_posicion puntero){
 	//recibo
 	t_msg* msgRecibido = msg_recibir(socket_memoria);
 	if(msgRecibido->tipoMensaje != LECTURA_PAGINA){
-		log_error(logKernel, "No recibi LECTURA_PAGINA sino %d", msgRecibido->tipoMensaje);
+		log_error(logKernel, " [CPU %d | PID %d] No recibi LECTURA_PAGINA sino %d", socket_cpu, pid, msgRecibido->tipoMensaje);
 		if(msgRecibido->tipoMensaje == EXCEPCION_MEMORIA)
 			return heapMetadata;
 		if(msgRecibido->tipoMensaje == STACKOVERFLOW)
@@ -1912,7 +1912,7 @@ t_HeapMetadata _recibirHeapMetadata(t_pid pid, t_posicion puntero){
 	return heapMetadata;
 }
 
-int liberarMemoriaHeap(t_puntero posicion, t_PCB* pcb){
+int liberarMemoriaHeap(t_puntero posicion, t_PCB* pcb, int socket_cpu){
 	int _esHeap(t_heap* h){
 		return h->pid == pcb->pid;
 	}
@@ -1926,11 +1926,11 @@ int liberarMemoriaHeap(t_puntero posicion, t_PCB* pcb){
 	puntero.offset = posicion % tamanioPag;
 	puntero.size = sizeof(t_HeapMetadata);
 
-	t_HeapMetadata heapMetadata = _recibirHeapMetadata(pcb->pid, puntero);
-	log_error(logKernel, "		heapMetadata size %d free %d", heapMetadata.size, heapMetadata.isFree);
+	t_HeapMetadata heapMetadata = _recibirHeapMetadata(pcb->pid, puntero, socket_cpu);
+	log_error(logKernel, " [CPU %d | PID %d] 		heapMetadata size %d free %d", socket_cpu, pid, heapMetadata.size, heapMetadata.isFree);
 
 	if(heapMetadata.isFree == true){
-		log_warning(logKernel, "Quiero liberar algo liberado");
+		log_warning(logKernel, " [CPU %d | PID %d] Quiero liberar algo liberado", socket_cpu, pid);
 		return -1;
 	}
 
@@ -1963,12 +1963,12 @@ int liberarMemoriaHeap(t_puntero posicion, t_PCB* pcb){
 
 	t_msg* msgRecibido = msg_recibir(socket_memoria);
 	if(msgRecibido->tipoMensaje == LIBERAR){
-		log_trace(logKernel, "Se LIBERO");
+		log_trace(logKernel, " [CPU %d | PID %d] Se LIBERO", socket_cpu, pid);
 		flag_se_libero_pag = 1;
 		_sumarCantPagsHeap(pcb->pid, -1);
 		list_remove_and_destroy_by_condition(tabla_heap, (void*) _esHeap, free);
 	}else if(msgRecibido->tipoMensaje != ESCRITURA_PAGINA){
-		log_error(logKernel, "No recibi ESCRITURA_PAGINA o LIBERAR sino %d", msgRecibido->tipoMensaje);
+		log_error(logKernel, " [CPU %d | PID %d] No recibi ESCRITURA_PAGINA o LIBERAR sino %d", socket_cpu, pid, msgRecibido->tipoMensaje);
 		if(msgRecibido->tipoMensaje == EXCEPCION_MEMORIA)
 			return -4;
 		if(msgRecibido->tipoMensaje == STACKOVERFLOW)

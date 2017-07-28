@@ -133,6 +133,7 @@ void irAlLabel(t_nombre_etiqueta etiqueta){
 	if(nro == -1){
 		log_error(logAnsisop, "No encontre label %s", etiqueta);
 		flag_error = true;
+		pcb->exitCode = 11;
 	}
 	else
 		pcb->pc = nro;

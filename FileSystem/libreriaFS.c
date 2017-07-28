@@ -334,13 +334,14 @@ char* leerBloquesArchivo(void* path, int offset, int size){
 		log_info(logFS, "Leo bloque %s", bloques[i / tamanioBloques]);
 		tmpdata = leerArchivo(pathBloque);
 
+		offset = offset % tamanioBloques;
 		if(size-tmpoffset > tamanioBloques)	//lo q falta
 			memcpy(data + tmpoffset, tmpdata + offset, tamanioBloques);
 		else{
 			memcpy(data + tmpoffset, tmpdata + offset, size-tmpoffset);
 			break;
 		}
-		offset += tamanioBloques;
+		offset = 0;
 	}
 	data[size] = '\0';
 	log_info(logFS, "Contenido leido %s", data);
@@ -464,14 +465,15 @@ void escribirBloquesArchivo(void* path, int offset, int size, char* buffer){
 
 		if(tmpdata == NULL)
 			return;
-
+		
+		offset = offset % tamanioBloques;
 		if(size-tmpoffset > tamanioBloques)	//lo q falta
 			memcpy(tmpdata + offset, buffer + tmpoffset, tamanioBloques);
 		else{
 			memcpy(tmpdata + offset, buffer + tmpoffset, size-tmpoffset);
 			break;
 		}
-		offset += tamanioBloques;
+		offset = 0;
 	}
 
 	free(rutaMetadata);

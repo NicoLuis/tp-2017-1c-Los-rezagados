@@ -1581,6 +1581,7 @@ void finalizarPid(t_pid pid){
 		pthread_mutex_unlock(&mutex_listaSemaforos);
 	}
 
+	log_trace(logKernel, "Fin Finalizando pid %d", pid);
 }
 
 void _lockLista_cpus(){

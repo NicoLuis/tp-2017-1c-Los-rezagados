@@ -347,7 +347,7 @@ void escucharCPU(int socket_cpu) {
 
 		case 0: case FIN_CPU:
 			fprintf(stderr, PRINT_COLOR_YELLOW "La cpu %d se ha desconectado" PRINT_COLOR_RESET "\n", socket_cpu);
-			log_trace(logKernel, " [CPU %d | PID %d] Se desconecto la CPU", socket_cpu, pcb->pid);
+			log_trace(logKernel, " [CPU %d] Se desconecto la CPU", socket_cpu);
 			//pthread_mutex_unlock(&cpuUsada->mutex);
 			//si la cpu se desconecto la saco de la lista
 			_lockLista_cpus();

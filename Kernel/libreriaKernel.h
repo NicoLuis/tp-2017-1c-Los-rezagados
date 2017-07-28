@@ -215,7 +215,7 @@ sem_t sem_cantCPUs;
 pthread_mutex_t mutex_Solicitud_Memoria;
 pthread_mutex_t mutex_Solicitud_FS;
 
-
+bool flag_logCancer;
 
 void mostrarArchivoConfig();
 void inicializarSemaforosYVariables(char**, char**, char**);

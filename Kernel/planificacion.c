@@ -150,8 +150,10 @@ void finalizar(t_pid pidPCB){
 	list_iterate(lista_variablesSemaforo, (void*) _sacarDeSemaforos);
 	pthread_mutex_unlock(&mutex_listaSemaforos);
 
+	_lockMemoria();
 	send(socket_memoria, &pidPCB, sizeof(t_pid), 0);
 	msg_enviar_separado(FINALIZAR_PROGRAMA, 0, 0, socket_memoria);
+	_unlockMemoria();
 	sem_post(&sem_gradoMp);
 	sem_post(&sem_cantCPUs);
 

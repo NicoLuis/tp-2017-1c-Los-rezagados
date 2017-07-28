@@ -42,6 +42,7 @@ int main(int argc, char* argv[]) {
 	cola_Exec = queue_create();
 	cola_Block = queue_create();
 	cola_Exit = queue_create();
+	flag_logCancer = 1;
 
 	lista_tabla_de_procesos =  list_create(); //capa FS creo lista de estructuras de procesos
 	lista_tabla_global = list_create(); //capa FS creo lista de estructuras globales

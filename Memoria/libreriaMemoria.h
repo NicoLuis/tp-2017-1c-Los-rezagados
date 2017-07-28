@@ -131,7 +131,7 @@ void terminarMemoria();
 t_list* crearCache();
 void liberarCacheDeProceso(t_pid pid);
 void vaciarCache();
-void eliminarCache(t_list* unaCache);
+void eliminarCache();
 
 
 int estaEnCache(t_pid pid, t_num16 numero_pagina);

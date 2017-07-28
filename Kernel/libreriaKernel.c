@@ -1561,23 +1561,33 @@ void finalizarPid(t_pid pid){
 	_unlockLista_PCB_cpu();
 	if(info == NULL){
 		log_info(logKernel, "No hay cpu ejecutando pid %d", pid);
+		
+		log_trace(logKernel, "Preblock");
 		if(_sacarDeCola(pid, cola_Block, mutex_Block) == pid){
+			log_trace(logKernel, "PreReady1");
 			_ponerEnCola(pid, cola_Ready, mutex_Ready);
 			sem_post(&sem_cantColaReady);
-		}else
-		if(_sacarDeCola(pid, cola_New, mutex_New) == pid){
-			_ponerEnCola(pid, cola_Ready, mutex_Ready);
-			sem_post(&sem_cantColaReady);
+		}else{
+			log_trace(logKernel, "PreNew");
+			if(_sacarDeCola(pid, cola_New, mutex_New) == pid){
+				log_trace(logKernel, "PreReady2");
+				_ponerEnCola(pid, cola_Ready, mutex_Ready);
+				sem_post(&sem_cantColaReady);
+			}
 		}
+		log_trace(logKernel, "PreExit");
 		_ponerEnCola(pid, cola_Exit, mutex_Exit);
 
+		log_trace(logKernel, "Premutex_listaSemaforos lo");
 		pthread_mutex_lock(&mutex_listaSemaforos);
 		void _sacarDeSemaforos(t_VariableSemaforo* sem){
+			log_trace(logKernel, "Pre sem %s", sem->nombre);
 			t_pid encontrado = _sacarDeCola(pid, sem->colaBloqueados, sem->mutex_colaBloqueados);
 			if(encontrado == pid)
 				sem->valorSemaforo++;
 		}
 		list_iterate(lista_variablesSemaforo, (void*) _sacarDeSemaforos);
+		log_trace(logKernel, "Premutex_listaSemaforos un");
 		pthread_mutex_unlock(&mutex_listaSemaforos);
 	}
 

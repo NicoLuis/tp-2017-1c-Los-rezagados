@@ -334,7 +334,8 @@ char* leerBloquesArchivo(void* path, int offset, int size){
 		log_info(logFS, "Leo bloque %s", bloques[i / tamanioBloques]);
 		tmpdata = leerArchivo(pathBloque);
 
-		offset = offset % tamanioBloques;
+		if(offset != 0)
+			offset = offset % tamanioBloques;
 		if(size-tmpoffset > tamanioBloques)	//lo q falta
 			memcpy(data + tmpoffset, tmpdata + offset, tamanioBloques);
 		else{
@@ -466,7 +467,8 @@ void escribirBloquesArchivo(void* path, int offset, int size, char* buffer){
 		if(tmpdata == NULL)
 			return;
 		
-		offset = offset % tamanioBloques;
+		if(offset != 0)
+			offset = offset % tamanioBloques;
 		if(size-tmpoffset > tamanioBloques)	//lo q falta
 			memcpy(tmpdata + offset, buffer + tmpoffset, tamanioBloques);
 		else{

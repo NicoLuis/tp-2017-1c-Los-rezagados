@@ -10,9 +10,11 @@
 void mostrarArchivoConfig() {
 
 	system("clear");
+	pthread_mutex_lock(&mutexPrint);
 	printf("Nº log %d \n", process_getpid());
 	printf("La IP del Kernel es: %s \n", ipKernel);
 	printf("El puerto del Kernel es: %d\n", puertoKernel);
+	pthread_mutex_unlock(&mutexPrint);
 }
 
 
@@ -61,6 +63,7 @@ void leerComando(char* comando){
 			return p->pid == pidAFinalizar;
 		}
 		t_programa* prog = list_find(lista_programas, (void*) _esPid);
+		pthread_mutex_lock(&mutexPrint);
 		if(prog != NULL){
 			msg_enviar_separado(FINALIZAR_PROGRAMA, sizeof(t_pid), &pidAFinalizar, socket_kernel);
 			//finalizarPrograma(prog, 0);
@@ -68,6 +71,7 @@ void leerComando(char* comando){
 		}
 		else
 			fprintf(stderr, "El pid %d no pertenece a esta consola\n", pidAFinalizar);
+		pthread_mutex_unlock(&mutexPrint);
 
 
 	}else if(string_equals_ignore_case(comando, "disconnect")){
@@ -79,14 +83,19 @@ void leerComando(char* comando){
 		system("clear");
 
 	}else if(string_equals_ignore_case(comando, "help")){
+		pthread_mutex_unlock(&mutexPrint);
 		printf("Comandos:\n"
 				PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "start [path]: " PRINT_COLOR_RESET "Iniciar Programa\n"
 				PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "kill [pid]: " PRINT_COLOR_RESET "Finalizar Programa\n"
 				PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "disconnect: " PRINT_COLOR_RESET "Desconectar Consola\n"
 				PRINT_COLOR_BLUE "  ● " PRINT_COLOR_CYAN "clear: " PRINT_COLOR_RESET "Limpiar Mensajes\n");
+		pthread_mutex_unlock(&mutexPrint);
 	}else if(string_equals_ignore_case(comando, "\0")){
-	}else
+	}else{
+		pthread_mutex_lock(&mutexPrint);
 		fprintf(stderr, PRINT_COLOR_YELLOW "El comando '%s' no es valido" PRINT_COLOR_RESET "\n", comando);
+		pthread_mutex_unlock(&mutexPrint);
+	}
 
 }
 
@@ -120,13 +129,17 @@ void escucharKernel(){
 					log_trace(logConsola, "No se encuentra programa sin pid");
 				programa->pid = pidProg;
 
+				pthread_mutex_lock(&mutexPrint);
 				fprintf(stderr, PRINT_COLOR_CYAN "PID %d" PRINT_COLOR_RESET "\n", pidProg);
+				pthread_mutex_unlock(&mutexPrint);
 			}else
 				log_warning(logConsola, "No recibi nada");
 			break;
 		case MARCOS_INSUFICIENTES:
 			log_trace(logConsola, "Recibi MARCOS_INSUFICIENTES");
+			pthread_mutex_lock(&mutexPrint);
 			fprintf(stderr, PRINT_COLOR_YELLOW "No hay espacio suficiente en memoria" PRINT_COLOR_RESET "\n");
+			pthread_mutex_unlock(&mutexPrint);
 			finalizarPrograma(programa, 0);
 			break;
 		case FINALIZAR_PROGRAMA:
@@ -142,10 +155,12 @@ void escucharKernel(){
 				log_warning(logConsola, "No recibi nada");
 			break;
 		case 0:
+			pthread_mutex_lock(&mutexPrint);
 			if(flag_desconexion)
 				fprintf(stderr, PRINT_COLOR_BLUE "El kernel se ha desconectado" PRINT_COLOR_RESET "\n");
 			else
 				fprintf(stderr, PRINT_COLOR_RED "El kernel se ha desconectado" PRINT_COLOR_RESET "\n");
+			pthread_mutex_unlock(&mutexPrint);
 			log_trace(logConsola, "La desconecto el kernel");
 			close(socket_kernel);
 			socket_kernel = 0;
@@ -157,7 +172,9 @@ void escucharKernel(){
 			if(msg_recibir_data(socket_kernel, msgRecibido) > 0){
 				memcpy(&pidProg, msgRecibido->data, sizeof(t_pid));
 				log_trace(logConsola, "El pid %d no pudo terminar su ejecucion", pidProg);
+				pthread_mutex_lock(&mutexPrint);
 				fprintf(stderr, PRINT_COLOR_YELLOW "El PID %d no pudo terminar su ejecucion" PRINT_COLOR_RESET "\n", pidProg);
+				pthread_mutex_unlock(&mutexPrint);
 
 				programa = list_find(lista_programas, (void*) _esPrograma);
 				programa->horaFin = temporal_get_string_time();
@@ -170,7 +187,9 @@ void escucharKernel(){
 			if(msg_recibir_data(socket_kernel, msgRecibido) > 0){
 				char* texto = malloc(msgRecibido->longitud);
 				memcpy(texto, msgRecibido->data, msgRecibido->longitud);
+				pthread_mutex_lock(&mutexPrint);
 				fprintf(stderr, "%s\n", texto);
+				pthread_mutex_unlock(&mutexPrint);
 				programa = list_find(lista_programas, (void*) _esPrograma);
 				if(programa != NULL)
 					programa->cantImpresionesPantalla++;
@@ -247,11 +266,14 @@ char* _contarTiempo(char* tiempo1, char* tiempo2){
 void finalizarPrograma(t_programa* prog, bool flag_print){
 
 	if(flag_print){
-		fprintf(stderr, "● PID %d \n",  prog->pid);
-		fprintf(stderr, "  ● Fecha y hora de inicio %s \n",  prog->horaInicio);
-		fprintf(stderr, "  ● Fecha y hora de fin %s \n",  prog->horaFin);
-		fprintf(stderr, "  ● Impresiones por pantalla %d \n",  prog->cantImpresionesPantalla);
-		fprintf(stderr, "  ● Tiempo total %s \n",  _contarTiempo(prog->horaFin, prog->horaInicio));
+
+		pthread_mutex_lock(&mutexPrint);
+		fprintf(stderr, "● " PRINT_COLOR_GREEN "PID %d" PRINT_COLOR_RESET "\n",  prog->pid);
+		fprintf(stderr, "  ● " PRINT_COLOR_GREEN "Fecha y hora de inicio " PRINT_COLOR_RESET "%s\n",  prog->horaInicio);
+		fprintf(stderr, "  ● " PRINT_COLOR_GREEN "Fecha y hora de fin " PRINT_COLOR_RESET "%s\n",  prog->horaFin);
+		fprintf(stderr, "  ● " PRINT_COLOR_GREEN "Impresiones por pantalla " PRINT_COLOR_RESET "%d\n",  prog->cantImpresionesPantalla);
+		fprintf(stderr, "  ● " PRINT_COLOR_GREEN "Tiempo total " PRINT_COLOR_RESET "%s\n",  _contarTiempo(prog->horaFin, prog->horaInicio));
+		pthread_mutex_unlock(&mutexPrint);
 	}
 
 	int _esPid(t_programa* p){

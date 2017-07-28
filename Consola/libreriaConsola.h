@@ -52,6 +52,8 @@ t_log* logConsola;
 
 bool flag_desconexion;
 
+pthread_mutex_t mutexPrint;
+
 void leerComando(char* comando);
 void escucharKernel();
 char* cargarScript(void* pathScript);

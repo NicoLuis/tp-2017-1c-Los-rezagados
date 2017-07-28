@@ -729,7 +729,8 @@ void escucharCPU(int socket_cpu) {
 					}else{
 						msg_destruir(msgDatosObtenidos);
 						log_error(logKernel, " [CPU %d | PID %d] Error al leer", socket_cpu, pcb->pid);
-						msg_enviar_separado(ERROR, sizeof(t_num), &msgDatosObtenidos->tipoMensaje, socket_cpu);
+						t_num exitcode = msgDatosObtenidos->tipoMensaje;
+						msg_enviar_separado(ERROR, sizeof(t_num), &exitcode, socket_cpu);
 					}
 				}else{
 					log_error(logKernel, " [CPU %d | PID %d] No tiene permisos de escritura", socket_cpu, pcb->pid);
@@ -813,7 +814,7 @@ void escucharCPU(int socket_cpu) {
 							msg_enviar_separado(ESCRIBIR_FD, 0, 0, socket_cpu);
 						}else{
 							log_error(logKernel, " [CPU %d | PID %d] Error al escribir", socket_cpu, pcb->pid);
-							t_num exitCode = ARCHIVO_INEXISTENTE;
+							t_num exitCode = msgRecibido2->tipoMensaje;
 							msg_enviar_separado(ERROR, sizeof(t_num), &exitCode, socket_cpu);
 						}
 						free(buffer);
@@ -861,13 +862,10 @@ void escucharCPU(int socket_cpu) {
 
 			bool seguirEjecutando = true;
 
-			t_num exitcode;
 			if(msgValidacionObtenida->tipoMensaje == VALIDAR_ARCHIVO){
 				log_trace(logKernel, "El archivo existe %s", pathArchivo);
 			}else{
-				msg_recibir_data(socket_fs, msgValidacionObtenida);
-				memcpy(&exitcode, msgValidacionObtenida->data, sizeof(t_num));
-				if(exitcode == ARCHIVO_INEXISTENTE && flags.creacion == true){
+				if(msgValidacionObtenida->tipoMensaje == ARCHIVO_INEXISTENTE && flags.creacion == true){
 
 					log_trace(logKernel, "Se crea el archivo %s", pathArchivo);
 					msg_enviar_separado(CREAR_ARCHIVO, longitudPath, pathArchivo, socket_fs);
@@ -878,12 +876,14 @@ void escucharCPU(int socket_cpu) {
 					if(msgValidacionObtenida->tipoMensaje != CREAR_ARCHIVO ){
 						log_trace(logKernel, " error al crear el arcihvo: %s", pathArchivo, socket_cpu);
 						seguirEjecutando = false;
-						//error al crear archivo exitcode =-20 matar proceso??
+						t_num exitCode = msgValidacionObtenida->tipoMensaje;
+						msg_enviar_separado(ERROR, sizeof(t_num), &exitCode, socket_cpu);
 					}else{
 						log_trace(logKernel, " se creo el archivo: %s", pathArchivo, socket_cpu);
 					}
 				}else{
 					seguirEjecutando = false;
+					t_num exitcode = msgValidacionObtenida->tipoMensaje;
 					msg_enviar_separado(ERROR, sizeof(t_num), &exitcode, socket_cpu);
 				}
 			}
@@ -987,7 +987,8 @@ void escucharCPU(int socket_cpu) {
 						msg_enviar_separado(BORRAR,0,0,socket_cpu);
 					}else{
 						log_error(logKernel, "[CPU %d | PID %d] Error al borrar", socket_cpu, pcb->pid);
-						msg_enviar_separado(ERROR,0,0,socket_cpu);
+						t_num exitcode = msgValidacionObtenida->tipoMensaje;
+						msg_enviar_separado(ERROR, sizeof(t_num), &exitcode, socket_cpu);
 					}
 					msg_destruir(msgRecibidoBorrar);
 					
@@ -1492,6 +1493,7 @@ void consolaKernel(){
 					PRINT_COLOR_BLUE "  ○ " PRINT_COLOR_CYAN "-12 " PRINT_COLOR_RESET "StackOverflow\n"
 					PRINT_COLOR_BLUE "  ○ " PRINT_COLOR_CYAN "-13 " PRINT_COLOR_RESET "Se intento acceder a un semaforo inexistente\n"
 					PRINT_COLOR_BLUE "  ○ " PRINT_COLOR_CYAN "-14 " PRINT_COLOR_RESET "Se intento acceder a una variable compartida inexistente\n"
+					PRINT_COLOR_BLUE "  ○ " PRINT_COLOR_CYAN "-15 " PRINT_COLOR_RESET "No hay bloques libres en el FileSystem\n"
 					PRINT_COLOR_BLUE "  ○ " PRINT_COLOR_CYAN "-20 " PRINT_COLOR_RESET "Error sin definición\n");
 
 		}else if(string_equals_ignore_case(comando, "help")){

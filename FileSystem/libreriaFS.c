@@ -47,7 +47,7 @@ void escucharKERNEL(void* socket_kernel) {
 
 
 		case VALIDAR_ARCHIVO:
-			log_info(logFS, "Validar archivo");
+			log_info(logFS, "            OPERACION Validar archivo");
 			path = malloc(msgRecibido->longitud+1);
 			memcpy(path, msgRecibido->data, msgRecibido->longitud);
 			path[msgRecibido->longitud] = '\0';
@@ -61,8 +61,7 @@ void escucharKERNEL(void* socket_kernel) {
 				msg_enviar_separado(VALIDAR_ARCHIVO, 0, 0, socketKernel);
 			}else{
 				log_info(logFS, "El archivo no existe");
-				t_num exitcode = ARCHIVO_INEXISTENTE;
-				msg_enviar_separado(ERROR, sizeof(t_num), &exitcode, socketKernel);
+				msg_enviar_separado(ARCHIVO_INEXISTENTE, 0, 0, socketKernel);
 			}
 
 			free(path);
@@ -70,7 +69,7 @@ void escucharKERNEL(void* socket_kernel) {
 
 
 		case CREAR_ARCHIVO:
-			log_info(logFS, "Crear archivo");
+			log_info(logFS, "            OPERACION Crear archivo");
 
 			path = malloc(msgRecibido->longitud+1);
 			memcpy(path, msgRecibido->data, msgRecibido->longitud);
@@ -79,8 +78,8 @@ void escucharKERNEL(void* socket_kernel) {
 
 			crearArchivo(path);
 
-			if(tipoError < 0)
-				msg_enviar_separado(ERROR, 0, 0, socketKernel);
+			if(tipoError != 0)
+				msg_enviar_separado(tipoError, 0, 0, socketKernel);
 			else
 				msg_enviar_separado(CREAR_ARCHIVO, 0, 0, socketKernel);
 			free(path);
@@ -88,7 +87,7 @@ void escucharKERNEL(void* socket_kernel) {
 
 
 		case BORRAR:
-			log_info(logFS, "Borrar archivo");
+			log_info(logFS, "            OPERACION Borrar archivo");
 
 			path = malloc(msgRecibido->longitud+1);
 			memcpy(path, msgRecibido->data, msgRecibido->longitud);
@@ -97,8 +96,8 @@ void escucharKERNEL(void* socket_kernel) {
 
 			borrarArchivo(path);
 
-			if(tipoError < 0)
-				msg_enviar_separado(ERROR, 0, 0, socketKernel);
+			if(tipoError != 0)
+				msg_enviar_separado(tipoError, 0, 0, socketKernel);
 			else
 				msg_enviar_separado(BORRAR, 0, 0, socketKernel);
 			free(path);
@@ -106,7 +105,7 @@ void escucharKERNEL(void* socket_kernel) {
 
 
 		case OBTENER_DATOS:
-			log_info(logFS, "Obtener datos archivo");
+			log_info(logFS, "            OPERACION Obtener datos archivo");
 
 			memcpy(&sizePath, msgRecibido->data + tmpoffset, tmpsize = sizeof(t_num));
 			tmpoffset += tmpsize;
@@ -122,9 +121,9 @@ void escucharKERNEL(void* socket_kernel) {
 
 			char* data = leerBloquesArchivo(path, offset, size);
 
-			if(tipoError < 0)
-				msg_enviar_separado(ERROR, 0, 0, socketKernel);
-			else
+			if(tipoError != 0){
+				msg_enviar_separado(tipoError, 0, 0, socketKernel);
+			}else
 				msg_enviar_separado(OBTENER_DATOS, size, data, socketKernel);
 			free(data);
 			free(path);
@@ -132,7 +131,7 @@ void escucharKERNEL(void* socket_kernel) {
 
 
 		case GUARDAR_DATOS:
-			log_info(logFS, "Guardar datos archivo");
+			log_info(logFS, "            OPERACION Guardar datos archivo");
 
 			tmpoffset = 0;
 			memcpy(&sizePath, msgRecibido->data + tmpoffset, tmpsize = sizeof(t_num));
@@ -147,12 +146,12 @@ void escucharKERNEL(void* socket_kernel) {
 			tmpoffset += tmpsize;
 			buffer = malloc(size);
 			memcpy(buffer, msgRecibido->data + tmpoffset, size);
-			log_info(logFS, "Path: %s - offset: %d - size %d \n buffer %s", path, offset, size, buffer);
+			log_info(logFS, "Path: %s - offset: %d - size %d", path, offset, size);
 
 			escribirBloquesArchivo(path, offset, size, buffer);
 
-			if(tipoError < 0)
-				msg_enviar_separado(ERROR, 0, 0, socketKernel);
+			if(tipoError != 0)
+				msg_enviar_separado(tipoError, 0, 0, socketKernel);
 			else
 				msg_enviar_separado(GUARDAR_DATOS, 0, 0, socketKernel);
 			free(data);
@@ -196,7 +195,7 @@ void leerMetadataArchivo(){
 	t_config* metadata = config_create(rutaMetadata);
 	if(metadata == NULL){
 		log_error(logFS, "No se encuentra metadata");
-		fprintf(stderr, "No se encuentra metadata\n");
+		fprintf(stderr, PRINT_COLOR_RED "No se encuentra metadata" PRINT_COLOR_RESET "\n");
 		finalizarFS();
 	}
 	tamanioBloques = config_get_int_value(metadata, "TAMANIO_BLOQUES");
@@ -204,7 +203,7 @@ void leerMetadataArchivo(){
 
 	if(!string_equals_ignore_case( config_get_string_value(metadata, "MAGIC_NUMBER") , "SADICA")){
 		log_error(logFS, "No es un FS SADICA");
-		fprintf(stderr, "No es un FS SADICA\n");
+		fprintf(stderr, PRINT_COLOR_RED "No es un FS SADICA" PRINT_COLOR_RESET "\n");
 		finalizarFS();
 	}
 	config_destroy(metadata);
@@ -234,7 +233,7 @@ void leerBitMap(){
 		perror("Fallo el mmap del bitmap");
 		finalizarFS();
 	}
-	bitMap = bitarray_create_with_mode(data, sbuf.st_size, MSB_FIRST);
+	bitMap = bitarray_create_with_mode(data, cantidadBloques, MSB_FIRST);
 
 	close(fd);
 }
@@ -248,14 +247,15 @@ void crearArchivo(void* path){
 	log_info(logFS, "Crear %s", rutaMetadata);
 
 	for(i = 0; i < bitMap->size && nroBloque == -1; i++){
-		if(!bitarray_test_bit(bitMap, i)){
+		if(bitarray_test_bit(bitMap, i) == 0){
 			bitarray_set_bit(bitMap, i);
 			nroBloque = i;
 		}
 	}
 	if(nroBloque == -1){
 		log_warning(logFS, "No hay bloques libres");
-		tipoError = -1;
+		fprintf(stderr, PRINT_COLOR_YELLOW "No hay bloques libres" PRINT_COLOR_RESET "\n");
+		tipoError = NO_HAY_BLOQUES_LIBRES;
 	}
 
 	char* data = string_from_format("TAMANIO=0 \nBLOQUES=[%d]", nroBloque);
@@ -285,7 +285,7 @@ void borrarArchivo(void* path){
 	t_config* metadata = config_create(rutaMetadata);
 	if(metadata == NULL){
 		log_error(logFS, "No se encuentra metadata");
-		fprintf(stderr, "No se encuentra archivo %s\n", rutaMetadata);
+		fprintf(stderr, PRINT_COLOR_YELLOW "No se encuentra archivo " PRINT_COLOR_RESET "%s\n", rutaMetadata);
 		free(rutaMetadata);
 		free(metadata);
 		tipoError = ARCHIVO_INEXISTENTE;
@@ -318,7 +318,7 @@ char* leerBloquesArchivo(void* path, int offset, int size){
 	t_config* metadata = config_create(rutaMetadata);
 	if(metadata == NULL){
 		log_error(logFS, "No se encuentra metadata");
-		fprintf(stderr, "No se encuentra archivo %s\n", rutaMetadata);
+		fprintf(stderr, PRINT_COLOR_YELLOW "No se encuentra archivo " PRINT_COLOR_RESET "%s\n", rutaMetadata);
 		free(rutaMetadata);
 		free(metadata);
 		tipoError = ARCHIVO_INEXISTENTE;
@@ -351,8 +351,32 @@ char* leerBloquesArchivo(void* path, int offset, int size){
 	return data;
 }
 
+
+int _hayLibres(int cantidadNecesaria){
+	int cant = 0, i;
+	for(i = 0; i < bitMap->size; i++)
+		if(!bitarray_test_bit(bitMap, i)){
+			cant++;
+			if(cant >= cantidadNecesaria)
+				return 1;
+		}
+	return 0;
+}
+
+char* _construirStringBloques(char** bloques){
+	int j;
+	char* stringBloques = string_new();
+	for(j = 0; bloques[j] != NULL; j++){
+		string_append(&stringBloques, bloques[j]);
+		string_append(&stringBloques, ",");
+	}
+	stringBloques = string_substring_until(stringBloques, string_length(stringBloques)-1);
+		// para eliminar la ultima coma
+	return stringBloques;
+}
+
 void escribirBloquesArchivo(void* path, int offset, int size, char* buffer){
-	char *tmpdata, *pathBloque;
+	char *tmpdata, *pathBloque = string_new();
 	int i, tmpoffset = 0;
 	char* rutaMetadata = string_new();
 	string_append(&rutaMetadata, puntoMontaje);
@@ -363,7 +387,7 @@ void escribirBloquesArchivo(void* path, int offset, int size, char* buffer){
 	t_config* metadata = config_create(rutaMetadata);
 	if(metadata == NULL){
 		log_error(logFS, "No se encuentra metadata");
-		fprintf(stderr, "No se encuentra archivo %s\n", rutaMetadata);
+		fprintf(stderr, PRINT_COLOR_YELLOW "No se encuentra archivo " PRINT_COLOR_RESET "%s\n", rutaMetadata);
 		free(rutaMetadata);
 		free(metadata);
 		tipoError = ARCHIVO_INEXISTENTE;
@@ -372,14 +396,71 @@ void escribirBloquesArchivo(void* path, int offset, int size, char* buffer){
 	int tamanio = config_get_int_value(metadata, "TAMANIO");
 	char** bloques = config_get_array_value(metadata, "BLOQUES");
 
+	if(size + offset > tamanio){
+		int j;
+		char* stringBloques = _construirStringBloques(bloques);
+
+		int cantidadBloquesAsignados = tamanio / tamanioBloques;
+		if(tamanio > cantidadBloquesAsignados * tamanioBloques || tamanio == 0) cantidadBloquesAsignados++;
+		tamanio = size + offset;
+		int cantidadBloquesNuevos = tamanio / tamanioBloques;
+		if(tamanio > cantidadBloquesNuevos * tamanioBloques) cantidadBloquesNuevos++;
+		cantidadBloquesNuevos = cantidadBloquesNuevos - cantidadBloquesAsignados;
+
+		log_trace(logFS, "Asigno %d bloque/s nuevo/s", cantidadBloquesNuevos);
+
+		if(_hayLibres(cantidadBloquesNuevos)){
+			for (j = 0; j < cantidadBloquesNuevos; j++){
+				int nroBloque = -1;
+				for(i = 0; i < bitMap->size && nroBloque == -1; i++){
+					if(bitarray_test_bit(bitMap, i) == 0){
+						bitarray_set_bit(bitMap, i);
+						nroBloque = i;
+						string_append(&stringBloques, ",");
+						string_append_with_format(&stringBloques, "%d", nroBloque);
+					}
+				}
+			}
+			char* data = string_from_format("TAMANIO=%d \nBLOQUES=[%s]", tamanio, stringBloques);
+			log_trace(logFS, "Escribo en metadata \n%s", data);
+
+			config_destroy(metadata);
+			int fd = open(rutaMetadata, O_RDWR);
+			if(fd < 0){
+				log_error(logFS, "Error al actualizar metadata");
+				tipoError = SIN_DEFINICION;
+			}
+			write(fd, data, string_length(data));
+			close(fd);
+
+			t_config* metadata = config_create(rutaMetadata);
+			if(metadata == NULL){
+				log_error(logFS, "No se encuentra metadata");
+				fprintf(stderr, PRINT_COLOR_YELLOW "No se encuentra archivo " PRINT_COLOR_RESET "%s\n", rutaMetadata);
+				free(rutaMetadata);
+				free(metadata);
+				tipoError = ARCHIVO_INEXISTENTE;
+				return;
+			}
+			tamanio = config_get_int_value(metadata, "TAMANIO");
+			bloques = config_get_array_value(metadata, "BLOQUES");
+		}
+		else{
+			log_warning(logFS, "No hay suficientes bloques libres");
+			fprintf(stderr, PRINT_COLOR_YELLOW "No hay suficientes bloques libres" PRINT_COLOR_RESET "\n");
+			tipoError = NO_HAY_BLOQUES_LIBRES;
+			offset = 1;
+			tamanio = 0;
+		}
+	}
+
+
 	for(i = offset; i < tamanio; i += tamanioBloques, tmpoffset += tamanioBloques){
 		pathBloque = string_new();
 		string_append(&pathBloque, puntoMontaje);
 		string_append_with_format(&pathBloque, "/Bloques/%s.bin", bloques[i / tamanioBloques]);
-		log_info(logFS, "Leo bloque %s", bloques[i / tamanioBloques]);
+		log_info(logFS, "Escribo bloque %s", bloques[i / tamanioBloques]);
 		tmpdata = leerArchivo(pathBloque);
-		log_info(logFS, "Lei bloque %s", bloques[i / tamanioBloques]);
-		log_info(logFS, "contenido bloque \n %s", tmpdata);
 
 		if(tmpdata == NULL)
 			return;
@@ -414,7 +495,6 @@ char* leerArchivo(void* path){
 		tipoError = SIN_DEFINICION;
 		return NULL;
 	}
-		log_info(logFS, "size bloque %d", sbuf.st_size);
 	
 	if(sbuf.st_size < tamanioBloques){
 		close(fd);
@@ -431,10 +511,7 @@ char* leerArchivo(void* path){
 			tipoError = SIN_DEFINICION;
 			return NULL;
 		}
-		
-		log_info(logFS, "size bloque truncado %d", sbuf.st_size);
 	}
-	
 	
 	data = mmap((caddr_t)0, tamanioBloques, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
 	if (data == MAP_FAILED) {

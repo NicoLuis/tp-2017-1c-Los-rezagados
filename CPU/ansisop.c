@@ -372,6 +372,10 @@ void borrar(t_descriptor_archivo direccion){
 	else{
 		log_error(logAnsisop, "Error al borrar");
 		flag_error = 1;
+		if(msgRecibido->tipoMensaje == ERROR){
+			msg_recibir_data(socket_kernel, msgRecibido);
+			memcpy(&pcb->exitCode, msgRecibido->data, sizeof(t_num));
+		}
 	}
 
 	msg_destruir(msgRecibido);

@@ -50,6 +50,7 @@
 #define ERROR_STACKOVERFLOW 12
 #define SEMAFORO_INEXISTENTE 13
 #define VARIABLE_COMPARTIDA_INEXISTENTE 14
+#define NO_HAY_BLOQUES_LIBRES 15
 #define SIN_DEFINICION 20
 
 //////////////////////// CAPA FS ////////////////////////////

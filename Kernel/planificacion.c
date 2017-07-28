@@ -26,10 +26,13 @@ void planificar(){
 		_unlockLista_cpus();
 		cpuUsada = list_find(lista_cpus, (void*) _cpuLibre);
 		_unlockLista_cpus();
-		} while(cpuUsada == NULL);
-		log_trace(logKernel, "	");
-		log_trace(logKernel, " [CPU %d] CPU Libre", cpuUsada->socket);
 		sem_wait(&sem_cantColaReady);
+		if(cpuUsada != NULL){
+			log_trace(logKernel, "	");
+			log_trace(logKernel, " [CPU %d] CPU Libre", cpuUsada->socket);
+		}else
+			sem_post(&sem_cantColaReady);
+		} while(cpuUsada == NULL);
 		t_pid pidPCB = _sacarDeCola(0, cola_Ready, mutex_Ready);
 		log_warning(logKernel, " 								[PID %d] SACO READY", pidPCB);
 
@@ -60,9 +63,11 @@ void planificar(){
 
 				uint32_t size = tamanioTotalPCB(pcb);
 				void* pcbSerializado = serializarPCB(pcb);
-				if( msg_enviar_separado(ENVIO_PCB, size, pcbSerializado, cpuUsada->socket) < 0 )
-					log_trace(logKernel, "No se envio un joraca");
-
+				if( msg_enviar_separado(ENVIO_PCB, size, pcbSerializado, cpuUsada->socket) < 0 ){
+					log_trace(logKernel, "[CPU %d | PID %d] No se envio a CPU", cpuUsada->socket, pidPCB);
+					_ponerEnCola(pidPCB, cola_Ready, mutex_Ready);
+					sem_post(&sem_cantColaReady);
+				}
 
 				//log_trace(logKernel, "Planifico proceso %d en cpu %d", pcb->pid, cpuUsada->socket);
 

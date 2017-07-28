@@ -42,6 +42,7 @@ void inicializarSemaforosYVariables(char** ids, char** valores, char** shared_va
 		semaforo->nombre = ids[i];
 		semaforo->valorSemaforo = atoi(valores[i]);
 		semaforo->colaBloqueados = queue_create();
+		pthread_mutex_init(&(semaforo->mutex_colaBloqueados), NULL);
 		list_add(lista_variablesSemaforo, semaforo);
 	}
 

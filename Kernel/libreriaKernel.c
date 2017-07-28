@@ -337,10 +337,6 @@ void escucharCPU(int socket_cpu) {
 
 			if(flag_finalizado)
 				setearExitCode(pcbRecibido->pid, exitcode);
-			/*else{
-				_ponerEnCola(pcbRecibido->pid, cola_Ready, mutex_Ready);
-				sem_post(&sem_cantColaReady);
-			}*/
 			liberarCPU(cpuUsada);
 			_ponerEnCola(pcbRecibido->pid, cola_Ready, mutex_Ready);
 			sem_post(&sem_cantColaReady);
@@ -416,8 +412,10 @@ void escucharCPU(int socket_cpu) {
 			msg_enviar_separado(ERROR, sizeof(t_pid), &pcbRecibido2->pid, info->socket);
 			sem_post(&sem_gradoMp);
 			liberarCPU(cpuUsada);
-			_ponerEnCola(pid, cola_Ready, mutex_Ready);
-			sem_post(&sem_cantColaReady);
+			if(!_estaEnCola(pcbRecibido2->pid, cola_Ready, mutex_Ready)){
+				_ponerEnCola(pcbRecibido2->pid, cola_Ready, mutex_Ready);
+				sem_post(&sem_cantColaReady);
+			}
 			break;
 
 

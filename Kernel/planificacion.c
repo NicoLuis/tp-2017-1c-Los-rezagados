@@ -31,6 +31,7 @@ void planificar(){
 		log_trace(logKernel, " [CPU %d] CPU Libre", cpuUsada->socket);
 		sem_wait(&sem_cantColaReady);
 		t_pid pidPCB = _sacarDeCola(0, cola_Ready, mutex_Ready);
+		log_warning(logKernel, " 								[PID %d] SACO READY", pidPCB);
 
 		_lockLista_PCBs();
 		int _es_PCB(t_PCB* p){

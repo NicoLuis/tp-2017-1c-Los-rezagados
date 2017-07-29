@@ -1,2 +1,0 @@
-PUERTO=4444
-PUNTO_MONTAJE=/home/utnso/workspace/ansisop-parser/programas-ejemplo/evaluacion-final-esther/FS-ejemplo/SADICA_FS

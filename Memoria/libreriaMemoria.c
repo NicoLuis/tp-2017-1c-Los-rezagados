@@ -1443,6 +1443,7 @@ void dumpCache(){
 		i++;
 	}
 	list_iterate(Cache, (void*) _dump);
+	fclose(archivoDump);
 }
 
 
@@ -1499,7 +1500,7 @@ void dumpTablaPaginas(){
 	fprintf(stderr, PRINT_COLOR_CYAN "\nProcesos activos: " PRINT_COLOR_RESET "%s\n", procActivos);
 	fprintf(archivoDump, "\nProcesos activos: %s\n", procActivos);
 
-
+	fclose(archivoDump);
 }
 
 

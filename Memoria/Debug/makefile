@@ -25,7 +25,7 @@ endif
 all: Memoria
 
 dependents:
-	-cd /home/utnso/workspace/tp-2017-1c-Los-rezagados/Herramientas/Debug && $(MAKE) clean all
+	-cd /home/utnso/workspace/tp-2017-1c-Los-rezagados/Herramientas/Debug && $(MAKE) all
 
 # Tool invocations
 Memoria: $(OBJS) $(USER_OBJS) /home/utnso/workspace/tp-2017-1c-Los-rezagados/Herramientas/Debug/libHerramientas.so
